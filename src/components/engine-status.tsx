@@ -1,9 +1,8 @@
-import { useRouter } from "@tanstack/react-router";
 import { CircleAlert, CirclePause, CirclePlay } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { pauseRunner } from "@/server/functions/tasks.ts";
+import { getRunnerState, pauseRunner } from "@/server/functions/tasks.ts";
 import { cn } from "@/lib/utils";
 
 export type EngineState = {
@@ -13,22 +12,53 @@ export type EngineState = {
 };
 
 /**
+ * The engine can stop between two page loads and nothing on a page would
+ * change, so this asks rather than waiting to be told.
+ */
+function useEngineState(everyMs = 10_000) {
+  const [engine, setEngine] = useState<EngineState | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      setEngine(await getRunnerState());
+    } catch {
+      // A failed poll says nothing about the engine, only about this request.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    const timer = setInterval(() => void refresh(), everyMs);
+    return () => clearInterval(timer);
+  }, [everyMs, refresh]);
+
+  return { engine, refresh };
+}
+
+/**
  * Runs happen in the daemon, so a queued task that never moves usually means
  * the engine is not there. Saying so is the difference between a queue and a
  * thing that quietly swallows work.
+ *
+ * It lives in the sidebar because it is true of the whole app rather than of
+ * whichever page is open, and because a page is the wrong place to learn that
+ * nothing you do on it will happen.
  */
-export function EngineStatus({ engine, quiet }: { engine: EngineState; quiet?: boolean }) {
-  const router = useRouter();
+export function EngineStatus() {
+  const { engine, refresh } = useEngineState();
   const [busy, setBusy] = useState(false);
-  const healthy = engine.daemonPid !== null && !engine.paused;
 
-  if (quiet && healthy) return null;
+  // Nothing is known yet on the first paint. A dot that guesses green would be
+  // worse than no dot at all.
+  if (!engine) return null;
+
+  const down = engine.daemonPid === null;
 
   const toggle = async () => {
     setBusy(true);
     try {
       await pauseRunner({ data: { paused: !engine.paused } });
-      await router.invalidate();
+      await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -39,39 +69,54 @@ export function EngineStatus({ engine, quiet }: { engine: EngineState; quiet?: b
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-lg border px-3 py-2 text-sm",
-        healthy ? "text-muted-foreground" : "border-amber-500/40 bg-amber-500/5",
+        "flex flex-col gap-1.5 rounded-md px-2 py-1.5 text-xs",
+        // Collapsed to icons there is room for the dot and nothing else.
+        "group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0",
+        !down && !engine.paused
+          ? "text-muted-foreground"
+          : "bg-amber-500/10 text-amber-700 dark:text-amber-500",
       )}
     >
-      {engine.daemonPid === null ? (
-        <>
-          <CircleAlert className="size-4 shrink-0 text-amber-600" />
-          <span className="flex-1">
-            The engine is not running, so queued tasks will wait. Start it with{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">pnpm daemon</code>.
-          </span>
-        </>
-      ) : engine.paused ? (
-        <>
-          <CirclePause className="size-4 shrink-0 text-amber-600" />
-          <span className="flex-1">Paused. Nothing will run until you start it again.</span>
-          <Button size="sm" variant="outline" onClick={toggle} disabled={busy}>
-            <CirclePlay />
-            Resume
+      <div className="flex items-center gap-2">
+        {down ? (
+          <CircleAlert className="size-3.5 shrink-0" />
+        ) : (
+          <span
+            className={cn(
+              "size-2 shrink-0 rounded-full",
+              engine.paused ? "bg-amber-500" : "bg-emerald-500",
+            )}
+          />
+        )}
+        <span className="flex-1 truncate group-data-[collapsible=icon]:hidden">
+          {down ? "Engine not running" : engine.paused ? "Paused" : "Engine running"}
+        </span>
+        {down ? null : (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={toggle}
+            disabled={busy}
+            title={engine.paused ? "Resume" : "Pause"}
+            className="size-6 shrink-0 group-data-[collapsible=icon]:hidden"
+          >
+            {engine.paused ? <CirclePlay /> : <CirclePause />}
+            <span className="sr-only">{engine.paused ? "Resume" : "Pause"}</span>
           </Button>
-        </>
-      ) : (
-        <>
-          <span className="size-2 shrink-0 rounded-full bg-emerald-500" />
-          <span className="flex-1">
-            Engine running, {engine.maxConcurrentRuns} at a time.
-          </span>
-          <Button size="sm" variant="ghost" onClick={toggle} disabled={busy}>
-            <CirclePause />
-            Pause
-          </Button>
-        </>
-      )}
+        )}
+      </div>
+      <p className="text-[11px] leading-snug opacity-80 group-data-[collapsible=icon]:hidden">
+        {down ? (
+          <>
+            Queued tasks will wait. Start it with{" "}
+            <code className="rounded bg-muted px-1 py-0.5">pnpm daemon</code>.
+          </>
+        ) : engine.paused ? (
+          "Nothing will run until you start it again."
+        ) : (
+          `${engine.maxConcurrentRuns} run${engine.maxConcurrentRuns === 1 ? "" : "s"} at a time.`
+        )}
+      </p>
     </div>
   );
 }

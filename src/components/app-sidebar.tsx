@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Bot, Inbox, Plug, Settings, Workflow } from "lucide-react";
+import { EngineStatus } from "@/components/engine-status";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -12,6 +13,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 type NavItem = {
@@ -44,13 +46,18 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
               {item.to ? (
                 <SidebarMenuButton
                   isActive={pathname.startsWith(item.to)}
+                  tooltip={item.label}
                   render={<Link to={item.to} />}
                 >
                   <item.icon />
                   <span>{item.label}</span>
                 </SidebarMenuButton>
               ) : (
-                <SidebarMenuButton disabled className="cursor-default opacity-60">
+                <SidebarMenuButton
+                  disabled
+                  tooltip={`${item.label} (soon)`}
+                  className="cursor-default opacity-60"
+                >
                   <item.icon />
                   <span>{item.label}</span>
                   <Badge variant="outline" className="ml-auto">
@@ -68,23 +75,31 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
 
 export function AppSidebar() {
   return (
-    <Sidebar>
+    // Collapsing to icons rather than off screen, so the toggle in the header
+    // is still there to toggle back with.
+    <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Link to="/connectors" className="flex items-center gap-2 px-2 py-1.5">
-          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Workflow className="size-4" />
-          </span>
-          <span className="font-medium">Loopable</span>
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link
+            to="/connectors"
+            className="flex min-w-0 flex-1 items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:hidden"
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Workflow className="size-4" />
+            </span>
+            <span className="truncate font-medium">Loopable</span>
+          </Link>
+          <SidebarTrigger className="shrink-0" />
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <NavGroup label="Loop" items={LOOP} />
         <NavGroup label="Setup" items={SETUP} />
       </SidebarContent>
       <SidebarFooter>
-        <p className="px-2 pb-1 text-xs text-muted-foreground">
-          Runs on this machine, with your own agents and your own credentials.
-        </p>
+        {/* The engine is what makes every page true, so it is reported once
+            here rather than repeated on the pages that happen to care. */}
+        <EngineStatus />
       </SidebarFooter>
     </Sidebar>
   );

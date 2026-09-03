@@ -46,12 +46,26 @@ export const Route = createFileRoute("/agents/")({
   component: AgentsPage,
 });
 
+/**
+ * The agent that actually runs the loops first, then the rest of what is on the
+ * machine, then what could be. Manifest order only decides ties.
+ */
+function rank(view: AgentView | undefined): number {
+  if (!view) return 3;
+  if (view.isDefault) return 0;
+  return view.installed ? 1 : 2;
+}
+
 function AgentsPage() {
   const agents = Route.useLoaderData();
   const installed = agents.filter((agent) => agent.installed);
+  const ordered = AGENT_MANIFESTS.map((manifest) => ({
+    manifest,
+    view: agents.find((agent) => agent.agentId === manifest.id),
+  })).sort((a, b) => rank(a.view) - rank(b.view));
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -68,11 +82,9 @@ function AgentsPage() {
         </Alert>
       ) : null}
 
-      {AGENT_MANIFESTS.map((manifest) => {
-        const view = agents.find((agent) => agent.agentId === manifest.id);
-        if (!view) return null;
-        return <AgentCard key={manifest.id} manifest={manifest} view={view} />;
-      })}
+      {ordered.map(({ manifest, view }) =>
+        view ? <AgentCard key={manifest.id} manifest={manifest} view={view} /> : null,
+      )}
     </div>
   );
 }

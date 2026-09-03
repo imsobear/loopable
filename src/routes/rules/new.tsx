@@ -8,7 +8,7 @@ export const Route = createFileRoute("/rules/new")({
 
 function NewRulePage() {
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <Link
         to="/rules"
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

@@ -2,7 +2,6 @@ import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-rout
 import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, Play } from "lucide-react";
-import { EngineStatus } from "@/components/engine-status";
 import { RuleForm } from "@/components/rule-form";
 import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
@@ -13,26 +12,22 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { connectorManifest } from "@/connectors/manifests.ts";
 import { getRuleById } from "@/server/functions/rules.ts";
-import { getRunnerState, getRuleTasks, runRuleNow } from "@/server/functions/tasks.ts";
+import { getRuleTasks, runRuleNow } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/rules/$ruleId")({
   loader: async ({ params }) => {
     const rule = await getRuleById({ data: { id: params.ruleId } });
     if (!rule) throw notFound();
-    return {
-      rule,
-      tasks: await getRuleTasks({ data: { ruleId: params.ruleId } }),
-      engine: await getRunnerState(),
-    };
+    return { rule, tasks: await getRuleTasks({ data: { ruleId: params.ruleId } }) };
   },
   component: RulePage,
 });
 
 function RulePage() {
-  const { rule, tasks, engine } = Route.useLoaderData();
+  const { rule, tasks } = Route.useLoaderData();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <Link
         to="/rules"
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -42,24 +37,21 @@ function RulePage() {
       </Link>
       <h1 className="text-2xl font-semibold tracking-tight">{rule.name}</h1>
 
-      <Tabs defaultValue="tasks">
+      {/* Opening a rule is nearly always about changing it; its runs are in the
+          inbox too. */}
+      <Tabs defaultValue="settings">
         <TabsList>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="tasks" className="flex flex-col gap-4 pt-2">
-          <RunBox rule={rule} />
-          <EngineStatus engine={engine} quiet />
-          <TaskList
-            tasks={tasks}
-            showRule={false}
-            empty="This rule has not run yet."
-          />
-        </TabsContent>
 
         <TabsContent value="settings" className="pt-2">
           <RuleForm rule={rule} />
+        </TabsContent>
+
+        <TabsContent value="tasks" className="flex flex-col gap-4 pt-2">
+          <RunBox rule={rule} />
+          <TaskList tasks={tasks} showRule={false} empty="This rule has not run yet." />
         </TabsContent>
       </Tabs>
     </div>

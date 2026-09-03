@@ -40,7 +40,7 @@ function ConnectorDetailPage() {
     manifest.allowsMultipleAccounts || state.connections.length === 0;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <Link
         to="/connectors"
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
