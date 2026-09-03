@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq, sql } from "drizzle-orm";
-import { agentManifest } from "@/agents/manifests.ts";
-import { connectorManifest } from "@/connectors/manifests.ts";
-import type { SettingField } from "@/connectors/types.ts";
-import type { ConnectionSettings, JsonValue, RuleReadiness, RuleView } from "@/lib/domain.ts";
+import { agentManifest } from "#/agents/manifests.ts";
+import { connectorManifest } from "#/connectors/manifests.ts";
+import type { SettingField } from "#/connectors/types.ts";
+import type { ConnectionSettings, JsonValue, RuleReadiness, RuleView } from "#/lib/domain.ts";
 import { listAgents } from "./agents.ts";
 import { db } from "./db/client.ts";
 import { connections, rules, type Rule } from "./db/schema.ts";

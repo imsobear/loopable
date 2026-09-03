@@ -11,7 +11,7 @@
  * Adding a connector must not require touching any page.
  */
 
-import type { JsonValue } from "@/lib/domain.ts";
+import type { JsonValue } from "#/lib/domain.ts";
 
 export type ConnectorId = string;
 

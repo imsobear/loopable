@@ -2,10 +2,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { AGENT_MANIFESTS, agentManifest } from "@/agents/manifests.ts";
-import { agentRuntime } from "@/agents/runtimes.ts";
-import type { AgentRunResult, AgentSettingsValues } from "@/agents/types.ts";
-import type { AgentView } from "@/lib/domain.ts";
+import { AGENT_MANIFESTS, agentManifest } from "#/agents/manifests.ts";
+import { agentRuntime } from "#/agents/runtimes.ts";
+import type { AgentRunResult, AgentSettingsValues } from "#/agents/types.ts";
+import type { AgentView } from "#/lib/domain.ts";
 import { db } from "./db/client.ts";
 import { agentSettings, appSettings } from "./db/schema.ts";
 

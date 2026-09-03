@@ -1,13 +1,13 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { PermissionMode } from "@/agents/types.ts";
+import type { PermissionMode } from "#/agents/types.ts";
 import type {
   ConnectionSettings,
   ConnectionStatus,
   JsonValue,
   TaskSourceKind,
   TaskState,
-} from "@/lib/domain.ts";
+} from "#/lib/domain.ts";
 
 /**
  * One row per connected account, so a connector can be connected several times

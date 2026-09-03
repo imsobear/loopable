@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { PermissionMode } from "@/agents/types.ts";
-import type { AgentView } from "@/lib/domain.ts";
+import type { PermissionMode } from "#/agents/types.ts";
+import type { AgentView } from "#/lib/domain.ts";
 import { listAgents, saveAgentSettings, setDefaultAgent, testAgent } from "../agents.ts";
 
 export const getAgents = createServerFn({ method: "GET" }).handler(

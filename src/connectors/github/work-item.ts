@@ -1,18 +1,33 @@
 import type { WorkItem } from "../types.ts";
 import { getIssue, getPull, listPullFiles, type PullFile } from "./api.ts";
 
-/** Accepts what a person actually copies out of the address bar. */
+const HOSTS = new Set(["github.com", "www.github.com"]);
+
+/**
+ * Accepts what a person actually copies out of the address bar, and checks the
+ * host properly: matching "github.com" anywhere in the text would accept
+ * https://notgithub.com/acme/web/pull/1 and then go and fetch acme/web from
+ * the real GitHub.
+ */
 export function parseGithubUrl(
   input: string,
 ): { repo: string; kind: "pull_request" | "issue"; number: number } | null {
-  const match = input
-    .trim()
-    .match(/github\.com\/([^/\s]+)\/([^/\s]+)\/(pull|issues)\/(\d+)/i);
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+  } catch {
+    return null;
+  }
+  if (!HOSTS.has(url.hostname.toLowerCase())) return null;
+
+  const match = url.pathname.match(/^\/([^/]+)\/([^/]+)\/(pull|issues)\/(\d+)/);
   if (!match) return null;
   const [, owner, name, kind, number] = match;
   return {
     repo: `${owner}/${name}`,
-    kind: kind.toLowerCase() === "pull" ? "pull_request" : "issue",
+    kind: kind === "pull" ? "pull_request" : "issue",
     number: Number(number),
   };
 }

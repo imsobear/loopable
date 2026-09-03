@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { CONNECTOR_MANIFESTS } from "@/connectors/manifests.ts";
-import { connectorRuntime } from "@/connectors/runtimes.ts";
-import type { Readiness } from "@/connectors/types.ts";
-import type { ConnectionSettings, ConnectionView } from "@/lib/domain.ts";
+import { CONNECTOR_MANIFESTS } from "#/connectors/manifests.ts";
+import { connectorRuntime } from "#/connectors/runtimes.ts";
+import type { Readiness } from "#/connectors/types.ts";
+import type { ConnectionSettings, ConnectionView } from "#/lib/domain.ts";
 import {
   checkConnection,
   listConnections,

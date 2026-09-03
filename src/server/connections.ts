@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, lt } from "drizzle-orm";
-import type { AuthResult, ConnectorAccount, ConnectorId } from "@/connectors/types.ts";
-import { connectorRuntime } from "@/connectors/runtimes.ts";
+import type { AuthResult, ConnectorAccount, ConnectorId } from "#/connectors/types.ts";
+import { connectorRuntime } from "#/connectors/runtimes.ts";
 import { db } from "./db/client.ts";
 import { authAttempts, connections, type Connection } from "./db/schema.ts";
 import { deleteCredential, readCredential, writeCredential } from "./secrets.ts";
-import type { ConnectionSettings, ConnectionView } from "@/lib/domain.ts";
+import type { ConnectionSettings, ConnectionView } from "#/lib/domain.ts";
 
 const ATTEMPT_TTL_MS = 10 * 60 * 1000;
 
