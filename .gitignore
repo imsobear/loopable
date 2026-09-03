@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.loopable/
+data/
+.DS_Store
+.env
+config/oauth-app.json
