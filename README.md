@@ -65,6 +65,18 @@ PKCE is what actually protects a login: an intercepted authorization code cannot
 
 What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's machine. Anyone who wants their own registration, or who is on GitHub Enterprise, can set the environment variables above instead.
 
+## Rules
+
+A rule says: when this service reports this signal, ask an agent to do this, and offer to write the result back through this action. One prepared result, one approval, one write.
+
+The first rule that matches an event is the one that runs, so rules are ordered and the order is editable. Everything else about a rule is a single choice: a name, the trigger event, an instruction for the agent, which agent runs it (the default unless one is pinned), and which action it may propose. Timeouts and models are deliberately absent, because those belong to the agent and would only drift if restated here.
+
+Conditions are the interesting part. "Repositories" and "drafts" are GitHub's words, so they are not columns: each event in a manifest declares the conditions a rule can narrow it by, using the same field type as connection settings, and the rule stores whatever those fields produce as JSON. The rules table therefore knows nothing about GitHub, and the rule form renders conditions it has never seen. Switching a rule to a different event drops conditions that event does not declare, and a stored condition a connector no longer offers is discarded rather than left filtering invisibly.
+
+Connectors may also suggest rules through `ruleTemplates`. Templates are offered on the page and create an ordinary rule when chosen; nothing is ever seeded on a person's behalf.
+
+Rules can be written before anything is connected or installed. The page says what is still missing instead of refusing to save.
+
 ## Agents
 
 An agent is a coding agent CLI already installed on the machine. Agents live under `src/agents/` and follow the same manifest and runtime split as connectors, but they are discovered rather than connected: every page load looks for the binary, reads its version, and asks the tool whether it is signed in. Installing or removing a CLI shows up without any setup step.

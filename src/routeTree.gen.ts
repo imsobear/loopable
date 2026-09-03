@@ -13,6 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as ConnectorsIndexRouteImport } from './routes/connectors/index'
 import { Route as ConnectorsConnectorIdRouteImport } from './routes/connectors/$connectorId'
+import { Route as RulesIndexRouteImport } from './routes/rules/index'
+import { Route as RulesRuleIdRouteImport } from './routes/rules/$ruleId'
+import { Route as RulesNewRouteImport } from './routes/rules/new'
 import { Route as ApiConnectorsConnectorIdAuthorizeRouteImport } from './routes/api/connectors/$connectorId/authorize'
 import { Route as ApiConnectorsConnectorIdCallbackRouteImport } from './routes/api/connectors/$connectorId/callback'
 
@@ -36,6 +39,21 @@ const ConnectorsConnectorIdRoute = ConnectorsConnectorIdRouteImport.update({
   path: '/connectors/$connectorId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RulesIndexRoute = RulesIndexRouteImport.update({
+  id: '/rules/',
+  path: '/rules/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RulesRuleIdRoute = RulesRuleIdRouteImport.update({
+  id: '/rules/$ruleId',
+  path: '/rules/$ruleId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RulesNewRoute = RulesNewRouteImport.update({
+  id: '/rules/new',
+  path: '/rules/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiConnectorsConnectorIdAuthorizeRoute =
   ApiConnectorsConnectorIdAuthorizeRouteImport.update({
     id: '/api/connectors/$connectorId/authorize',
@@ -52,16 +70,22 @@ const ApiConnectorsConnectorIdCallbackRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/rules/$ruleId': typeof RulesRuleIdRoute
+  '/rules/new': typeof RulesNewRoute
   '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
+  '/rules/': typeof RulesIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/rules/$ruleId': typeof RulesRuleIdRoute
+  '/rules/new': typeof RulesNewRoute
   '/agents': typeof AgentsIndexRoute
   '/connectors': typeof ConnectorsIndexRoute
+  '/rules': typeof RulesIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
 }
@@ -69,8 +93,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/rules/$ruleId': typeof RulesRuleIdRoute
+  '/rules/new': typeof RulesNewRoute
   '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
+  '/rules/': typeof RulesIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
 }
@@ -79,24 +106,33 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connectors/$connectorId'
+    | '/rules/$ruleId'
+    | '/rules/new'
     | '/agents/'
     | '/connectors/'
+    | '/rules/'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/connectors/$connectorId'
+    | '/rules/$ruleId'
+    | '/rules/new'
     | '/agents'
     | '/connectors'
+    | '/rules'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
   id:
     | '__root__'
     | '/'
     | '/connectors/$connectorId'
+    | '/rules/$ruleId'
+    | '/rules/new'
     | '/agents/'
     | '/connectors/'
+    | '/rules/'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
   fileRoutesById: FileRoutesById
@@ -104,8 +140,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectorsConnectorIdRoute: typeof ConnectorsConnectorIdRoute
+  RulesRuleIdRoute: typeof RulesRuleIdRoute
+  RulesNewRoute: typeof RulesNewRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   ConnectorsIndexRoute: typeof ConnectorsIndexRoute
+  RulesIndexRoute: typeof RulesIndexRoute
   ApiConnectorsConnectorIdAuthorizeRoute: typeof ApiConnectorsConnectorIdAuthorizeRoute
   ApiConnectorsConnectorIdCallbackRoute: typeof ApiConnectorsConnectorIdCallbackRoute
 }
@@ -140,6 +179,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectorsConnectorIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rules/': {
+      id: '/rules/'
+      path: '/rules'
+      fullPath: '/rules/'
+      preLoaderRoute: typeof RulesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rules/$ruleId': {
+      id: '/rules/$ruleId'
+      path: '/rules/$ruleId'
+      fullPath: '/rules/$ruleId'
+      preLoaderRoute: typeof RulesRuleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rules/new': {
+      id: '/rules/new'
+      path: '/rules/new'
+      fullPath: '/rules/new'
+      preLoaderRoute: typeof RulesNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/connectors/$connectorId/authorize': {
       id: '/api/connectors/$connectorId/authorize'
       path: '/api/connectors/$connectorId/authorize'
@@ -160,8 +220,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectorsConnectorIdRoute: ConnectorsConnectorIdRoute,
+  RulesRuleIdRoute: RulesRuleIdRoute,
+  RulesNewRoute: RulesNewRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   ConnectorsIndexRoute: ConnectorsIndexRoute,
+  RulesIndexRoute: RulesIndexRoute,
   ApiConnectorsConnectorIdAuthorizeRoute:
     ApiConnectorsConnectorIdAuthorizeRoute,
   ApiConnectorsConnectorIdCallbackRoute: ApiConnectorsConnectorIdCallbackRoute,

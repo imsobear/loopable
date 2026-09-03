@@ -8,6 +8,31 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 /** Connection settings cross the wire and land in a JSON column, so they stay JSON. */
 export type ConnectionSettings = Record<string, JsonValue>;
 
+/** A rule as the browser sees it. */
+export type RuleView = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  connectorId: string;
+  eventId: string;
+  /** Keys are declared by the event in the connector manifest. */
+  conditions: ConnectionSettings;
+  instruction: string;
+  /** Null means whichever agent is the default when the rule runs. */
+  agentId: string | null;
+  actionId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** What a rule needs to run, resolved when the page loads rather than stored. */
+export type RuleReadiness = {
+  connectedConnectorIds: string[];
+  defaultAgentId: string | null;
+  installedAgentIds: string[];
+};
+
 /** An agent as the browser sees it: what was found on the machine plus choices. */
 export type AgentView = {
   agentId: string;

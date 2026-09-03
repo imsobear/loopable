@@ -23,7 +23,7 @@ type NavItem = {
 
 const LOOP: NavItem[] = [
   { label: "Inbox", icon: Inbox, soon: true },
-  { label: "Rules", icon: Workflow, soon: true },
+  { label: "Rules", to: "/rules", icon: Workflow },
 ];
 
 const SETUP: NavItem[] = [

@@ -54,6 +54,39 @@ export const authAttempts = sqliteTable("auth_attempts", {
 });
 
 /**
+ * A rule says: when this connector reports this signal, ask an agent to do
+ * this, and offer to write the result back through this action. Conditions are
+ * a JSON blob because only the connector knows what can be narrowed.
+ */
+export const rules = sqliteTable(
+  "rules",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    /** Lowest first. The first matching rule wins, so order is meaningful. */
+    priority: integer("priority").notNull(),
+    connectorId: text("connector_id").notNull(),
+    eventId: text("event_id").notNull(),
+    conditions: text("conditions", { mode: "json" })
+      .$type<ConnectionSettings>()
+      .notNull()
+      .default({}),
+    instruction: text("instruction").notNull(),
+    /** Null means whichever agent is currently the default. */
+    agentId: text("agent_id"),
+    actionId: text("action_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("rules_priority_idx").on(table.priority)],
+);
+
+/**
  * Agents are discovered on the machine every time, so nothing about their
  * presence is stored. Only the choices a person makes live here.
  */
@@ -76,6 +109,8 @@ export const appSettings = sqliteTable("app_settings", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+export type Rule = typeof rules.$inferSelect;
+export type NewRule = typeof rules.$inferInsert;
 export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;
 export type AuthAttempt = typeof authAttempts.$inferSelect;

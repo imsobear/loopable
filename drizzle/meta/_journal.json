@@ -15,6 +15,13 @@
       "when": 1788413727259,
       "tag": "0001_fancy_blonde_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788415067536,
+      "tag": "0002_spooky_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }

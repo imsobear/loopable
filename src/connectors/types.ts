@@ -11,6 +11,8 @@
  * Adding a connector must not require touching any page.
  */
 
+import type { JsonValue } from "@/lib/domain.ts";
+
 export type ConnectorId = string;
 
 /** How a user connects an account. The UI renders from this, so the set is closed. */
@@ -37,11 +39,17 @@ export type TokenField = {
   optional?: boolean;
 };
 
-/** A signal the connector can observe. Drives the rules UI later. */
+/** A signal the connector can observe. Drives the rules UI. */
 export type EventDescriptor = {
   id: string;
   name: string;
   summary: string;
+  /**
+   * Which conditions a rule can narrow this event by. Declared here because
+   * "repositories" and "drafts" are GitHub's words, and the rules table has no
+   * business knowing them.
+   */
+  conditions?: SettingField[];
 };
 
 /** Something the connector can do to the outside world. Always approval-gated. */
@@ -51,7 +59,10 @@ export type ActionDescriptor = {
   summary: string;
 };
 
-/** Per-connection configuration, rendered generically as a form. */
+/**
+ * A configurable field, rendered generically as a form. Used both for
+ * per-connection settings and for the conditions on a rule.
+ */
 export type SettingField =
   | { key: string; kind: "boolean"; label: string; help?: string; default: boolean }
   | { key: string; kind: "text"; label: string; help?: string; placeholder?: string }
@@ -64,6 +75,20 @@ export type SettingField =
       options: Array<{ value: string; label: string }>;
       default: string;
     };
+
+/**
+ * A rule worth suggesting for this connector. Templates are offered, never
+ * created behind a person's back.
+ */
+export type RuleTemplate = {
+  id: string;
+  name: string;
+  summary: string;
+  eventId: string;
+  actionId: string;
+  instruction: string;
+  conditions: Record<string, JsonValue>;
+};
 
 export type ConnectorManifest = {
   id: ConnectorId;
@@ -79,6 +104,7 @@ export type ConnectorManifest = {
   events: EventDescriptor[];
   actions: ActionDescriptor[];
   settings: SettingField[];
+  ruleTemplates: RuleTemplate[];
   /** Connecting more than one account of this connector is meaningful. */
   allowsMultipleAccounts: boolean;
 };
