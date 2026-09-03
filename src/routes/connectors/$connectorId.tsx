@@ -112,7 +112,7 @@ function ConnectorDetailPage() {
           <Separator />
           <CapabilityList
             title="Actions it can propose"
-            note="Every action waits for your approval."
+            note="A rule can write these back on its own."
             items={manifest.actions.map((action) => ({
               id: action.id,
               name: action.name,

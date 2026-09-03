@@ -1,7 +1,8 @@
 import { defineRuntime } from "../define.ts";
 import type { ConnectorAccount } from "../types.ts";
-import { getViewer } from "./api.ts";
+import { getViewer, postIssueComment, submitReview } from "./api.ts";
 import { githubAppRegistration } from "./app-registration.ts";
+import { resolveWorkItem } from "./work-item.ts";
 import {
   buildAuthorizeUrl,
   createPkce,
@@ -59,6 +60,27 @@ export const githubRuntime = defineRuntime({
         "Add config/oauth-app.json, or set LOOPABLE_GITHUB_CLIENT_ID and LOOPABLE_GITHUB_CLIENT_SECRET.",
     };
   },
+  async resolveWorkItem({ url, credential }) {
+    const { accessToken } = await usableToken(credential as GithubCredential);
+    return resolveWorkItem(url, accessToken);
+  },
+
+  async applyAction({ actionId, item, body, credential }) {
+    const { accessToken } = await usableToken(credential as GithubCredential);
+    if (actionId === "github.submit_review") {
+      if (item.kind !== "pull_request") {
+        throw new Error("A review can only be submitted on a pull request.");
+      }
+      const review = await submitReview(accessToken, item.repo, item.number, body);
+      return { url: review.html_url };
+    }
+    if (actionId === "github.post_issue_comment") {
+      const comment = await postIssueComment(accessToken, item.repo, item.number, body);
+      return { url: comment.html_url };
+    }
+    throw new Error(`GitHub cannot ${actionId}.`);
+  },
+
   auth: {
     async startAuthorization({ redirectUri, state }) {
       const registration = requireRegistration();

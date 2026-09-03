@@ -22,6 +22,13 @@
       "when": 1788415067536,
       "tag": "0002_spooky_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788416262271,
+      "tag": "0003_small_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

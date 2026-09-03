@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as ConnectorsIndexRouteImport } from './routes/connectors/index'
 import { Route as ConnectorsConnectorIdRouteImport } from './routes/connectors/$connectorId'
+import { Route as InboxIndexRouteImport } from './routes/inbox/index'
+import { Route as InboxTaskIdRouteImport } from './routes/inbox/$taskId'
 import { Route as RulesIndexRouteImport } from './routes/rules/index'
 import { Route as RulesRuleIdRouteImport } from './routes/rules/$ruleId'
 import { Route as RulesNewRouteImport } from './routes/rules/new'
@@ -37,6 +39,16 @@ const ConnectorsIndexRoute = ConnectorsIndexRouteImport.update({
 const ConnectorsConnectorIdRoute = ConnectorsConnectorIdRouteImport.update({
   id: '/connectors/$connectorId',
   path: '/connectors/$connectorId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxIndexRoute = InboxIndexRouteImport.update({
+  id: '/inbox/',
+  path: '/inbox/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxTaskIdRoute = InboxTaskIdRouteImport.update({
+  id: '/inbox/$taskId',
+  path: '/inbox/$taskId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RulesIndexRoute = RulesIndexRouteImport.update({
@@ -70,10 +82,12 @@ const ApiConnectorsConnectorIdCallbackRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/inbox/$taskId': typeof InboxTaskIdRoute
   '/rules/$ruleId': typeof RulesRuleIdRoute
   '/rules/new': typeof RulesNewRoute
   '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
+  '/inbox/': typeof InboxIndexRoute
   '/rules/': typeof RulesIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
@@ -81,10 +95,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/inbox/$taskId': typeof InboxTaskIdRoute
   '/rules/$ruleId': typeof RulesRuleIdRoute
   '/rules/new': typeof RulesNewRoute
   '/agents': typeof AgentsIndexRoute
   '/connectors': typeof ConnectorsIndexRoute
+  '/inbox': typeof InboxIndexRoute
   '/rules': typeof RulesIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
@@ -93,10 +109,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/inbox/$taskId': typeof InboxTaskIdRoute
   '/rules/$ruleId': typeof RulesRuleIdRoute
   '/rules/new': typeof RulesNewRoute
   '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
+  '/inbox/': typeof InboxIndexRoute
   '/rules/': typeof RulesIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
@@ -106,10 +124,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connectors/$connectorId'
+    | '/inbox/$taskId'
     | '/rules/$ruleId'
     | '/rules/new'
     | '/agents/'
     | '/connectors/'
+    | '/inbox/'
     | '/rules/'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
@@ -117,10 +137,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connectors/$connectorId'
+    | '/inbox/$taskId'
     | '/rules/$ruleId'
     | '/rules/new'
     | '/agents'
     | '/connectors'
+    | '/inbox'
     | '/rules'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
@@ -128,10 +150,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connectors/$connectorId'
+    | '/inbox/$taskId'
     | '/rules/$ruleId'
     | '/rules/new'
     | '/agents/'
     | '/connectors/'
+    | '/inbox/'
     | '/rules/'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
@@ -140,10 +164,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectorsConnectorIdRoute: typeof ConnectorsConnectorIdRoute
+  InboxTaskIdRoute: typeof InboxTaskIdRoute
   RulesRuleIdRoute: typeof RulesRuleIdRoute
   RulesNewRoute: typeof RulesNewRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   ConnectorsIndexRoute: typeof ConnectorsIndexRoute
+  InboxIndexRoute: typeof InboxIndexRoute
   RulesIndexRoute: typeof RulesIndexRoute
   ApiConnectorsConnectorIdAuthorizeRoute: typeof ApiConnectorsConnectorIdAuthorizeRoute
   ApiConnectorsConnectorIdCallbackRoute: typeof ApiConnectorsConnectorIdCallbackRoute
@@ -177,6 +203,20 @@ declare module '@tanstack/react-router' {
       path: '/connectors/$connectorId'
       fullPath: '/connectors/$connectorId'
       preLoaderRoute: typeof ConnectorsConnectorIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox/': {
+      id: '/inbox/'
+      path: '/inbox'
+      fullPath: '/inbox/'
+      preLoaderRoute: typeof InboxIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox/$taskId': {
+      id: '/inbox/$taskId'
+      path: '/inbox/$taskId'
+      fullPath: '/inbox/$taskId'
+      preLoaderRoute: typeof InboxTaskIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rules/': {
@@ -220,10 +260,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectorsConnectorIdRoute: ConnectorsConnectorIdRoute,
+  InboxTaskIdRoute: InboxTaskIdRoute,
   RulesRuleIdRoute: RulesRuleIdRoute,
   RulesNewRoute: RulesNewRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   ConnectorsIndexRoute: ConnectorsIndexRoute,
+  InboxIndexRoute: InboxIndexRoute,
   RulesIndexRoute: RulesIndexRoute,
   ApiConnectorsConnectorIdAuthorizeRoute:
     ApiConnectorsConnectorIdAuthorizeRoute,

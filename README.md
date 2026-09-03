@@ -2,7 +2,7 @@
 
 **Build reliable engineering loops across the services and agents you already use.**
 
-Loopable watches the services a team already works in, prepares the work with a coding agent, and holds every result for human approval. Nothing is written back to any service until a person approves it.
+Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the rule says, and writes the result back. Rules run on their own, and every run is recorded so you can see what happened.
 
 Everything runs on your own machine: the app, the database, and the credentials.
 
@@ -30,7 +30,7 @@ A connector is a folder under `src/connectors/`. It exports two halves, and the 
 | File | Runs where | Contents |
 | --- | --- | --- |
 | `manifest.ts` | Browser and server | Pure data: name, icon, how to authorize, which signals it watches, which actions it can propose, which settings a connection has |
-| `runtime.ts` | Server only | Behaviour: authorizing, reading the account, later polling and applying approved actions |
+| `runtime.ts` | Server only | Behaviour: authorizing, reading the account, resolving work items, carrying out actions |
 
 The pages render entirely from manifests, so adding a connector means adding a folder and one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. No page changes. The contract lives in `src/connectors/types.ts`.
 
@@ -67,7 +67,7 @@ What a copied client id and secret allow is impersonation: a different app can s
 
 ## Rules
 
-A rule says: when this service reports this signal, ask an agent to do this, and offer to write the result back through this action. One prepared result, one approval, one write.
+A rule says: when this service reports this signal, ask an agent to do this, and write the result back through this action. A rule runs by itself and nobody has to click anything; a per-rule "check this before it goes out" switch is a door left open for later.
 
 The first rule that matches an event is the one that runs, so rules are ordered and the order is editable. Everything else about a rule is a single choice: a name, the trigger event, an instruction for the agent, which agent runs it (the default unless one is pinned), and which action it may propose. Timeouts and models are deliberately absent, because those belong to the agent and would only drift if restated here.
 
@@ -76,6 +76,18 @@ Conditions are the interesting part. "Repositories" and "drafts" are GitHub's wo
 Connectors may also suggest rules through `ruleTemplates`. Templates are offered on the page and create an ordinary rule when chosen; nothing is ever seeded on a person's behalf.
 
 Rules can be written before anything is connected or installed. The page says what is still missing instead of refusing to save.
+
+## Tasks and the inbox
+
+A task is one run of one rule against one thing: fetch the context, let the agent work, write the result back. It is kept whether it wrote anything or not, because a rule that runs on its own is only worth having if you can see afterwards what it did. The inbox is every task in the order it happened; a rule's own page shows the same records filtered to that rule, next to the settings that produced them.
+
+Signals do not arrive on their own yet, so a task starts by pasting a link on the rule's page. Dry run prepares the result and shows it without writing, which is how a rule gets shaped without leaving marks on a real repository.
+
+A run passes through `preparing` and, if it has something to say, `applying`, ending at `done` with a link to what was written. Two other endings matter as much. `skipped` is the agent answering `NOTHING_TO_DO`, which the prompt asks for explicitly: a rule that runs by itself must be able to stay quiet, or it posts filler. `prepared` is output with nothing written, which today means a dry run and later will mean a rule that asked to be checked first.
+
+The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into a scratch directory as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess.
+
+Written work is signed, so nobody has to wonder whether a person or a rule wrote it.
 
 ## Agents
 

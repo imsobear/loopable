@@ -176,7 +176,7 @@ export function RuleForm({ rule }: { rule?: RuleView }) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="rule-action">Then offer to</Label>
+              <Label htmlFor="rule-action">Then</Label>
               <Select value={actionId} onValueChange={(value) => value && setActionId(value)}>
                 <SelectTrigger id="rule-action" className="w-full">
                   <SelectValue>
@@ -193,7 +193,7 @@ export function RuleForm({ rule }: { rule?: RuleView }) {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Waits for your approval.</p>
+              <p className="text-xs text-muted-foreground">Written back automatically.</p>
             </div>
 
             <div className="flex flex-col gap-2">

@@ -40,7 +40,7 @@ function ConnectorsPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Connectors</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect the services a loop should watch. Loopable only reads until you approve a write.
+          Connect the services a loop should watch. Credentials stay on this machine.
         </p>
       </header>
 

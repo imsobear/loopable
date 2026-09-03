@@ -52,7 +52,7 @@ export type EventDescriptor = {
   conditions?: SettingField[];
 };
 
-/** Something the connector can do to the outside world. Always approval-gated. */
+/** Something the connector can do to the outside world, on a rule's behalf. */
 export type ActionDescriptor = {
   id: string;
   name: string;
@@ -147,8 +147,33 @@ export type CompleteAuthorizationContext = {
   verifier: string;
 };
 
+/** What a rule is acting on, resolved from a link or, later, from a signal. */
+export type WorkItem = {
+  kind: "pull_request" | "issue";
+  repo: string;
+  number: number;
+  title: string;
+  url: string;
+  /** Files the agent should read before it writes anything. */
+  context: Array<{ name: string; body: string }>;
+};
+
+export type ActionOutcome = {
+  /** Where the write landed, so a person can go and look at it. */
+  url: string;
+};
+
 export type ConnectorRuntime = {
   readiness(): Promise<Readiness>;
+  /** Turn a link a person pasted into something a rule can act on. */
+  resolveWorkItem?(input: { url: string; credential: unknown }): Promise<WorkItem>;
+  /** Carry out one of the manifest's actions. This is the part that writes. */
+  applyAction?(input: {
+    actionId: string;
+    item: WorkItem;
+    body: string;
+    credential: unknown;
+  }): Promise<ActionOutcome>;
   auth: {
     /** Required when auth.kind is "oauth_redirect". */
     startAuthorization?(ctx: StartAuthorizationContext): Promise<{

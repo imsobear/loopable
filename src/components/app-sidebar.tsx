@@ -22,7 +22,7 @@ type NavItem = {
 };
 
 const LOOP: NavItem[] = [
-  { label: "Inbox", icon: Inbox, soon: true },
+  { label: "Inbox", to: "/inbox", icon: Inbox },
   { label: "Rules", to: "/rules", icon: Workflow },
 ];
 
@@ -83,7 +83,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <p className="px-2 pb-1 text-xs text-muted-foreground">
-          Runs on this machine. Nothing is written to a service without your approval.
+          Runs on this machine, with your own agents and your own credentials.
         </p>
       </SidebarFooter>
     </Sidebar>

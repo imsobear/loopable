@@ -60,12 +60,12 @@ export const githubManifest = defineManifest({
     {
       id: "github.submit_review",
       name: "Submit a review",
-      summary: "Post review comments on a pull request after you approve them.",
+      summary: "Post a review on a pull request, as a comment rather than an approval.",
     },
     {
       id: "github.post_issue_comment",
       name: "Comment on an issue",
-      summary: "Post a prepared comment after you approve it.",
+      summary: "Post a comment on an issue or pull request.",
     },
   ],
   // Nothing to configure per account: what the account can see is what GitHub

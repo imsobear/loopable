@@ -146,6 +146,32 @@ export function updateConnectionSettings(
   return toView(row);
 }
 
+/**
+ * A credential a run can use right now. Goes through the connection check so a
+ * rotated credential is stored rather than refreshed again on the next run,
+ * and so a broken connection fails here with a clear message instead of a 401
+ * in the middle of the work.
+ */
+export async function credentialForConnector(
+  connectorId: ConnectorId,
+): Promise<{ connectionId: string; credential: unknown }> {
+  const row = db()
+    .select()
+    .from(connections)
+    .where(eq(connections.connectorId, connectorId))
+    .orderBy(asc(connections.createdAt))
+    .get();
+  if (!row) throw new Error(`No ${connectorId} account is connected.`);
+
+  const checked = await checkConnection(row.id);
+  if (checked.status !== "connected") {
+    throw new Error(checked.lastError ?? `The ${connectorId} connection needs reconnecting.`);
+  }
+  const credential = await readCredential<unknown>(row.id);
+  if (!credential) throw new Error(`No credential is stored for ${connectorId}.`);
+  return { connectionId: row.id, credential };
+}
+
 /** Proves the stored credential still works and refreshes the shown account. */
 export async function checkConnection(id: string): Promise<ConnectionView> {
   const row = getConnection(id);

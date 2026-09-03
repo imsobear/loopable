@@ -1,7 +1,13 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { PermissionMode } from "@/agents/types.ts";
-import type { ConnectionSettings, ConnectionStatus, JsonValue } from "@/lib/domain.ts";
+import type {
+  ConnectionSettings,
+  ConnectionStatus,
+  JsonValue,
+  TaskSourceKind,
+  TaskState,
+} from "@/lib/domain.ts";
 
 /**
  * One row per connected account, so a connector can be connected several times
@@ -54,9 +60,53 @@ export const authAttempts = sqliteTable("auth_attempts", {
 });
 
 /**
+ * One run of one rule against one thing. Kept whether it wrote anything or
+ * not, because a rule that runs on its own is only trustworthy if you can see
+ * afterwards what it did.
+ */
+export const tasks = sqliteTable(
+  "tasks",
+  {
+    id: text("id").primaryKey(),
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => rules.id, { onDelete: "cascade" }),
+    connectorId: text("connector_id").notNull(),
+    state: text("state").$type<TaskState>().notNull().default("queued"),
+    /** What the task is about, resolved once so the record survives the source. */
+    sourceUrl: text("source_url").notNull(),
+    sourceKind: text("source_kind").$type<TaskSourceKind>().notNull(),
+    sourceRepo: text("source_repo").notNull(),
+    sourceNumber: integer("source_number").notNull(),
+    sourceTitle: text("source_title").notNull(),
+    /** Set when a run was asked to stop before writing anything. */
+    dryRun: integer("dry_run", { mode: "boolean" }).notNull().default(false),
+    agentId: text("agent_id"),
+    agentCommand: text("agent_command"),
+    /** What the agent produced, which is also what gets written back. */
+    output: text("output"),
+    actionId: text("action_id").notNull(),
+    /** Where the write landed, once it has. */
+    resultUrl: text("result_url"),
+    error: text("error"),
+    durationMs: integer("duration_ms"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    index("tasks_rule_idx").on(table.ruleId),
+    index("tasks_created_idx").on(table.createdAt),
+  ],
+);
+
+/**
  * A rule says: when this connector reports this signal, ask an agent to do
- * this, and offer to write the result back through this action. Conditions are
- * a JSON blob because only the connector knows what can be narrowed.
+ * this, and write the result back through this action. Conditions are a JSON
+ * blob because only the connector knows what can be narrowed.
  */
 export const rules = sqliteTable(
   "rules",
@@ -109,6 +159,7 @@ export const appSettings = sqliteTable("app_settings", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+export type Task = typeof tasks.$inferSelect;
 export type Rule = typeof rules.$inferSelect;
 export type NewRule = typeof rules.$inferInsert;
 export type Connection = typeof connections.$inferSelect;

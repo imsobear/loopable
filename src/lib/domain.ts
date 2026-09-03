@@ -8,6 +8,48 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 /** Connection settings cross the wire and land in a JSON column, so they stay JSON. */
 export type ConnectionSettings = Record<string, JsonValue>;
 
+/**
+ * How far a run got. A rule runs by itself, so these are all outcomes rather
+ * than requests for attention.
+ */
+export const TASK_STATE = [
+  "queued",
+  "preparing",
+  "applying",
+  /** Output ready, nothing written: a dry run, and later a rule that asks to be checked. */
+  "prepared",
+  "done",
+  /** The agent judged there was nothing worth writing. */
+  "skipped",
+  "failed",
+] as const;
+export type TaskState = (typeof TASK_STATE)[number];
+
+export type TaskSourceKind = "pull_request" | "issue";
+
+export type TaskView = {
+  id: string;
+  ruleId: string;
+  ruleName: string;
+  connectorId: string;
+  state: TaskState;
+  sourceUrl: string;
+  sourceKind: TaskSourceKind;
+  sourceRepo: string;
+  sourceNumber: number;
+  sourceTitle: string;
+  dryRun: boolean;
+  agentId: string | null;
+  agentCommand: string | null;
+  output: string | null;
+  actionId: string;
+  resultUrl: string | null;
+  error: string | null;
+  durationMs: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** A rule as the browser sees it. */
 export type RuleView = {
   id: string;

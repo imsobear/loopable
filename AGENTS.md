@@ -2,7 +2,7 @@
 
 Build reliable engineering loops across the services and agents you already use.
 
-Loopable watches the services a team already works in, prepares the work with a coding agent, and holds every result for human approval. Nothing is written back to any service until a person approves it.
+Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the rule says, and writes the result back. Rules run on their own, and every run is recorded so you can see what happened.
 
 ## Stack
 
