@@ -1,3 +1,4 @@
+import { sweepRunDirs } from "#/server/tasks.ts";
 import { createWorker } from "#/server/worker.ts";
 import { claimSingleInstance, releaseSingleInstance } from "./instance.ts";
 
@@ -20,6 +21,9 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+
+  const swept = sweepRunDirs();
+  if (swept > 0) log(`cleared ${swept} old run director${swept === 1 ? "y" : "ies"}`);
 
   const worker = createWorker({ log });
   log(`daemon started (pid ${process.pid})`);

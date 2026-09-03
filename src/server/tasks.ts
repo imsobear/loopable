@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
@@ -11,7 +11,7 @@ import type { TaskView } from "#/lib/domain.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
-import { runDir } from "./paths.ts";
+import { dataDir, runDir } from "./paths.ts";
 import { rules, tasks, type Task } from "./db/schema.ts";
 
 /**
@@ -153,6 +153,38 @@ export function enqueueTask(input: {
   return getTask(id)!;
 }
 
+/** The tail is what matters while a run is going; the whole thing rarely is. */
+const LOG_TAIL_BYTES = 64_000;
+
+export function readTaskLog(id: string): string | null {
+  const task = taskRow(id);
+  if (!task?.logPath || !existsSync(task.logPath)) return null;
+  const text = readFileSync(task.logPath, "utf8");
+  if (text.length <= LOG_TAIL_BYTES) return text;
+  return `[earlier output not shown]\n\n${text.slice(-LOG_TAIL_BYTES)}`;
+}
+
+/**
+ * Scratch directories are kept after a run so a person can see what the agent
+ * was given and what it said. Kept, not kept forever.
+ */
+export function sweepRunDirs(maxAgeMs = 7 * 24 * 60 * 60 * 1_000): number {
+  const root = join(dataDir(), "runs");
+  if (!existsSync(root)) return 0;
+  let removed = 0;
+  for (const entry of readdirSync(root)) {
+    const dir = join(root, entry);
+    try {
+      if (Date.now() - statSync(dir).mtimeMs < maxAgeMs) continue;
+      rmSync(dir, { recursive: true, force: true });
+      removed += 1;
+    } catch {
+      // being written to, or already gone
+    }
+  }
+  return removed;
+}
+
 export function requestCancel(id: string): TaskView | null {
   const row = taskRow(id);
   if (!row) return null;
@@ -223,6 +255,8 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     for (const file of item.context) {
       writeFileSync(join(workspace, file.name), file.body);
     }
+    const logPath = join(workspace, "agent.log");
+    updateTask(id, { logPath });
 
     const result = await agentRuntime(agentId).run({
       prompt: promptFor({
@@ -234,6 +268,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
       settings: settingsFor(agentId),
       outputFile: join(workspace, "answer.txt"),
       signal,
+      logFile: logPath,
     });
     updateTask(id, { agentCommand: result.command });
 

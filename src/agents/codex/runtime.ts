@@ -63,6 +63,7 @@ export const codexRuntime = defineAgentRuntime({
       cwd: input.cwd,
       timeoutMs: input.settings.timeoutMs,
       signal: input.signal,
+      logPath: input.logFile,
     });
 
     // --output-last-message isolates the final answer; stdout also carries the

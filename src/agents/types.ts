@@ -58,6 +58,8 @@ export type AgentRunInput = {
   outputFile?: string;
   /** Stops the agent: a person pressed Stop, or the daemon is shutting down. */
   signal?: AbortSignal;
+  /** Where to write everything the agent prints, while it prints it. */
+  logFile?: string;
 };
 
 export type AgentInvocation = { bin: string; args: string[] };

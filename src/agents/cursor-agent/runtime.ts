@@ -2,6 +2,7 @@ import { defineAgentRuntime } from "../define.ts";
 import { firstLine, probe, resolveBinary } from "../discover.ts";
 import { runProcess } from "../process.ts";
 import type { AgentInvocation, AgentRunInput } from "../types.ts";
+import { answerFrom, describeEvent } from "./events.ts";
 import { cursorAgentManifest } from "./manifest.ts";
 
 async function binary(): Promise<string> {
@@ -13,8 +14,12 @@ async function binary(): Promise<string> {
 function args(input: AgentRunInput): string[] {
   const list = [
     "-p",
+    // A stream of events rather than one block at the end: it can be watched
+    // while it runs, and the final answer arrives as a field of its own
+    // instead of as whatever reached stdout.
     "--output-format",
-    "text",
+    "stream-json",
+    "--stream-partial-output",
     "--workspace",
     input.cwd,
     // Without this the agent stops to ask whether the workspace is trusted,
@@ -64,25 +69,33 @@ export const cursorAgentRuntime = defineAgentRuntime({
       cwd: input.cwd,
       timeoutMs: input.settings.timeoutMs,
       signal: input.signal,
+      logPath: input.logFile,
+      logLine: (line) => describeEvent(line, input.cwd),
     });
     const command = `${bin} ${argv.join(" ")}`;
+    const answer = answerFrom(outcome.stdout);
 
     if (outcome.aborted) {
-      return { ok: false, aborted: true, output: outcome.stdout, durationMs: outcome.durationMs, command };
+      return { ok: false, aborted: true, output: answer.text, durationMs: outcome.durationMs, command };
     }
     if (outcome.timedOut) {
       return {
         ok: false,
-        output: outcome.stdout,
+        output: answer.text,
         detail: `Cursor Agent did not finish within ${Math.round(input.settings.timeoutMs / 1000)}s.`,
         durationMs: outcome.durationMs,
         command,
       };
     }
     return {
-      ok: outcome.code === 0,
-      output: outcome.stdout,
-      detail: outcome.code === 0 ? undefined : outcome.stderr || `Exited with code ${outcome.code}.`,
+      ok: outcome.code === 0 && !answer.failed,
+      output: answer.text,
+      detail:
+        outcome.code === 0 && !answer.failed
+          ? undefined
+          : answer.failed
+            ? answer.text || "The agent reported an error."
+            : outcome.stderr || `Exited with code ${outcome.code}.`,
       durationMs: outcome.durationMs,
       command,
     };

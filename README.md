@@ -112,9 +112,11 @@ Two agents ship today, both with a verified non-interactive invocation:
 | Agent | Read-only invocation |
 | --- | --- |
 | Codex | `codex exec --sandbox read-only ...` |
-| Cursor Agent | `cursor-agent -p --mode ask --trust ...` |
+| Cursor Agent | `cursor-agent -p --output-format stream-json --mode ask --trust ...` |
 
-Three details are load bearing. Agents default to read-only, because preparing a draft never needs to change files. Standard input is closed and the timeout is enforced by Loopable, so an agent that stops to ask a question fails instead of hanging a loop forever. And an agent process never receives Loopable's credentials: `GITHUB_*`, `GH_*` and `LOOPABLE_*` are stripped from its environment, while its own model credentials are left alone.
+Four details are load bearing. Agents default to read-only, because preparing a draft never needs to change files. Standard input is closed and the timeout is enforced by Loopable, so an agent that stops to ask a question fails instead of hanging a loop forever. An agent process never receives Loopable's credentials: `GITHUB_*`, `GH_*` and `LOOPABLE_*` are stripped from its environment, while its own model credentials are left alone. And each agent runs in its own process group, because these tools start helpers of their own and signalling just the process we launched leaves those behind, reparented to init and still working.
+
+Everything an agent prints is written to `agent.log` in its run directory while it prints it, and the task page tails it. Cursor Agent is asked for a stream of events rather than one block at the end, which is what makes that log arrive during the run instead of after it; the events are turned into ordinary lines, and the final answer is read from the field that carries it rather than from whatever reached standard output. Run directories are kept afterwards, since they are the first place to look when a run goes wrong, and swept after a week.
 
 Detection looks at `PATH`, then at the usual install directories, then asks the login shell where its tools are. That last step matters once Loopable is started by launchd or as a packaged app, where the inherited `PATH` is too small to find anything.
 

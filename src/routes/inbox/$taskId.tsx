@@ -1,6 +1,6 @@
 import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, CircleStop, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, CircleStop, ExternalLink, Loader } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { TaskStateLabel, taskTitle } from "@/components/task-list";
 import { useLiveTasks } from "@/components/use-live-tasks.ts";
@@ -10,19 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { connectorManifest } from "@/connectors/manifests.ts";
 import { isTaskActive, type TaskView } from "@/lib/domain.ts";
-import { getTaskById, stopTask } from "@/server/functions/tasks.ts";
+import { getTaskById, getTaskLog, stopTask } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/inbox/$taskId")({
   loader: async ({ params }) => {
     const task = await getTaskById({ data: { id: params.taskId } });
     if (!task) throw notFound();
-    return task;
+    return { task, log: await getTaskLog({ data: { id: params.taskId } }) };
   },
   component: TaskPage,
 });
 
 function TaskPage() {
-  const task = Route.useLoaderData();
+  const { task, log } = Route.useLoaderData();
   const manifest = connectorManifest(task.connectorId);
   const action = manifest?.actions.find((entry) => entry.id === task.actionId);
   useLiveTasks([task]);
@@ -100,6 +100,8 @@ function TaskPage() {
         </Card>
       ) : null}
 
+      {log ? <AgentLog log={log} live={isTaskActive(task.state)} /> : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">How this ran</CardTitle>
@@ -134,6 +136,42 @@ function TaskPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Everything the agent printed, as it prints it. Four minutes of a spinner
+ * tells you nothing; this is what tells you the run is alive, and afterwards
+ * it is the only place that explains a failure.
+ */
+function AgentLog({ log, live }: { log: string; live: boolean }) {
+  const box = useRef<HTMLPreElement>(null);
+
+  // Stay at the bottom while it is still being written, the way a tail does.
+  useEffect(() => {
+    if (live && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [live, log]);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center gap-3">
+        <CardTitle className="flex-1 text-base">Agent log</CardTitle>
+        {live ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader className="size-3.5 animate-spin" />
+            still running
+          </span>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        <pre
+          ref={box}
+          className="max-h-80 overflow-auto rounded-md bg-muted p-2.5 text-xs leading-relaxed whitespace-pre-wrap break-words"
+        >
+          {log}
+        </pre>
+      </CardContent>
+    </Card>
   );
 }
 

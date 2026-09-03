@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import { clean } from "./discover.ts";
 
 /**
@@ -55,6 +56,14 @@ export function runProcess(input: {
   cwd: string;
   timeoutMs: number;
   signal?: AbortSignal;
+  /** Everything the agent prints, as it prints it, so a run can be watched. */
+  logPath?: string;
+  /**
+   * Turns one line of output into one line of log, or nothing to leave it out.
+   * Agents that report as a stream of events use this so the log reads like a
+   * log rather than like a wire protocol.
+   */
+  logLine?: (line: string) => string | null;
 }): Promise<ProcessOutcome> {
   return new Promise((resolve) => {
     const started = Date.now();
@@ -96,16 +105,56 @@ export function runProcess(input: {
     };
     input.signal?.addEventListener("abort", onAbort);
 
+    // Both streams go to one file, interleaved as they happened, which is what
+    // makes a log worth reading afterwards.
+    const logFile = input.logPath ? createWriteStream(input.logPath, { flags: "a" }) : null;
+    logFile?.on("error", () => {});
+
+    /**
+     * A chunk is not a line, so each stream keeps its own remainder. Sharing
+     * one buffer would splice half a line of stderr into the middle of stdout.
+     */
+    const lineWriter = () => {
+      let pending = "";
+      const emit = (line: string) => {
+        const text = input.logLine ? input.logLine(line) : line;
+        if (text !== null && text !== "") logFile?.write(`${text}\n`);
+      };
+      return {
+        take(chunk: string) {
+          if (!logFile) return;
+          pending += chunk;
+          const lines = pending.split("\n");
+          pending = lines.pop() ?? "";
+          for (const line of lines) emit(line);
+        },
+        flush() {
+          if (logFile && pending !== "") emit(pending);
+          pending = "";
+        },
+      };
+    };
+    const outLines = lineWriter();
+    const errLines = lineWriter();
+
     child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
+      const text = chunk.toString();
+      stdout += text;
+      outLines.take(text);
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      stderr += text;
+      errLines.take(text);
     });
 
     const finish = (code: number | null, failure?: string) => {
       clearTimeout(timer);
       input.signal?.removeEventListener("abort", onAbort);
+      outLines.flush();
+      errLines.flush();
+      if (failure) logFile?.write(`\n${failure}\n`);
+      logFile?.end();
       resolve({
         code,
         stdout: clean(stdout),
