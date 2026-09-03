@@ -108,7 +108,11 @@ export function ConnectionSettingsForm({
                   onValueChange={(value) => set(field.key, value)}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: string) =>
+                        field.options.find((option) => option.value === value)?.label ?? value
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {field.options.map((option) => (

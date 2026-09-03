@@ -57,15 +57,38 @@ Register the callback URL without a port, because loopback redirects match on ho
 http://127.0.0.1/api/connectors/github/callback
 ```
 
-Login is the OAuth 2.0 authorization code flow with PKCE over a loopback redirect. GitHub still requires the client secret at the token endpoint, and a client running on a user's machine cannot hide it; PKCE is what actually secures the exchange. This is the same trade-off the GitHub CLI makes.
+Login is the OAuth 2.0 authorization code flow with PKCE (S256) over a loopback redirect.
+
+**Treat the client secret as public, not as a credential.** GitHub lists `client_secret` as required at the token endpoint and does not distinguish between public and confidential clients, so a browser-redirect login cannot avoid shipping it, and anything running on a user's machine can be read. The GitHub CLI embeds its secret for the same reason.
+
+PKCE is what actually protects a login: an intercepted authorization code cannot be redeemed by anyone else, because the exchange must present the verifier held only by the process that started the flow. That matters most for a loopback redirect, where another local process might race for the code.
+
+What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's machine. Anyone who wants their own registration, or who is on GitHub Enterprise, can set the environment variables above instead.
+
+## Agents
+
+An agent is a coding agent CLI already installed on the machine. Agents live under `src/agents/` and follow the same manifest and runtime split as connectors, but they are discovered rather than connected: every page load looks for the binary, reads its version, and asks the tool whether it is signed in. Installing or removing a CLI shows up without any setup step.
+
+Because they are discovered, no agent is stored. The only things kept are the choices a person makes: which agent runs the loops, and per agent a permission mode, an optional model, and a timeout.
+
+Two agents ship today, both with a verified non-interactive invocation:
+
+| Agent | Read-only invocation |
+| --- | --- |
+| Codex | `codex exec --sandbox read-only ...` |
+| Cursor Agent | `cursor-agent -p --mode ask --trust ...` |
+
+Three details are load bearing. Agents default to read-only, because preparing a draft never needs to change files. Standard input is closed and the timeout is enforced by Loopable, so an agent that stops to ask a question fails instead of hanging a loop forever. And an agent process never receives Loopable's credentials: `GITHUB_*`, `GH_*` and `LOOPABLE_*` are stripped from its environment, while its own model credentials are left alone.
+
+Detection looks at `PATH`, then at the usual install directories, then asks the login shell where its tools are. That last step matters once Loopable is started by launchd or as a packaged app, where the inherited `PATH` is too small to find anything.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
 | `src/connectors/` | The connector contract and one folder per connector |
+| `src/agents/` | The agent contract and one folder per agent |
 | `src/server/` | Database, secret store, connection service, server functions |
 | `src/routes/` | Pages, plus the OAuth endpoints under `api/` |
 | `src/components/` | Shell, shared pieces, and shadcn/ui in `ui/` |
 | `drizzle/` | Generated migrations |
-| `legacy/` | The proof of concept: polling, rules, agent runs, publishing. Being ported feature by feature |

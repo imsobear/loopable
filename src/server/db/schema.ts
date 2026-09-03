@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { PermissionMode } from "@/agents/types.ts";
 import type { ConnectionSettings, ConnectionStatus, JsonValue } from "@/lib/domain.ts";
 
 /**
@@ -48,6 +49,29 @@ export const authAttempts = sqliteTable("auth_attempts", {
   returnTo: text("return_to"),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
+ * Agents are discovered on the machine every time, so nothing about their
+ * presence is stored. Only the choices a person makes live here.
+ */
+export const agentSettings = sqliteTable("agent_settings", {
+  agentId: text("agent_id").primaryKey(),
+  permissionMode: text("permission_mode").$type<PermissionMode>().notNull(),
+  model: text("model"),
+  timeoutMs: integer("timeout_ms").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/** Small key/value store for single settings such as the default agent. */
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value", { mode: "json" }).$type<JsonValue>().notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
 });

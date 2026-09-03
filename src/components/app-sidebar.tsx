@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Inbox, Plug, Settings, Workflow } from "lucide-react";
+import { Bot, Inbox, Plug, Settings, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -28,6 +28,7 @@ const LOOP: NavItem[] = [
 
 const SETUP: NavItem[] = [
   { label: "Connectors", to: "/connectors", icon: Plug },
+  { label: "Agents", to: "/agents", icon: Bot },
   { label: "Settings", icon: Settings, soon: true },
 ];
 

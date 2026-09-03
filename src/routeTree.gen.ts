@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as ConnectorsIndexRouteImport } from './routes/connectors/index'
 import { Route as ConnectorsConnectorIdRouteImport } from './routes/connectors/$connectorId'
 import { Route as ApiConnectorsConnectorIdAuthorizeRouteImport } from './routes/api/connectors/$connectorId/authorize'
@@ -18,6 +19,11 @@ import { Route as ApiConnectorsConnectorIdCallbackRouteImport } from './routes/a
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsIndexRoute = AgentsIndexRouteImport.update({
+  id: '/agents/',
+  path: '/agents/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectorsIndexRoute = ConnectorsIndexRouteImport.update({
@@ -46,6 +52,7 @@ const ApiConnectorsConnectorIdCallbackRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
@@ -53,6 +60,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/agents': typeof AgentsIndexRoute
   '/connectors': typeof ConnectorsIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
+  '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
@@ -70,6 +79,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connectors/$connectorId'
+    | '/agents/'
     | '/connectors/'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
@@ -77,6 +87,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connectors/$connectorId'
+    | '/agents'
     | '/connectors'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
@@ -84,6 +95,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connectors/$connectorId'
+    | '/agents/'
     | '/connectors/'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
@@ -92,6 +104,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectorsConnectorIdRoute: typeof ConnectorsConnectorIdRoute
+  AgentsIndexRoute: typeof AgentsIndexRoute
   ConnectorsIndexRoute: typeof ConnectorsIndexRoute
   ApiConnectorsConnectorIdAuthorizeRoute: typeof ApiConnectorsConnectorIdAuthorizeRoute
   ApiConnectorsConnectorIdCallbackRoute: typeof ApiConnectorsConnectorIdCallbackRoute
@@ -104,6 +117,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/': {
+      id: '/agents/'
+      path: '/agents'
+      fullPath: '/agents/'
+      preLoaderRoute: typeof AgentsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connectors/': {
@@ -140,6 +160,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectorsConnectorIdRoute: ConnectorsConnectorIdRoute,
+  AgentsIndexRoute: AgentsIndexRoute,
   ConnectorsIndexRoute: ConnectorsIndexRoute,
   ApiConnectorsConnectorIdAuthorizeRoute:
     ApiConnectorsConnectorIdAuthorizeRoute,
