@@ -1,7 +1,7 @@
 import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { ConnectionSettingsForm } from "@/components/connection-settings-form";
 import { ConnectionStatusBadge } from "@/components/connection-status";
 import { ConnectorIcon } from "@/components/connector-icon";
@@ -170,6 +170,9 @@ function ConnectionCard({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"verify" | "disconnect" | null>(null);
+  // Connecting is offered once per connector, so a broken connection needs its
+  // own way back to the provider.
+  const broken = connection.status === "needs_reauth" || connection.status === "error";
 
   const run = async (action: "verify" | "disconnect") => {
     setBusy(action);
@@ -215,6 +218,15 @@ function ConnectionCard({
           <RefreshCw className={busy === "verify" ? "animate-spin" : undefined} />
           Verify
         </Button>
+        {broken ? (
+          <Button
+            size="sm"
+            render={<a href={`/api/connectors/${connection.connectorId}/authorize`} />}
+          >
+            <RotateCcw />
+            Reconnect
+          </Button>
+        ) : null}
         <Button
           variant="outline"
           size="sm"

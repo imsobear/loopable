@@ -63,5 +63,8 @@ export const githubManifest = defineManifest({
       default: true,
     },
   ],
-  allowsMultipleAccounts: true,
+  // The redirect authorizes whichever account the browser is already signed in
+  // as, so a second account is out of reach without signing out of GitHub
+  // first. Connections are still rows, so this is a product decision only.
+  allowsMultipleAccounts: false,
 });

@@ -34,7 +34,7 @@ A connector is a folder under `src/connectors/`. It exports two halves, and the 
 
 The pages render entirely from manifests, so adding a connector means adding a folder and one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. No page changes. The contract lives in `src/connectors/types.ts`.
 
-Connections are rows, not a single slot per connector, so the same connector can hold several accounts.
+Connections are rows rather than a single slot per connector, so the storage side already holds several accounts. The product exposes one account per connector for now, which each manifest states through `allowsMultipleAccounts`: a browser redirect authorizes whichever account the provider is already signed in as, so a second account cannot be reached without signing out there first.
 
 ### The GitHub app registration (maintainer only)
 
