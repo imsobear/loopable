@@ -252,4 +252,26 @@ describe("worker", () => {
     expect(task.state).toBe("cancelled");
     expect(task.error).toBe("Stopped before it finished.");
   });
+
+  /**
+   * Shutting down also aborts whatever is running, but nobody asked for those
+   * to end, so they have to be waiting when the daemon comes back rather than
+   * recorded as though a person stopped them.
+   */
+  it("queues again a run that only stopped because the daemon did", async () => {
+    const id = givenTask();
+    const worker = createWorker({
+      runTask: async (_id, signal) => {
+        await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve()));
+        throw new TaskCancelled();
+      },
+    });
+
+    await worker.tick();
+    await worker.stop(2_000);
+
+    const task = taskById(id);
+    expect(task.state).toBe("queued");
+    expect(task.error).toContain("shutting down");
+  });
 });

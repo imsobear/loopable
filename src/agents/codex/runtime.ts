@@ -62,6 +62,7 @@ export const codexRuntime = defineAgentRuntime({
       args: argv,
       cwd: input.cwd,
       timeoutMs: input.settings.timeoutMs,
+      signal: input.signal,
     });
 
     // --output-last-message isolates the final answer; stdout also carries the
@@ -77,6 +78,9 @@ export const codexRuntime = defineAgentRuntime({
     }
     if (!output) output = outcome.stdout;
 
+    if (outcome.aborted) {
+      return { ok: false, aborted: true, output, durationMs: outcome.durationMs, command };
+    }
     if (outcome.timedOut) {
       return {
         ok: false,

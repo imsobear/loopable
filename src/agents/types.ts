@@ -56,6 +56,8 @@ export type AgentRunInput = {
   settings: AgentSettingsValues;
   /** Where the agent should write its final message, when it supports that. */
   outputFile?: string;
+  /** Stops the agent: a person pressed Stop, or the daemon is shutting down. */
+  signal?: AbortSignal;
 };
 
 export type AgentInvocation = { bin: string; args: string[] };
@@ -65,6 +67,8 @@ export type AgentRunResult = {
   /** The agent's final message, or as close to it as the product allows. */
   output: string;
   detail?: string;
+  /** True when the run was stopped from outside rather than failing. */
+  aborted?: boolean;
   durationMs: number;
   /** Exactly what ran, for the audit trail. */
   command: string;

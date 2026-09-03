@@ -17,11 +17,30 @@ export function agentEnvironment(): NodeJS.ProcessEnv {
   return env;
 }
 
+/**
+ * A negative pid means the process group. Failing is normal here: the group
+ * is usually already gone, which is exactly what we wanted.
+ */
+function signalGroup(pid: number | undefined, signal: NodeJS.Signals): void {
+  if (pid === undefined) return;
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // already gone
+    }
+  }
+}
+
 export type ProcessOutcome = {
   code: number | null;
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** Stopped from outside: a person pressed Stop, or Loopable is shutting down. */
+  aborted: boolean;
   durationMs: number;
 };
 
@@ -35,24 +54,47 @@ export function runProcess(input: {
   args: string[];
   cwd: string;
   timeoutMs: number;
+  signal?: AbortSignal;
 }): Promise<ProcessOutcome> {
   return new Promise((resolve) => {
     const started = Date.now();
+
+    if (input.signal?.aborted) {
+      resolve({ code: null, stdout: "", stderr: "", timedOut: false, aborted: true, durationMs: 0 });
+      return;
+    }
+
     const child = spawn(input.bin, input.args, {
       cwd: input.cwd,
       env: agentEnvironment(),
       stdio: ["ignore", "pipe", "pipe"],
+      // Its own process group, so it can be stopped as a family. Agent CLIs
+      // start helpers of their own, and signalling only the process we
+      // launched leaves those behind, reparented to init and still working.
+      detached: true,
     });
 
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let aborted = false;
+
+    /** Ask the whole group first, insist shortly after. */
+    const halt = () => {
+      signalGroup(child.pid, "SIGTERM");
+      setTimeout(() => signalGroup(child.pid, "SIGKILL"), 3000).unref();
+    };
 
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 3000).unref();
+      halt();
     }, input.timeoutMs);
+
+    const onAbort = () => {
+      aborted = true;
+      halt();
+    };
+    input.signal?.addEventListener("abort", onAbort);
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
@@ -63,11 +105,13 @@ export function runProcess(input: {
 
     const finish = (code: number | null, failure?: string) => {
       clearTimeout(timer);
+      input.signal?.removeEventListener("abort", onAbort);
       resolve({
         code,
         stdout: clean(stdout),
         stderr: clean(failure ? `${stderr}\n${failure}` : stderr),
         timedOut,
+        aborted,
         durationMs: Date.now() - started,
       });
     };

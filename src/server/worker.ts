@@ -113,10 +113,26 @@ export function createWorker(options: WorkerOptions = {}) {
     const message = error instanceof Error ? error.message : String(error);
     const task = db().select().from(tasks).where(eq(tasks.id, id)).get();
     const attempts = task?.attempts ?? maxAttempts;
+    const started = task?.startedAt?.getTime() ?? task?.createdAt.getTime() ?? now();
+    /** How long it went on for, which a person wants to know most when it did not work. */
+    const durationMs = now() - started;
 
     if (isCancellation(error)) {
-      log(`cancelled ${id}`);
-      updateTask(id, { state: "cancelled", error: message, leaseUntil: null });
+      // A run is also aborted when the daemon is shutting down, which is not
+      // the same as a person stopping it: nobody asked for it to end, so it
+      // goes back in the queue instead of being recorded as cancelled.
+      if (task?.cancelRequested) {
+        log(`cancelled ${id}`);
+        updateTask(id, { state: "cancelled", error: message, leaseUntil: null, durationMs });
+      } else {
+        log(`requeue ${id}: stopped while shutting down`);
+        updateTask(id, {
+          state: "queued",
+          leaseUntil: null,
+          runAfter: new Date(now()),
+          error: "Loopable was shutting down, so this was queued again.",
+        });
+      }
       return;
     }
     if (isTransient(error) && attempts < maxAttempts) {
@@ -131,12 +147,15 @@ export function createWorker(options: WorkerOptions = {}) {
       return;
     }
     log(`failed ${id}: ${message}`);
-    updateTask(id, { state: "failed", error: message, leaseUntil: null });
+    updateTask(id, { state: "failed", error: message, leaseUntil: null, durationMs });
   }
 
   function launch(id: string): void {
     const abort = new AbortController();
-    const heartbeat = setInterval(() => renew(id, abort), Math.max(1_000, leaseMs / 3));
+    // Fast enough that Stop feels like a button, rather than as slow as the
+    // lease it also renews. A one-row update every couple of seconds is
+    // nothing next to what the agent is doing.
+    const heartbeat = setInterval(() => renew(id, abort), Math.min(2_000, leaseMs / 3));
 
     const done = execute(id, abort.signal)
       .then(() => {
@@ -193,17 +212,19 @@ export function createWorker(options: WorkerOptions = {}) {
   }
 
   /**
-   * Stops claiming and gives what is running a chance to finish. Anything
-   * still going when the grace period ends is left alone: its lease will
-   * lapse, and the next start will queue it again rather than pretend it
-   * was cancelled.
+   * Stops claiming and brings the running agents down with us. Walking away
+   * instead would leave them running with nowhere to report, still spending
+   * money, while the task they belong to gets queued again and starts a
+   * second one alongside the first.
    */
-  async function stop(graceMs = 10_000): Promise<void> {
+  async function stop(graceMs = 15_000): Promise<void> {
     stopping = true;
     if (poll) clearInterval(poll);
     poll = undefined;
     if (inFlight.size === 0) return;
-    log(`waiting up to ${Math.round(graceMs / 1000)}s for ${inFlight.size} run(s)`);
+
+    log(`stopping ${inFlight.size} run(s)`);
+    for (const entry of inFlight.values()) entry.abort.abort();
     await Promise.race([drain(), new Promise((resolve) => setTimeout(resolve, graceMs))]);
   }
 

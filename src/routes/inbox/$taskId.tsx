@@ -1,5 +1,7 @@
-import { Link, createFileRoute, notFound } from "@tanstack/react-router";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
+import { ArrowLeft, CircleStop, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { TaskStateLabel, taskTitle } from "@/components/task-list";
 import { useLiveTasks } from "@/components/use-live-tasks.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -7,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { connectorManifest } from "@/connectors/manifests.ts";
-import { getTaskById } from "@/server/functions/tasks.ts";
+import { isTaskActive, type TaskView } from "@/lib/domain.ts";
+import { getTaskById, stopTask } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/inbox/$taskId")({
   loader: async ({ params }) => {
@@ -47,12 +50,19 @@ function TaskPage() {
         <div className="flex flex-col items-end gap-2">
           <TaskStateLabel state={task.state} />
           {task.dryRun ? <Badge variant="outline">Dry run</Badge> : null}
+          {isTaskActive(task.state) ? <StopButton task={task} /> : null}
         </div>
       </header>
 
       {task.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>This run failed</AlertTitle>
+        <Alert variant={task.state === "failed" ? "destructive" : undefined}>
+          <AlertTitle>
+            {task.state === "failed"
+              ? "This run failed"
+              : task.state === "cancelled"
+                ? "Stopped before it finished"
+                : "Waiting to try again"}
+          </AlertTitle>
           <AlertDescription className="whitespace-pre-wrap">{task.error}</AlertDescription>
         </Alert>
       ) : null}
@@ -108,7 +118,8 @@ function TaskPage() {
           </Row>
           <Row label="Action">{action?.name ?? task.actionId}</Row>
           <Row label="Agent">{task.agentId ?? "unknown"}</Row>
-          <Row label="Started">{new Date(task.createdAt).toLocaleString()}</Row>
+          <Row label="Queued">{new Date(task.createdAt).toLocaleString()}</Row>
+          {task.attempts > 1 ? <Row label="Attempt">{task.attempts}</Row> : null}
           {task.durationMs ? (
             <Row label="Took">{(task.durationMs / 1000).toFixed(1)}s</Row>
           ) : null}
@@ -123,6 +134,34 @@ function TaskPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * The run is in the other process, so this only leaves a note. The daemon
+ * sees it when it next renews its claim, which is why the button says it has
+ * been asked for rather than pretending it is already done.
+ */
+function StopButton({ task }: { task: TaskView }) {
+  const router = useRouter();
+  const [asked, setAsked] = useState(task.cancelRequested);
+
+  const stop = async () => {
+    setAsked(true);
+    try {
+      await stopTask({ data: { id: task.id } });
+      await router.invalidate();
+    } catch (error) {
+      setAsked(false);
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={stop} disabled={asked}>
+      <CircleStop />
+      {asked ? "Stopping" : "Stop"}
+    </Button>
   );
 }
 

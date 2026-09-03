@@ -63,9 +63,13 @@ export const cursorAgentRuntime = defineAgentRuntime({
       args: argv,
       cwd: input.cwd,
       timeoutMs: input.settings.timeoutMs,
+      signal: input.signal,
     });
     const command = `${bin} ${argv.join(" ")}`;
 
+    if (outcome.aborted) {
+      return { ok: false, aborted: true, output: outcome.stdout, durationMs: outcome.durationMs, command };
+    }
     if (outcome.timedOut) {
       return {
         ok: false,

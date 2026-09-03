@@ -233,9 +233,11 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
       cwd: workspace,
       settings: settingsFor(agentId),
       outputFile: join(workspace, "answer.txt"),
+      signal,
     });
     updateTask(id, { agentCommand: result.command });
 
+    if (result.aborted) throw new TaskCancelled();
     if (!result.ok) {
       // Never transient: the same prompt and the same timeout would fail again.
       throw new Error(result.detail ?? "The agent did not finish.");
