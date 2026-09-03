@@ -1,0 +1,43 @@
+import { createWorker } from "#/server/worker.ts";
+import { claimSingleInstance, releaseSingleInstance } from "./instance.ts";
+
+function log(message: string): void {
+  process.stdout.write(`${new Date().toISOString()} ${message}\n`);
+}
+
+/**
+ * The engine. Runs as its own process so a rule keeps working when nobody has
+ * the app open, which is the whole point of a loop that runs by itself.
+ *
+ * It talks to the app only through SQLite: the app queues tasks and asks for
+ * them to stop, the daemon does the work and records what happened. No ports,
+ * no sockets, nothing to authenticate between the two.
+ */
+async function main(): Promise<void> {
+  const claim = claimSingleInstance();
+  if (!claim.ok) {
+    log(`another Loopable daemon is already running (pid ${claim.pid}). Nothing to do.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const worker = createWorker({ log });
+  log(`daemon started (pid ${process.pid})`);
+  worker.start();
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log(`${signal}: stopping`);
+    await worker.stop();
+    releaseSingleInstance();
+    log("stopped");
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+}
+
+await main();

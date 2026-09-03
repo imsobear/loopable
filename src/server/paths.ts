@@ -11,3 +11,18 @@ export function dataDir(): string {
 export function dbPath(): string {
   return process.env.LOOPABLE_DB ?? join(dataDir(), "loopable.sqlite");
 }
+
+/**
+ * Where a run keeps its scratch files and its log. Not the system temp
+ * directory: the daemon writes these and the app reads them, they are the
+ * first thing to look at when a run goes wrong, and temp gets swept.
+ */
+export function runDir(taskId: string): string {
+  const dir = join(dataDir(), "runs", taskId);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function daemonPidPath(): string {
+  return join(dataDir(), "daemon.pid");
+}

@@ -78,7 +78,11 @@ export const tasks = sqliteTable(
     sourceKind: text("source_kind").$type<TaskSourceKind>().notNull(),
     sourceRepo: text("source_repo").notNull(),
     sourceNumber: integer("source_number").notNull(),
-    sourceTitle: text("source_title").notNull(),
+    /**
+     * Identifying a link needs no network, but the title does, so it arrives
+     * when the worker fetches rather than when the task is queued.
+     */
+    sourceTitle: text("source_title"),
     /** Set when a run was asked to stop before writing anything. */
     dryRun: integer("dry_run", { mode: "boolean" }).notNull().default(false),
     agentId: text("agent_id"),
@@ -89,10 +93,32 @@ export const tasks = sqliteTable(
     /** Where the write landed, once it has. */
     resultUrl: text("result_url"),
     error: text("error"),
+    /** Everything the agent printed, streamed to disk while it runs. */
+    logPath: text("log_path"),
+
+    // Queue bookkeeping. The work happens in another process, so a task has to
+    // carry enough state for the worker to be interrupted at any moment.
+    attempts: integer("attempts").notNull().default(0),
+    /** Not claimable before this: how a retry backs off. */
+    runAfter: integer("run_after", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    /**
+     * A claim that expires. Whoever holds it renews it while working, so a
+     * task whose worker died can be told apart from one still being worked on.
+     */
+    leaseUntil: integer("lease_until", { mode: "timestamp_ms" }),
+    cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Set once signals arrive on their own, to keep one rule from reviewing the
+     * same commit twice. Unused while every task comes from a pasted link.
+     */
+    dedupeKey: text("dedupe_key"),
     durationMs: integer("duration_ms"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -100,6 +126,9 @@ export const tasks = sqliteTable(
   (table) => [
     index("tasks_rule_idx").on(table.ruleId),
     index("tasks_created_idx").on(table.createdAt),
+    /** The worker's only question: what can I claim right now? */
+    index("tasks_claim_idx").on(table.state, table.runAfter),
+    uniqueIndex("tasks_dedupe_idx").on(table.dedupeKey),
   ],
 );
 

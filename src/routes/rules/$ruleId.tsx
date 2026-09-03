@@ -2,6 +2,7 @@ import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-rout
 import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, Play } from "lucide-react";
+import { EngineStatus } from "@/components/engine-status";
 import { RuleForm } from "@/components/rule-form";
 import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
@@ -12,19 +13,23 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { connectorManifest } from "@/connectors/manifests.ts";
 import { getRuleById } from "@/server/functions/rules.ts";
-import { getRuleTasks, runRuleNow } from "@/server/functions/tasks.ts";
+import { getRunnerState, getRuleTasks, runRuleNow } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/rules/$ruleId")({
   loader: async ({ params }) => {
     const rule = await getRuleById({ data: { id: params.ruleId } });
     if (!rule) throw notFound();
-    return { rule, tasks: await getRuleTasks({ data: { ruleId: params.ruleId } }) };
+    return {
+      rule,
+      tasks: await getRuleTasks({ data: { ruleId: params.ruleId } }),
+      engine: await getRunnerState(),
+    };
   },
   component: RulePage,
 });
 
 function RulePage() {
-  const { rule, tasks } = Route.useLoaderData();
+  const { rule, tasks, engine } = Route.useLoaderData();
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -45,6 +50,7 @@ function RulePage() {
 
         <TabsContent value="tasks" className="flex flex-col gap-4 pt-2">
           <RunBox rule={rule} />
+          <EngineStatus engine={engine} quiet />
           <TaskList
             tasks={tasks}
             showRule={false}
@@ -75,13 +81,10 @@ function RunBox({ rule }: { rule: { id: string; connectorId: string } }) {
   const run = async () => {
     setRunning(true);
     try {
-      const task = await runRuleNow({ data: { ruleId: rule.id, url: url.trim(), dryRun } });
+      await runRuleNow({ data: { ruleId: rule.id, url: url.trim(), dryRun } });
       await router.invalidate();
       setUrl("");
-      if (task.state === "failed") toast.error(task.error ?? "The run failed");
-      else if (task.state === "skipped") toast.success("The agent had nothing to say");
-      else if (task.state === "prepared") toast.success("Prepared, nothing written");
-      else toast.success("Written back to GitHub");
+      toast.success(dryRun ? "Queued as a dry run" : "Queued");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -103,7 +106,7 @@ function RunBox({ rule }: { rule: { id: string; connectorId: string } }) {
             />
             <Button onClick={run} disabled={running || url.trim() === ""}>
               <Play />
-              {running ? "Running..." : "Run"}
+              Run
             </Button>
           </div>
         </div>

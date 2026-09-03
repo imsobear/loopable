@@ -1,16 +1,32 @@
+import { TransientError } from "../errors.ts";
+
 async function request<T>(accessToken: string, path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`https://api.github.com${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "loopable",
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...init.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`https://api.github.com${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "loopable",
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...init.headers,
+      },
+    });
+  } catch (error) {
+    throw new TransientError(
+      `GitHub could not be reached: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   if (!res.ok) {
-    throw new Error(`GitHub ${res.status} on ${path}: ${(await res.text()).slice(0, 300)}`);
+    const detail = (await res.text()).slice(0, 300);
+    const message = `GitHub ${res.status} on ${path}: ${detail}`;
+    // A 403 is usually a permission problem, which will never fix itself, but
+    // GitHub also uses it for secondary rate limits, which will.
+    const rateLimited = res.status === 403 && /rate limit|abuse|try again/i.test(detail);
+    if (res.status === 429 || res.status >= 500 || rateLimited) throw new TransientError(message);
+    throw new Error(message);
   }
   return (await res.json()) as T;
 }

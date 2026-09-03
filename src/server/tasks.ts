@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
@@ -8,10 +7,11 @@ import { agentRuntime } from "#/agents/runtimes.ts";
 import { connectorManifest } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type { WorkItem } from "#/connectors/types.ts";
-import type { TaskState, TaskView } from "#/lib/domain.ts";
+import type { TaskView } from "#/lib/domain.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
+import { runDir } from "./paths.ts";
 import { rules, tasks, type Task } from "./db/schema.ts";
 
 /**
@@ -42,8 +42,11 @@ function toView(row: Task & { ruleName?: string | null }): TaskView {
     actionId: row.actionId,
     resultUrl: row.resultUrl,
     error: row.error,
+    attempts: row.attempts,
+    cancelRequested: row.cancelRequested,
     durationMs: row.durationMs,
     createdAt: row.createdAt.toISOString(),
+    startedAt: row.startedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -67,8 +70,15 @@ function select() {
       actionId: tasks.actionId,
       resultUrl: tasks.resultUrl,
       error: tasks.error,
+      logPath: tasks.logPath,
+      attempts: tasks.attempts,
+      runAfter: tasks.runAfter,
+      leaseUntil: tasks.leaseUntil,
+      cancelRequested: tasks.cancelRequested,
+      dedupeKey: tasks.dedupeKey,
       durationMs: tasks.durationMs,
       createdAt: tasks.createdAt,
+      startedAt: tasks.startedAt,
       updatedAt: tasks.updatedAt,
       ruleName: rules.name,
     })
@@ -87,12 +97,82 @@ export function getTask(id: string): TaskView | null {
   return row ? toView(row) : null;
 }
 
-function update(id: string, values: Partial<Task>): void {
+export function taskRow(id: string): Task | undefined {
+  return db().select().from(tasks).where(eq(tasks.id, id)).get();
+}
+
+export function updateTask(id: string, values: Partial<Task>): void {
   db()
     .update(tasks)
     .set({ ...values, updatedAt: new Date() })
     .where(eq(tasks.id, id))
     .run();
+}
+
+/**
+ * Queues a run and returns at once. Identifying the link needs no network, so
+ * a typo still fails while the person is looking at the box, but everything
+ * that can be slow or can fail belongs to the worker.
+ */
+export function enqueueTask(input: {
+  ruleId: string;
+  url: string;
+  dryRun: boolean;
+}): TaskView {
+  const rule = db().select().from(rules).where(eq(rules.id, input.ruleId)).get();
+  if (!rule) throw new Error("Rule not found");
+
+  const manifest = connectorManifest(rule.connectorId);
+  if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
+  const runtime = connectorRuntime(rule.connectorId);
+  if (!runtime.identifyLink || !runtime.resolveWorkItem || !runtime.applyAction) {
+    throw new Error(`${manifest.name} cannot run tasks yet.`);
+  }
+
+  const ref = runtime.identifyLink(input.url);
+  if (!ref) {
+    throw new Error(`That does not look like a ${manifest.name} link Loopable can work on.`);
+  }
+
+  const id = randomUUID();
+  db()
+    .insert(tasks)
+    .values({
+      id,
+      ruleId: rule.id,
+      connectorId: rule.connectorId,
+      state: "queued",
+      sourceUrl: input.url.trim(),
+      sourceKind: ref.kind,
+      sourceRepo: ref.repo,
+      sourceNumber: ref.number,
+      dryRun: input.dryRun,
+      actionId: rule.actionId,
+    })
+    .run();
+  return getTask(id)!;
+}
+
+export function requestCancel(id: string): TaskView | null {
+  const row = taskRow(id);
+  if (!row) return null;
+  updateTask(id, { cancelRequested: true });
+  return getTask(id);
+}
+
+export class TaskCancelled extends Error {
+  constructor() {
+    super("Stopped before it finished.");
+    this.name = "Cancelled";
+  }
+}
+
+/**
+ * Matched by name rather than by class. The app and the daemon load their own
+ * copy of every module, so instanceof cannot be relied on to travel.
+ */
+export function isCancellation(error: unknown): boolean {
+  return error instanceof TaskCancelled || (error as Error | null)?.name === "Cancelled";
 }
 
 function promptFor(input: { instruction: string; item: WorkItem; files: string[] }): string {
@@ -109,121 +189,96 @@ function promptFor(input: { instruction: string; item: WorkItem; files: string[]
 }
 
 /**
- * Runs one rule against one thing, start to finish: fetch the context, let the
- * agent work, then write the result back unless this was a dry run or the
- * agent had nothing to say.
+ * Carries one queued task as far as it can get. Throws so the worker can
+ * decide whether to try again; what it must never do is repeat the agent,
+ * which is the only expensive part. Once output is stored, a retry picks up at
+ * the write.
  */
-export async function runRuleAgainstUrl(input: {
-  ruleId: string;
-  url: string;
-  dryRun: boolean;
-}): Promise<TaskView> {
-  const rule = db().select().from(rules).where(eq(rules.id, input.ruleId)).get();
-  if (!rule) throw new Error("Rule not found");
+export async function runTask(id: string, signal?: AbortSignal): Promise<TaskView> {
+  const task = taskRow(id);
+  if (!task) throw new Error(`Task not found: ${id}`);
+  const stop = () => {
+    if (signal?.aborted || taskRow(id)?.cancelRequested) throw new TaskCancelled();
+  };
 
-  const manifest = connectorManifest(rule.connectorId);
-  if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
-  const runtime = connectorRuntime(rule.connectorId);
+  const rule = db().select().from(rules).where(eq(rules.id, task.ruleId)).get();
+  if (!rule) throw new Error("The rule behind this task has been deleted.");
+  const runtime = connectorRuntime(task.connectorId);
   if (!runtime.resolveWorkItem || !runtime.applyAction) {
-    throw new Error(`${manifest.name} cannot run tasks yet.`);
+    throw new Error(`${task.connectorId} cannot run tasks.`);
   }
 
-  // Resolving happens before the row exists, so a bad link is a plain error
-  // rather than a failed task cluttering the record.
-  const { credential } = await credentialForConnector(rule.connectorId);
-  const item = await runtime.resolveWorkItem({ url: input.url, credential });
+  stop();
+  const { credential } = await credentialForConnector(task.connectorId);
+  const item = await runtime.resolveWorkItem({ url: task.sourceUrl, credential });
+  updateTask(id, { sourceTitle: item.title });
 
+  let output = task.output;
+  if (!output) {
+    stop();
+    const agentId = task.agentId ?? (await defaultAgentFor(rule.agentId));
+    updateTask(id, { state: "preparing", agentId });
+
+    const workspace = runDir(id);
+    for (const file of item.context) {
+      writeFileSync(join(workspace, file.name), file.body);
+    }
+
+    const result = await agentRuntime(agentId).run({
+      prompt: promptFor({
+        instruction: rule.instruction,
+        item,
+        files: item.context.map((file) => file.name),
+      }),
+      cwd: workspace,
+      settings: settingsFor(agentId),
+      outputFile: join(workspace, "answer.txt"),
+    });
+    updateTask(id, { agentCommand: result.command });
+
+    if (!result.ok) {
+      // Never transient: the same prompt and the same timeout would fail again.
+      throw new Error(result.detail ?? "The agent did not finish.");
+    }
+    output = result.output.trim();
+    if (!output) throw new Error("The agent produced nothing.");
+
+    if (output.replace(/[`*_.\s]/g, "").toUpperCase() === NOTHING) {
+      finish(id, task, { state: "skipped", output });
+      return getTask(id)!;
+    }
+    updateTask(id, { output });
+  }
+
+  if (task.dryRun) {
+    finish(id, task, { state: "prepared" });
+    return getTask(id)!;
+  }
+
+  stop();
+  updateTask(id, { state: "applying" });
+  const outcome = await runtime.applyAction({
+    actionId: task.actionId,
+    item,
+    body: output + SIGNATURE,
+    credential,
+  });
+  finish(id, task, { state: "done", resultUrl: outcome.url });
+  return getTask(id)!;
+}
+
+function finish(id: string, task: Task, values: Partial<Task>): void {
+  const started = task.startedAt?.getTime() ?? task.createdAt.getTime();
+  updateTask(id, { ...values, durationMs: Date.now() - started, leaseUntil: null });
+}
+
+async function defaultAgentFor(pinned: string | null): Promise<string> {
   const agents = await listAgents();
-  const chosen = rule.agentId ?? agents.find((agent) => agent.isDefault)?.agentId ?? null;
+  const chosen = pinned ?? agents.find((agent) => agent.isDefault)?.agentId ?? null;
   if (!chosen) throw new Error("No agent is available. Choose a default on the Agents page.");
   if (!agentManifest(chosen)) throw new Error(`Unknown agent: ${chosen}`);
   if (!agents.find((agent) => agent.agentId === chosen)?.installed) {
     throw new Error(`${chosen} is not installed on this machine.`);
   }
-
-  const id = randomUUID();
-  db()
-    .insert(tasks)
-    .values({
-      id,
-      ruleId: rule.id,
-      connectorId: rule.connectorId,
-      state: "preparing",
-      sourceUrl: item.url,
-      sourceKind: item.kind,
-      sourceRepo: item.repo,
-      sourceNumber: item.number,
-      sourceTitle: item.title,
-      dryRun: input.dryRun,
-      agentId: chosen,
-      actionId: rule.actionId,
-    })
-    .run();
-
-  const started = Date.now();
-  const fail = (message: string): TaskView => {
-    update(id, { state: "failed", error: message, durationMs: Date.now() - started });
-    return getTask(id)!;
-  };
-
-  try {
-    const workspace = mkdtempSync(join(tmpdir(), "loopable-task-"));
-    for (const file of item.context) {
-      writeFileSync(join(workspace, file.name), file.body);
-    }
-
-    const settings = settingsFor(chosen);
-    const prompt = promptFor({
-      instruction: rule.instruction,
-      item,
-      files: item.context.map((file) => file.name),
-    });
-    const result = await agentRuntime(chosen).run({
-      prompt,
-      cwd: workspace,
-      settings,
-      outputFile: join(workspace, "answer.txt"),
-    });
-    update(id, { agentCommand: result.command });
-
-    if (!result.ok) {
-      return fail(result.detail ?? "The agent did not finish.");
-    }
-    const output = result.output.trim();
-    if (!output) return fail("The agent produced nothing.");
-
-    if (output.replace(/[`*_.\s]/g, "").toUpperCase() === NOTHING) {
-      update(id, { state: "skipped", output, durationMs: Date.now() - started });
-      return getTask(id)!;
-    }
-
-    update(id, { output });
-
-    if (input.dryRun) {
-      update(id, { state: "prepared", durationMs: Date.now() - started });
-      return getTask(id)!;
-    }
-
-    update(id, { state: "applying" });
-    const outcome = await runtime.applyAction({
-      actionId: rule.actionId,
-      item,
-      body: output + SIGNATURE,
-      credential,
-    });
-    update(id, { state: "done", resultUrl: outcome.url, durationMs: Date.now() - started });
-    return getTask(id)!;
-  } catch (error) {
-    return fail(error instanceof Error ? error.message : String(error));
-  }
+  return chosen;
 }
-
-export const TASK_STATE_LABELS: Record<TaskState, string> = {
-  queued: "Queued",
-  preparing: "Working",
-  applying: "Writing",
-  prepared: "Prepared",
-  done: "Written",
-  skipped: "Nothing to say",
-  failed: "Failed",
-};

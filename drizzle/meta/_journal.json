@@ -29,6 +29,13 @@
       "when": 1788416262271,
       "tag": "0003_small_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788457074767,
+      "tag": "0004_wonderful_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

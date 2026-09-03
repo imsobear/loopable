@@ -11,12 +11,16 @@ Everything runs on your own machine: the app, the database, and the credentials.
 ```bash
 pnpm install
 pnpm dev            # http://127.0.0.1:4321
+pnpm daemon         # the engine: runs the queued work
 ```
+
+Two processes, on purpose. The app is the windows and the buttons; the daemon does the work, so a rule keeps running when nobody has the app open. They talk only through SQLite: the app queues a task and the daemon picks it up. If the daemon is not running, the app says so rather than letting work pile up in silence.
 
 Other commands:
 
 ```bash
 pnpm typecheck      # tsc --noEmit
+pnpm test           # vitest
 pnpm db:generate    # write a migration after changing the schema
 pnpm db:studio      # browse the local database
 ```
@@ -85,7 +89,15 @@ Signals do not arrive on their own yet, so a task starts by pasting a link on th
 
 A run passes through `preparing` and, if it has something to say, `applying`, ending at `done` with a link to what was written. Two other endings matter as much. `skipped` is the agent answering `NOTHING_TO_DO`, which the prompt asks for explicitly: a rule that runs by itself must be able to stay quiet, or it posts filler. `prepared` is output with nothing written, which today means a dry run and later will mean a rule that asked to be checked first.
 
-The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into a scratch directory as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess.
+## The queue
+
+Pressing Run does not run anything. It checks the link, writes a `queued` task, and returns; the daemon claims it a moment later. The queue is the tasks table itself, which is what lets a run survive both processes being restarted.
+
+A claim is a lease, renewed while the work goes on. That is what tells a run still in progress apart from one whose worker died: nothing else can, once the process holding it is gone. A lapsed lease is picked up again, and attempts are counted so a task that kills its worker cannot do so forever. Renewal is also when a stop request is noticed, since the person asking is in the other process and the database is where they leave the message.
+
+Retries are deliberately lopsided, because the phases cost wildly different amounts. Fetching and writing are milliseconds and fail for reasons that pass, so a connector marks those as transient and they are tried again with a growing wait. The agent is minutes of compute and real money, and a prompt that failed will fail the same way, so it is never repeated. Once output is stored it stays stored: a write that fails because GitHub returned 502 resumes at the write, and nobody pays for the review twice.
+
+The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into `~/.loopable/runs/<task>/` as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess.
 
 Written work is signed, so nobody has to wonder whether a person or a rule wrote it.
 
@@ -112,7 +124,8 @@ Detection looks at `PATH`, then at the usual install directories, then asks the 
 | --- | --- |
 | `src/connectors/` | The connector contract and one folder per connector |
 | `src/agents/` | The agent contract and one folder per agent |
-| `src/server/` | Database, secret store, connection service, server functions |
+| `src/server/` | Database, secret store, connections, the queue and the worker, server functions |
+| `src/daemon/` | The engine process: single instance, signals, its own logging |
 | `src/routes/` | Pages, plus the OAuth endpoints under `api/` |
 | `src/components/` | Shell, shared pieces, and shadcn/ui in `ui/` |
 | `drizzle/` | Generated migrations |

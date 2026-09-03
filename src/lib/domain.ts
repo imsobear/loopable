@@ -22,8 +22,19 @@ export const TASK_STATE = [
   /** The agent judged there was nothing worth writing. */
   "skipped",
   "failed",
+  "cancelled",
 ] as const;
 export type TaskState = (typeof TASK_STATE)[number];
+
+/**
+ * States the worker still owes something for. Used by the pages to know when
+ * to keep looking, and by the reaper to find runs a dead process abandoned.
+ */
+export const TASK_ACTIVE_STATES = ["queued", "preparing", "applying"] as const satisfies TaskState[];
+
+export function isTaskActive(state: TaskState): boolean {
+  return (TASK_ACTIVE_STATES as readonly TaskState[]).includes(state);
+}
 
 export type TaskSourceKind = "pull_request" | "issue";
 
@@ -37,7 +48,8 @@ export type TaskView = {
   sourceKind: TaskSourceKind;
   sourceRepo: string;
   sourceNumber: number;
-  sourceTitle: string;
+  /** Only known once the connector has fetched it. */
+  sourceTitle: string | null;
   dryRun: boolean;
   agentId: string | null;
   agentCommand: string | null;
@@ -45,8 +57,12 @@ export type TaskView = {
   actionId: string;
   resultUrl: string | null;
   error: string | null;
+  attempts: number;
+  cancelRequested: boolean;
   durationMs: number | null;
   createdAt: string;
+  /** When the worker picked it up, so the pages can count the minutes. */
+  startedAt: string | null;
   updatedAt: string;
 };
 

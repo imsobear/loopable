@@ -1,6 +1,7 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { TaskStateLabel } from "@/components/task-list";
+import { TaskStateLabel, taskTitle } from "@/components/task-list";
+import { useLiveTasks } from "@/components/use-live-tasks.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ function TaskPage() {
   const task = Route.useLoaderData();
   const manifest = connectorManifest(task.connectorId);
   const action = manifest?.actions.find((entry) => entry.id === task.actionId);
+  useLiveTasks([task]);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -34,7 +36,7 @@ function TaskPage() {
 
       <header className="flex items-start gap-4">
         <div className="flex-1">
-          <h1 className="text-xl font-semibold tracking-tight">{task.sourceTitle}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{taskTitle(task)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {task.sourceRepo} #{task.sourceNumber} ·{" "}
             <Link to="/rules/$ruleId" params={{ ruleId: task.ruleId }} className="underline">

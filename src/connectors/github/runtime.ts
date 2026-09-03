@@ -2,7 +2,7 @@ import { defineRuntime } from "../define.ts";
 import type { ConnectorAccount } from "../types.ts";
 import { getViewer, postIssueComment, submitReview } from "./api.ts";
 import { githubAppRegistration } from "./app-registration.ts";
-import { resolveWorkItem } from "./work-item.ts";
+import { parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
   buildAuthorizeUrl,
   createPkce,
@@ -60,6 +60,10 @@ export const githubRuntime = defineRuntime({
         "Add config/oauth-app.json, or set LOOPABLE_GITHUB_CLIENT_ID and LOOPABLE_GITHUB_CLIENT_SECRET.",
     };
   },
+  identifyLink(url) {
+    return parseGithubUrl(url);
+  },
+
   async resolveWorkItem({ url, credential }) {
     const { accessToken } = await usableToken(credential as GithubCredential);
     return resolveWorkItem(url, accessToken);

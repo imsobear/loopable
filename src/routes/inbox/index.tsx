@@ -1,14 +1,15 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { EngineStatus } from "@/components/engine-status";
 import { TaskList } from "@/components/task-list";
-import { getInbox } from "@/server/functions/tasks.ts";
+import { getInbox, getRunnerState } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/inbox/")({
-  loader: () => getInbox(),
+  loader: async () => ({ tasks: await getInbox(), engine: await getRunnerState() }),
   component: InboxPage,
 });
 
 function InboxPage() {
-  const tasks = Route.useLoaderData();
+  const { tasks, engine } = Route.useLoaderData();
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -19,6 +20,8 @@ function InboxPage() {
           nothing to say.
         </p>
       </header>
+
+      <EngineStatus engine={engine} />
 
       <TaskList
         tasks={tasks}

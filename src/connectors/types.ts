@@ -163,8 +163,21 @@ export type ActionOutcome = {
   url: string;
 };
 
+/** What a link points at, as far as can be told without asking the service. */
+export type WorkItemRef = {
+  kind: "pull_request" | "issue";
+  repo: string;
+  number: number;
+};
+
 export type ConnectorRuntime = {
   readiness(): Promise<Readiness>;
+  /**
+   * Whether this connector recognises a link, answered without any network
+   * call, so a typo fails while the person is still looking at the box rather
+   * than becoming a queued task that fails a second later.
+   */
+  identifyLink?(url: string): WorkItemRef | null;
   /** Turn a link a person pasted into something a rule can act on. */
   resolveWorkItem?(input: { url: string; credential: unknown }): Promise<WorkItem>;
   /** Carry out one of the manifest's actions. This is the part that writes. */
