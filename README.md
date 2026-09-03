@@ -2,48 +2,70 @@
 
 **Build reliable engineering loops across the services and agents you already use.**
 
-A loop runs from a signal in a service you already use, through an agent that prepares real work, to a result you approve. v1 closes one loop entirely on your Mac: a daemon polls GitHub, prepares work with a local coding agent, and puts the result in a supervised inbox. Nothing is posted until you approve it.
+Loopable watches the services a team already works in, prepares the work with a coding agent, and holds every result for human approval. Nothing is written back to any service until a person approves it.
 
-## Run
+Everything runs on your own machine: the app, the database, and the credentials.
 
-```bash
-# start the local UI (127.0.0.1:8787)
-node --experimental-strip-types src/cli.ts start
-```
-
-Then open http://127.0.0.1:8787 → **Setup → Authorize GitHub**. That is the whole login: GitHub's authorize page opens, you click Authorize, GitHub redirects back to `127.0.0.1`, and the token lands in Keychain. Authorization code flow with PKCE (代码交换证明) on a loopback redirect — the flow GitHub recommends for apps that run on the user's machine.
-
-There is nothing to register and nothing to paste. Loopable ships with one app registration.
+## Run it
 
 ```bash
-# insert a fake inbox item without GitHub, then click Poll GitHub now
-node --experimental-strip-types src/cli.ts demo
+pnpm install
+pnpm dev            # http://127.0.0.1:4321
 ```
 
-`setup` starts the daemon in the background and opens the browser.
-
-## The app registration (maintainer only)
-
-One OAuth App exists for all of Loopable, registered once with callback URL `http://127.0.0.1/oauth/github/callback` — no port. GitHub matches loopback redirects without comparing the port ("the `redirect_uri` does not need to match the port specified in the callback URL"), so one registration covers every `LOOPABLE_PORT`.
-
-Its client ID and secret live in `config/oauth-app.json`, which ships with the app. GitHub's own guidance for public clients: "You cannot secure your client secret. You do have to ship the client secret in the application's code, and you should use PKCE." So that secret is a public credential, PKCE is the real protection, and the registration must never be used to gate access to any other service. `gh` does the same thing.
-
-It is an OAuth App rather than a GitHub App, chosen so that one Authorize click is the entire login: scopes `repo notifications`, no per-repo install step, no token expiry, and the notifications API stays available. The known limit is that an organization can block third-party OAuth Apps, and that the grant covers every repo the user can reach. Moving to a GitHub App later needs no code change here — the authorization code flow is identical, token refresh is already handled, and the poller already falls back to search when notifications are unavailable.
-
-A source checkout has no such file. To point a build at your own registration, in order of precedence:
+Other commands:
 
 ```bash
-export LOOPABLE_GITHUB_CLIENT_ID=Ov23li… LOOPABLE_GITHUB_CLIENT_SECRET=…
-node --experimental-strip-types src/cli.ts auth oauth-app Ov23li… SECRET  # Keychain
-cp config/oauth-app.example.json config/oauth-app.json                    # shipped default
+pnpm typecheck      # tsc --noEmit
+pnpm db:generate    # write a migration after changing the schema
+pnpm db:studio      # browse the local database
 ```
 
-## v1
+State lives in `~/.loopable/loopable.sqlite` (override with `LOOPABLE_HOME` or `LOOPABLE_DB`). Migrations run automatically when the app first touches the database. Credentials never go in the database: on macOS they go in the keychain, elsewhere in a `0600` file under the data directory.
 
-- GitHub only, ~60s poll, laptop catch-up
-- Events: assigned issue, review requested, comments on my PR, CI on my PR
-- Actions: plan, review, address comments, investigate CI
-- Codex if `codex` is on PATH; otherwise a local stub draft
-- Approve/reject in the inbox. The agent process does not receive the GitHub token
+## Connectors
 
-See `docs/rfc/0001-v1-local-github-runtime.md`.
+A connector is a folder under `src/connectors/`. It exports two halves, and the split is load bearing:
+
+| File | Runs where | Contents |
+| --- | --- | --- |
+| `manifest.ts` | Browser and server | Pure data: name, icon, how to authorize, which signals it watches, which actions it can propose, which settings a connection has |
+| `runtime.ts` | Server only | Behaviour: authorizing, reading the account, later polling and applying approved actions |
+
+The pages render entirely from manifests, so adding a connector means adding a folder and one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. No page changes. The contract lives in `src/connectors/types.ts`.
+
+Connections are rows, not a single slot per connector, so the same connector can hold several accounts.
+
+### The GitHub app registration (maintainer only)
+
+End users never register anything; they click Connect. One OAuth App ships with Loopable, configured either through the environment:
+
+```bash
+export LOOPABLE_GITHUB_CLIENT_ID=...
+export LOOPABLE_GITHUB_CLIENT_SECRET=...
+```
+
+or through `config/oauth-app.json`, which is gitignored:
+
+```json
+{ "clientId": "Ov23...", "clientSecret": "..." }
+```
+
+Register the callback URL without a port, because loopback redirects match on host and path only:
+
+```
+http://127.0.0.1/api/connectors/github/callback
+```
+
+Login is the OAuth 2.0 authorization code flow with PKCE over a loopback redirect. GitHub still requires the client secret at the token endpoint, and a client running on a user's machine cannot hide it; PKCE is what actually secures the exchange. This is the same trade-off the GitHub CLI makes.
+
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `src/connectors/` | The connector contract and one folder per connector |
+| `src/server/` | Database, secret store, connection service, server functions |
+| `src/routes/` | Pages, plus the OAuth endpoints under `api/` |
+| `src/components/` | Shell, shared pieces, and shadcn/ui in `ui/` |
+| `drizzle/` | Generated migrations |
+| `legacy/` | The proof of concept: polling, rules, agent runs, publishing. Being ported feature by feature |

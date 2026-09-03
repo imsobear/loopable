@@ -1,0 +1,135 @@
+/**
+ * The connector contract.
+ *
+ * Every connector is a folder under src/connectors that exports two things:
+ *
+ *   manifest.ts  pure data, safe to import from the browser. Everything the UI
+ *                needs to render a connector it has never heard of.
+ *   runtime.ts   server-only behaviour: authorizing, reading signals, writing
+ *                back. Only ever imported from server functions.
+ *
+ * Adding a connector must not require touching any page.
+ */
+
+export type ConnectorId = string;
+
+/** How a user connects an account. The UI renders from this, so the set is closed. */
+export type AuthDescriptor =
+  | {
+      kind: "oauth_redirect";
+      /** Shown before sending the user off to the provider. */
+      scopes: string[];
+      /** This install needs an app registration before anyone can connect. */
+      needsAppRegistration: boolean;
+    }
+  | {
+      kind: "token";
+      fields: TokenField[];
+      /** Where the user creates the token. */
+      helpUrl?: string;
+    };
+
+export type TokenField = {
+  key: string;
+  label: string;
+  placeholder?: string;
+  secret: boolean;
+  optional?: boolean;
+};
+
+/** A signal the connector can observe. Drives the rules UI later. */
+export type EventDescriptor = {
+  id: string;
+  name: string;
+  summary: string;
+};
+
+/** Something the connector can do to the outside world. Always approval-gated. */
+export type ActionDescriptor = {
+  id: string;
+  name: string;
+  summary: string;
+};
+
+/** Per-connection configuration, rendered generically as a form. */
+export type SettingField =
+  | { key: string; kind: "boolean"; label: string; help?: string; default: boolean }
+  | { key: string; kind: "text"; label: string; help?: string; placeholder?: string }
+  | { key: string; kind: "string_list"; label: string; help?: string; placeholder?: string }
+  | {
+      key: string;
+      kind: "select";
+      label: string;
+      help?: string;
+      options: Array<{ value: string; label: string }>;
+      default: string;
+    };
+
+export type ConnectorManifest = {
+  id: ConnectorId;
+  name: string;
+  /** One line, shown on the connector card. */
+  tagline: string;
+  docsUrl?: string;
+  /** Lucide icon name, so the client bundle carries no connector assets. */
+  icon: string;
+  /** Tailwind class for the card icon tile. */
+  accent: string;
+  auth: AuthDescriptor;
+  events: EventDescriptor[];
+  actions: ActionDescriptor[];
+  settings: SettingField[];
+  /** Connecting more than one account of this connector is meaningful. */
+  allowsMultipleAccounts: boolean;
+};
+
+/** The account a credential belongs to, as shown in the UI. */
+export type ConnectorAccount = {
+  id: string;
+  label: string;
+  url?: string;
+  avatarUrl?: string;
+  scopes?: string[];
+};
+
+export type AuthResult = {
+  credential: unknown;
+  account: ConnectorAccount;
+};
+
+/** Whether this install can offer the connector at all. */
+export type Readiness = { ready: true } | { ready: false; reason: string; fixHint?: string };
+
+export type StartAuthorizationContext = {
+  /** Absolute callback URL this server will receive, provider must allow it. */
+  redirectUri: string;
+  state: string;
+};
+
+export type CompleteAuthorizationContext = {
+  redirectUri: string;
+  code: string;
+  verifier: string;
+};
+
+export type ConnectorRuntime = {
+  readiness(): Promise<Readiness>;
+  auth: {
+    /** Required when auth.kind is "oauth_redirect". */
+    startAuthorization?(ctx: StartAuthorizationContext): Promise<{
+      redirectUrl: string;
+      verifier: string;
+    }>;
+    completeAuthorization?(ctx: CompleteAuthorizationContext): Promise<AuthResult>;
+    /** Required when auth.kind is "token". */
+    connectWithFields?(fields: Record<string, string>): Promise<AuthResult>;
+    /** Re-read the account to prove a stored credential still works. */
+    identity(credential: unknown): Promise<ConnectorAccount>;
+    revoke?(credential: unknown): Promise<void>;
+  };
+};
+
+export type Connector = {
+  manifest: ConnectorManifest;
+  runtime: ConnectorRuntime;
+};
