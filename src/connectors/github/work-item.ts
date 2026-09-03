@@ -19,22 +19,22 @@ export function parseGithubUrl(
 
 /**
  * Generous, because a review written against half a diff is worse than no
- * review: the agent hedges everything it could not see. Where a cut is
- * unavoidable it is announced, so the agent knows to stay quiet about the rest
- * instead of guessing.
+ * review: the agent hedges everything it could not see. Nothing is cut while
+ * the whole diff fits, and where a cut is unavoidable it is announced, so the
+ * agent knows to stay quiet about the rest instead of guessing.
  */
-const PER_FILE_LIMIT = 24_000;
-const TOTAL_LIMIT = 120_000;
+const TOTAL_LIMIT = 200_000;
+/** No file is cut below this, however many files there are. */
+const MIN_PER_FILE = 8_000;
 
 function patchOf(file: PullFile, budget: number): string {
   const patch = file.patch;
   if (!patch) {
     return file.status === "renamed" ? "_Renamed, no content change._" : "_No diff available._";
   }
-  const limit = Math.min(PER_FILE_LIMIT, budget);
-  if (patch.length <= limit) return `\`\`\`diff\n${patch}\n\`\`\``;
+  if (patch.length <= budget) return `\`\`\`diff\n${patch}\n\`\`\``;
 
-  const kept = patch.slice(0, limit);
+  const kept = patch.slice(0, budget);
   const cutAtLine = kept.slice(0, kept.lastIndexOf("\n"));
   const droppedLines = patch.slice(cutAtLine.length).split("\n").length;
   return [
@@ -44,6 +44,14 @@ function patchOf(file: PullFile, budget: number): string {
 }
 
 function diffOf(files: PullFile[]): string {
+  const total = files.reduce((sum, file) => sum + (file.patch?.length ?? 0), 0);
+  // A fair share only comes into play once the whole diff cannot fit, so the
+  // common case of a normal-sized pull request arrives complete.
+  const share =
+    total <= TOTAL_LIMIT
+      ? Number.POSITIVE_INFINITY
+      : Math.max(MIN_PER_FILE, Math.floor(TOTAL_LIMIT / files.length));
+
   const sections: string[] = [];
   let budget = TOTAL_LIMIT;
   let shown = 0;
@@ -56,7 +64,7 @@ function diffOf(files: PullFile[]): string {
     ]
       .filter(Boolean)
       .join(" ");
-    const body = patchOf(file, budget);
+    const body = patchOf(file, Math.min(share, budget));
     sections.push(`### ${file.filename}\n\n${file.status}${counts ? ` ${counts}` : ""}\n\n${body}`);
     budget -= body.length;
     shown += 1;
