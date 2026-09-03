@@ -97,6 +97,15 @@ export type AuthResult = {
   account: ConnectorAccount;
 };
 
+export type IdentityResult = {
+  account: ConnectorAccount;
+  /**
+   * Set only when reading the identity renewed the credential, so the caller
+   * stores it instead of refreshing again on every read.
+   */
+  renewedCredential?: unknown;
+};
+
 /** Whether this install can offer the connector at all. */
 export type Readiness = { ready: true } | { ready: false; reason: string; fixHint?: string };
 
@@ -124,7 +133,7 @@ export type ConnectorRuntime = {
     /** Required when auth.kind is "token". */
     connectWithFields?(fields: Record<string, string>): Promise<AuthResult>;
     /** Re-read the account to prove a stored credential still works. */
-    identity(credential: unknown): Promise<ConnectorAccount>;
+    identity(credential: unknown): Promise<IdentityResult>;
     revoke?(credential: unknown): Promise<void>;
   };
 };

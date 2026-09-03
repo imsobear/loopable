@@ -86,8 +86,9 @@ export const githubRuntime = defineRuntime({
       return { credential, account: accountFrom(viewer) };
     },
     async identity(credential) {
-      const { accessToken } = await usableToken(credential as GithubCredential);
-      return accountFrom(await getViewer(accessToken));
+      const { accessToken, refreshed } = await usableToken(credential as GithubCredential);
+      const account = accountFrom(await getViewer(accessToken));
+      return refreshed ? { account, renewedCredential: refreshed } : { account };
     },
   },
 });

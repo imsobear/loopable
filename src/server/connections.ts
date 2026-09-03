@@ -165,7 +165,8 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
     return toView(getConnection(id)!);
   }
   try {
-    const account = await runtime.auth.identity(credential);
+    const { account, renewedCredential } = await runtime.auth.identity(credential);
+    if (renewedCredential) await writeCredential(id, renewedCredential);
     db()
       .update(connections)
       .set({
