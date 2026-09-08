@@ -1,6 +1,17 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { daemonPidPath } from "#/server/paths.ts";
 
+/** How often the daemon says it is still there. */
+export const HEARTBEAT_MS = 10_000;
+
+/**
+ * How long a heartbeat is believed. Three beats, because one missed beat is a
+ * busy machine and three is a process that is gone.
+ */
+export const STALE_MS = HEARTBEAT_MS * 3;
+
+type Claim = { pid: number; at: number };
+
 function isAlive(pid: number): boolean {
   try {
     // Signal 0 asks the kernel whether we could signal the process, which is
@@ -13,34 +24,56 @@ function isAlive(pid: number): boolean {
   }
 }
 
+function read(): Claim | null {
+  const path = daemonPidPath();
+  if (!existsSync(path)) return null;
+  try {
+    const claim = JSON.parse(readFileSync(path, "utf8")) as Partial<Claim>;
+    if (!Number.isInteger(claim.pid) || !Number.isFinite(claim.at)) return null;
+    return { pid: claim.pid as number, at: claim.at as number };
+  } catch {
+    // An unreadable claim is no claim. Whoever starts next overwrites it.
+    return null;
+  }
+}
+
 /**
- * Two daemons on one database would fight over every task. A pid file is
- * enough here: both processes belong to the same person on the same machine,
- * and a stale file is easy to tell from a live one.
+ * Whether a claim is one we should believe. A pid on its own is not enough:
+ * pids get reused, so a dead daemon's number can end up on somebody's editor
+ * and then that claim would be believed forever. A daemon that is really
+ * running says so every few seconds, and only a recent word counts.
+ */
+function held(claim: Claim, now: number): boolean {
+  return isAlive(claim.pid) && now - claim.at < STALE_MS;
+}
+
+/** Writes down that this process is the daemon, as of right now. */
+export function beat(): void {
+  const claim: Claim = { pid: process.pid, at: Date.now() };
+  writeFileSync(daemonPidPath(), JSON.stringify(claim), "utf8");
+}
+
+/**
+ * Two daemons on one database would fight over every task. A claim file is
+ * enough here: both processes belong to the same person on the same machine.
  */
 export function claimSingleInstance(): { ok: true } | { ok: false; pid: number } {
-  const path = daemonPidPath();
-  if (existsSync(path)) {
-    const existing = Number.parseInt(readFileSync(path, "utf8").trim(), 10);
-    if (Number.isInteger(existing) && existing !== process.pid && isAlive(existing)) {
-      return { ok: false, pid: existing };
-    }
+  const claim = read();
+  if (claim && claim.pid !== process.pid && held(claim, Date.now())) {
+    return { ok: false, pid: claim.pid };
   }
-  writeFileSync(path, String(process.pid), "utf8");
+  beat();
   return { ok: true };
 }
 
 export function releaseSingleInstance(): void {
-  const path = daemonPidPath();
-  if (!existsSync(path)) return;
-  const owner = Number.parseInt(readFileSync(path, "utf8").trim(), 10);
-  if (owner === process.pid) rmSync(path);
+  const claim = read();
+  if (claim?.pid === process.pid) rmSync(daemonPidPath());
 }
 
 /** What the app shows when it needs to say whether the engine is up. */
 export function runningDaemonPid(): number | null {
-  const path = daemonPidPath();
-  if (!existsSync(path)) return null;
-  const pid = Number.parseInt(readFileSync(path, "utf8").trim(), 10);
-  return Number.isInteger(pid) && isAlive(pid) ? pid : null;
+  const claim = read();
+  if (!claim) return null;
+  return held(claim, Date.now()) ? claim.pid : null;
 }

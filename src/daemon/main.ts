@@ -1,7 +1,7 @@
 import { createPoller } from "#/server/poller.ts";
 import { sweepRunDirs } from "#/server/tasks.ts";
 import { createWorker } from "#/server/worker.ts";
-import { claimSingleInstance, releaseSingleInstance } from "./instance.ts";
+import { beat, claimSingleInstance, HEARTBEAT_MS, releaseSingleInstance } from "./instance.ts";
 
 function log(message: string): void {
   process.stdout.write(`${new Date().toISOString()} ${message}\n`);
@@ -26,6 +26,11 @@ async function main(): Promise<void> {
   const swept = sweepRunDirs();
   if (swept > 0) log(`cleared ${swept} old run director${swept === 1 ? "y" : "ies"}`);
 
+  // Saying so on a timer is what makes the claim mean something: the app can
+  // tell a running daemon from one that was killed without a word.
+  const heartbeat = setInterval(beat, HEARTBEAT_MS);
+  heartbeat.unref();
+
   const worker = createWorker({ log });
   const poller = createPoller({ log });
   log(`daemon started (pid ${process.pid})`);
@@ -38,6 +43,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`${signal}: stopping`);
+    clearInterval(heartbeat);
     poller.stop();
     await worker.stop();
     releaseSingleInstance();
