@@ -6,17 +6,12 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { CONNECTOR_MANIFESTS, connectorManifest } from "@/connectors/manifests.ts";
+import { agentManifest } from "@/agents/manifests.ts";
+import { connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
 import type { RuleReadiness, RuleView } from "@/lib/domain.ts";
-import {
-  addRuleFromTemplate,
-  getRulesPage,
-  removeRule,
-  reorderRule,
-  toggleRule,
-} from "@/server/functions/rules.ts";
+import { getRulesPage, removeRule, reorderRule, toggleRule } from "@/server/functions/rules.ts";
 
 export const Route = createFileRoute("/rules/")({
   loader: () => getRulesPage(),
@@ -32,8 +27,8 @@ function RulesPage() {
         <div className="flex-1">
           <h1 className="text-2xl font-semibold tracking-tight">Rules</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            A rule turns one signal into prepared work. The first rule that matches an event is the
-            one that runs, so order matters.
+            Each rule runs one workflow on its own and writes the result back. The first rule that
+            matches something is the one that runs, so order matters.
           </p>
         </div>
         <Button render={<Link to="/rules/new" />}>
@@ -44,7 +39,18 @@ function RulesPage() {
 
       <Gaps readiness={readiness} hasRules={rules.length > 0} />
 
-      {rules.length === 0 ? <Templates /> : null}
+      {rules.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-sm text-muted-foreground">
+              No rules yet, so nothing is being watched for.
+            </p>
+            <Button variant="outline" render={<Link to="/rules/new" />}>
+              See what Loopable can do
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {rules.map((rule, index) => (
         <RuleCard
@@ -55,8 +61,6 @@ function RulesPage() {
           last={index === rules.length - 1}
         />
       ))}
-
-      {rules.length > 0 ? <Templates /> : null}
     </div>
   );
 }
@@ -96,52 +100,6 @@ function Gaps({ readiness, hasRules }: { readiness: RuleReadiness; hasRules: boo
   );
 }
 
-function Templates() {
-  const router = useRouter();
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const add = async (connectorId: string, templateId: string) => {
-    setBusy(templateId);
-    try {
-      const rule = await addRuleFromTemplate({ data: { connectorId, templateId } });
-      await router.invalidate();
-      toast.success(`Added "${rule.name}"`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Start from a suggestion</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {CONNECTOR_MANIFESTS.flatMap((manifest) =>
-          manifest.ruleTemplates.map((template) => (
-            <div key={template.id} className="flex items-start gap-3">
-              <div className="flex-1">
-                <p className="text-sm font-medium">{template.name}</p>
-                <p className="text-xs text-muted-foreground">{template.summary}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy !== null}
-                onClick={() => add(manifest.id, template.id)}
-              >
-                {busy === template.id ? "Adding..." : "Add"}
-              </Button>
-            </div>
-          )),
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function RuleCard({
   rule,
   position,
@@ -155,10 +113,11 @@ function RuleCard({
 }) {
   const router = useRouter();
   const manifest = connectorManifest(rule.connectorId);
+  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  // Named only when the rule pins one; otherwise the default is the story and
+  // it is told on the agents page rather than here.
+  const agent = rule.agentId ? agentManifest(rule.agentId) : undefined;
   const [busy, setBusy] = useState(false);
-
-  const event = manifest?.events.find((entry) => entry.id === rule.eventId);
-  const action = manifest?.actions.find((entry) => entry.id === rule.actionId);
 
   const run = async (work: () => Promise<unknown>, message?: string) => {
     setBusy(true);
@@ -188,9 +147,9 @@ function RuleCard({
             {rule.enabled ? null : <Badge variant="secondary">Off</Badge>}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            When {event?.name.toLowerCase() ?? rule.eventId}, prepare{" "}
-            {action?.name.toLowerCase() ?? rule.actionId}
-            {rule.agentId ? ` with ${rule.agentId}` : ""}.
+            {workflow
+              ? `When ${workflow.trigger}, it writes ${workflow.writes}${agent ? `, using ${agent.name}` : ""}.`
+              : `Built on ${rule.workflowId}, which is no longer offered.`}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -234,9 +193,13 @@ function RuleCard({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="border-t pt-4">
-        <p className="line-clamp-2 text-sm text-muted-foreground">{rule.instruction}</p>
-      </CardContent>
+      {/* What the rule does is the workflow's, and is said above. The only
+          thing here worth repeating is what this person added to it. */}
+      {rule.guidance ? (
+        <CardContent className="border-t pt-4">
+          <p className="line-clamp-2 text-sm text-muted-foreground">{rule.guidance}</p>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }

@@ -36,6 +36,13 @@
       "when": 1788457074767,
       "tag": "0004_wonderful_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788907058734,
+      "tag": "0005_named_workflows",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq, sql } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
-import { connectorManifest } from "#/connectors/manifests.ts";
+import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import type { SettingField } from "#/connectors/types.ts";
-import type { ConnectionSettings, JsonValue, RuleReadiness, RuleView } from "#/lib/domain.ts";
+import type { ConnectionSettings, RuleReadiness, RuleView } from "#/lib/domain.ts";
 import { listAgents } from "./agents.ts";
 import { db } from "./db/client.ts";
 import { connections, rules, type Rule } from "./db/schema.ts";
@@ -11,16 +11,15 @@ import { connections, rules, type Rule } from "./db/schema.ts";
 export type RuleDraft = {
   name: string;
   connectorId: string;
-  eventId: string;
-  actionId: string;
-  instruction: string;
+  workflowId: string;
+  guidance: string | null;
   agentId: string | null;
-  conditions: ConnectionSettings;
+  settings: ConnectionSettings;
   enabled: boolean;
 };
 
 const NAME_LIMIT = 80;
-const INSTRUCTION_LIMIT = 4000;
+const GUIDANCE_LIMIT = 4000;
 
 function toView(row: Rule): RuleView {
   return {
@@ -29,20 +28,19 @@ function toView(row: Rule): RuleView {
     enabled: row.enabled,
     priority: row.priority,
     connectorId: row.connectorId,
-    eventId: row.eventId,
-    conditions: row.conditions,
-    instruction: row.instruction,
+    workflowId: row.workflowId,
+    settings: row.settings,
+    guidance: row.guidance,
     agentId: row.agentId,
-    actionId: row.actionId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
 /**
- * Only the fields the chosen event declares survive, and each is coerced to the
- * kind it was declared as. A stored condition the connector no longer offers
- * would otherwise sit there filtering invisibly.
+ * Only the fields the chosen workflow declares survive, and each is coerced to
+ * the kind it was declared as. A stored setting the connector no longer offers
+ * would otherwise sit there narrowing things invisibly.
  */
 function cleanConditions(fields: SettingField[], input: ConnectionSettings): ConnectionSettings {
   const cleaned: ConnectionSettings = {};
@@ -74,11 +72,8 @@ function validate(draft: RuleDraft): RuleDraft {
   const manifest = connectorManifest(draft.connectorId);
   if (!manifest) throw new Error(`Unknown connector: ${draft.connectorId}`);
 
-  const event = manifest.events.find((entry) => entry.id === draft.eventId);
-  if (!event) throw new Error(`${manifest.name} does not report ${draft.eventId}.`);
-
-  const action = manifest.actions.find((entry) => entry.id === draft.actionId);
-  if (!action) throw new Error(`${manifest.name} cannot ${draft.actionId}.`);
+  const workflow = connectorWorkflow(draft.connectorId, draft.workflowId);
+  if (!workflow) throw new Error(`${manifest.name} does not offer ${draft.workflowId}.`);
 
   if (draft.agentId && !agentManifest(draft.agentId)) {
     throw new Error(`Unknown agent: ${draft.agentId}`);
@@ -88,17 +83,18 @@ function validate(draft: RuleDraft): RuleDraft {
   if (!name) throw new Error("Give the rule a name.");
   if (name.length > NAME_LIMIT) throw new Error(`Keep the name under ${NAME_LIMIT} characters.`);
 
-  const instruction = draft.instruction.trim();
-  if (!instruction) throw new Error("Tell the agent what to do.");
-  if (instruction.length > INSTRUCTION_LIMIT) {
-    throw new Error(`Keep the instruction under ${INSTRUCTION_LIMIT} characters.`);
+  // The workflow already knows what to ask for, so guidance is genuinely
+  // optional and an empty box is stored as nothing rather than as "".
+  const guidance = draft.guidance?.trim() || null;
+  if (guidance && guidance.length > GUIDANCE_LIMIT) {
+    throw new Error(`Keep the guidance under ${GUIDANCE_LIMIT} characters.`);
   }
 
   return {
     ...draft,
     name,
-    instruction,
-    conditions: cleanConditions(event.conditions ?? [], draft.conditions),
+    guidance,
+    settings: cleanConditions(workflow.settings, draft.settings),
   };
 }
 
@@ -126,11 +122,10 @@ export function createRule(draft: RuleDraft): RuleView {
       enabled: checked.enabled,
       priority: (last?.value ?? 0) + 1,
       connectorId: checked.connectorId,
-      eventId: checked.eventId,
-      conditions: checked.conditions,
-      instruction: checked.instruction,
+      workflowId: checked.workflowId,
+      settings: checked.settings,
+      guidance: checked.guidance,
       agentId: checked.agentId,
-      actionId: checked.actionId,
     })
     .run();
   return getRule(id)!;
@@ -145,11 +140,10 @@ export function updateRule(id: string, draft: RuleDraft): RuleView {
       name: checked.name,
       enabled: checked.enabled,
       connectorId: checked.connectorId,
-      eventId: checked.eventId,
-      conditions: checked.conditions,
-      instruction: checked.instruction,
+      workflowId: checked.workflowId,
+      settings: checked.settings,
+      guidance: checked.guidance,
       agentId: checked.agentId,
-      actionId: checked.actionId,
       updatedAt: new Date(),
     })
     .where(eq(rules.id, id))
@@ -187,20 +181,21 @@ export function moveRule(id: string, direction: "up" | "down"): RuleView[] {
   return listRules();
 }
 
-/** Add a rule the connector suggests, exactly as if it had been typed by hand. */
-export function createRuleFromTemplate(connectorId: string, templateId: string): RuleView {
-  const manifest = connectorManifest(connectorId);
-  if (!manifest) throw new Error(`Unknown connector: ${connectorId}`);
-  const template = manifest.ruleTemplates.find((entry) => entry.id === templateId);
-  if (!template) throw new Error(`Unknown template: ${templateId}`);
+/**
+ * Turn on one of a connector's workflows. Everything a workflow needs it
+ * already declares a default for, so this is the whole of "adding a rule" in
+ * the common case, and the form is only for changing one afterwards.
+ */
+export function createRuleFromWorkflow(connectorId: string, workflowId: string): RuleView {
+  const workflow = connectorWorkflow(connectorId, workflowId);
+  if (!workflow) throw new Error(`Unknown workflow: ${workflowId}`);
   return createRule({
-    name: template.name,
+    name: workflow.name,
     connectorId,
-    eventId: template.eventId,
-    actionId: template.actionId,
-    instruction: template.instruction,
+    workflowId,
+    guidance: null,
     agentId: null,
-    conditions: template.conditions as Record<string, JsonValue>,
+    settings: {},
     enabled: true,
   });
 }

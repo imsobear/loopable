@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
-import { connectorManifest } from "#/connectors/manifests.ts";
+import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
-import type { WorkItem } from "#/connectors/types.ts";
+import type { WorkItem, WorkflowDescriptor } from "#/connectors/types.ts";
 import type { TaskView } from "#/lib/domain.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -124,6 +124,10 @@ export function enqueueTask(input: {
 
   const manifest = connectorManifest(rule.connectorId);
   if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
+  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  if (!workflow) {
+    throw new Error(`${manifest.name} no longer offers the workflow this rule was built on.`);
+  }
   const runtime = connectorRuntime(rule.connectorId);
   if (!runtime.identifyLink || !runtime.resolveWorkItem || !runtime.applyAction) {
     throw new Error(`${manifest.name} cannot run tasks yet.`);
@@ -147,7 +151,7 @@ export function enqueueTask(input: {
       sourceRepo: ref.repo,
       sourceNumber: ref.number,
       dryRun: input.dryRun,
-      actionId: rule.actionId,
+      actionId: workflow.actionId,
     })
     .run();
   return getTask(id)!;
@@ -207,13 +211,24 @@ export function isCancellation(error: unknown): boolean {
   return error instanceof TaskCancelled || (error as Error | null)?.name === "Cancelled";
 }
 
-function promptFor(input: { instruction: string; item: WorkItem; files: string[] }): string {
+/**
+ * The workflow's prompt is the job; a rule's guidance is house rules layered
+ * on top. Guidance is added rather than substituted, so a rule cannot quietly
+ * turn a review into something else.
+ */
+function promptFor(input: {
+  workflow: WorkflowDescriptor;
+  guidance: string | null;
+  item: WorkItem;
+  files: string[];
+}): string {
   return [
     `You are working on ${input.item.repo} ${input.item.kind === "pull_request" ? "pull request" : "issue"} #${input.item.number}.`,
     `Read ${input.files.join(" and ")} in this directory first.`,
     ``,
     `Your task:`,
-    input.instruction,
+    input.workflow.prompt,
+    ...(input.guidance ? [``, `From the person who set this up:`, input.guidance] : []),
     ``,
     `Reply with only the text to post. No preamble, no explanation of what you are about to do.`,
     `If there is genuinely nothing worth posting, reply with exactly ${NOTHING}.`,
@@ -235,6 +250,10 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
 
   const rule = db().select().from(rules).where(eq(rules.id, task.ruleId)).get();
   if (!rule) throw new Error("The rule behind this task has been deleted.");
+  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  if (!workflow) {
+    throw new Error(`${rule.connectorId} no longer offers ${rule.workflowId}.`);
+  }
   const runtime = connectorRuntime(task.connectorId);
   if (!runtime.resolveWorkItem || !runtime.applyAction) {
     throw new Error(`${task.connectorId} cannot run tasks.`);
@@ -260,7 +279,8 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
 
     const result = await agentRuntime(agentId).run({
       prompt: promptFor({
-        instruction: rule.instruction,
+        workflow,
+        guidance: rule.guidance,
         item,
         files: item.context.map((file) => file.name),
       }),

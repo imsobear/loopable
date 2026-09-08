@@ -26,9 +26,7 @@ function givenRule(): void {
       id: RULE_ID,
       name: "Test rule",
       connectorId: "github",
-      eventId: "pull_request.review_requested_of_me",
-      actionId: "github.submit_review",
-      instruction: "Review it",
+      workflowId: "github.review_requested",
       priority: 1,
     })
     .onConflictDoNothing()

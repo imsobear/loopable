@@ -11,8 +11,6 @@
  * Adding a connector must not require touching any page.
  */
 
-import type { JsonValue } from "#/lib/domain.ts";
-
 export type ConnectorId = string;
 
 /** How a user connects an account. The UI renders from this, so the set is closed. */
@@ -37,19 +35,6 @@ export type TokenField = {
   placeholder?: string;
   secret: boolean;
   optional?: boolean;
-};
-
-/** A signal the connector can observe. Drives the rules UI. */
-export type EventDescriptor = {
-  id: string;
-  name: string;
-  summary: string;
-  /**
-   * Which conditions a rule can narrow this event by. Declared here because
-   * "repositories" and "drafts" are GitHub's words, and the rules table has no
-   * business knowing them.
-   */
-  conditions?: SettingField[];
 };
 
 /** Something the connector can do to the outside world, on a rule's behalf. */
@@ -77,17 +62,30 @@ export type SettingField =
     };
 
 /**
- * A rule worth suggesting for this connector. Templates are offered, never
- * created behind a person's back.
+ * A whole job, named the way a person would name it: watch for this, ask an
+ * agent that, write the answer there. A rule is one instance of a workflow
+ * with its knobs set.
+ *
+ * The prompt lives here rather than on the rule because "review a pull
+ * request" is a problem the connector should solve once and get right, instead
+ * of every person rediscovering it in an empty box. A rule may add to it, and
+ * most never will.
  */
-export type RuleTemplate = {
+export type WorkflowDescriptor = {
   id: string;
   name: string;
   summary: string;
-  eventId: string;
+  /** What arrives, as a sentence a rule card can read back. */
+  trigger: string;
+  /** What gets written, as a sentence. */
+  writes: string;
+  /** The knobs a rule may set, in the connector's own words. */
+  settings: SettingField[];
+  /** Owned here. A rule's guidance is appended, never substituted. */
+  prompt: string;
+  guidancePlaceholder?: string;
+  /** Which action carries the answer back. Not a choice a rule makes. */
   actionId: string;
-  instruction: string;
-  conditions: Record<string, JsonValue>;
 };
 
 export type ConnectorManifest = {
@@ -101,10 +99,9 @@ export type ConnectorManifest = {
   /** Tailwind class for the card icon tile. */
   accent: string;
   auth: AuthDescriptor;
-  events: EventDescriptor[];
+  workflows: WorkflowDescriptor[];
   actions: ActionDescriptor[];
   settings: SettingField[];
-  ruleTemplates: RuleTemplate[];
   /** Connecting more than one account of this connector is meaningful. */
   allowsMultipleAccounts: boolean;
 };

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { SettingFieldInputs, initialFieldValues } from "@/components/setting-fields";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,71 +18,60 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_MANIFESTS } from "@/agents/manifests.ts";
-import { CONNECTOR_MANIFESTS, connectorManifest } from "@/connectors/manifests.ts";
+import { connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
 import type { ConnectionSettings, RuleView } from "@/lib/domain.ts";
 import { saveRule } from "@/server/functions/rules.ts";
 
 const DEFAULT_AGENT = "__default";
 
-function conditionFields(connectorId: string, eventId: string) {
-  return connectorManifest(connectorId)?.events.find((event) => event.id === eventId)?.conditions ?? [];
-}
-
-export function RuleForm({ rule }: { rule?: RuleView }) {
+/**
+ * A rule is one of a connector's workflows with its knobs set, so this edits
+ * the knobs and nothing else. What to watch for, what to ask and where to
+ * write are the workflow's business, and are shown here only to be read.
+ */
+export function RuleForm({ rule }: { rule: RuleView }) {
   const navigate = useNavigate();
-  const first = CONNECTOR_MANIFESTS[0]!;
+  const connector = connectorManifest(rule.connectorId);
+  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
 
-  const [connectorId, setConnectorId] = useState(rule?.connectorId ?? first.id);
-  const [eventId, setEventId] = useState(rule?.eventId ?? first.events[0]!.id);
-  const [actionId, setActionId] = useState(rule?.actionId ?? first.actions[0]!.id);
-  const [name, setName] = useState(rule?.name ?? "");
-  const [instruction, setInstruction] = useState(rule?.instruction ?? "");
-  const [agentId, setAgentId] = useState(rule?.agentId ?? DEFAULT_AGENT);
-  const [enabled, setEnabled] = useState(rule?.enabled ?? true);
-  const [conditions, setConditions] = useState<ConnectionSettings>(() =>
-    initialFieldValues(
-      conditionFields(rule?.connectorId ?? first.id, rule?.eventId ?? first.events[0]!.id),
-      rule?.conditions ?? {},
-    ),
+  const [name, setName] = useState(rule.name);
+  const [guidance, setGuidance] = useState(rule.guidance ?? "");
+  const [agentId, setAgentId] = useState(rule.agentId ?? DEFAULT_AGENT);
+  const [enabled, setEnabled] = useState(rule.enabled);
+  const [settings, setSettings] = useState<ConnectionSettings>(() =>
+    initialFieldValues(workflow?.settings ?? [], rule.settings),
   );
   const [saving, setSaving] = useState(false);
 
-  const manifest = connectorManifest(connectorId)!;
-  const fields = conditionFields(connectorId, eventId);
-
-  /** Each event declares its own conditions, so switching drops the ones that no longer apply. */
-  const chooseEvent = (next: string | null) => {
-    if (!next) return;
-    setEventId(next);
-    setConditions((prev) => initialFieldValues(conditionFields(connectorId, next), prev));
-  };
-
-  const chooseConnector = (next: string | null) => {
-    if (!next) return;
-    const target = connectorManifest(next)!;
-    setConnectorId(next);
-    setEventId(target.events[0]!.id);
-    setActionId(target.actions[0]!.id);
-    setConditions(initialFieldValues(target.events[0]!.conditions ?? [], {}));
-  };
+  if (!workflow) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>This workflow is no longer offered</AlertTitle>
+        <AlertDescription>
+          {connector?.name ?? rule.connectorId} used to have <code>{rule.workflowId}</code> and no
+          longer does, so this rule cannot run or be edited. Deleting it is the only thing left to
+          do with it.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   const save = async () => {
     setSaving(true);
     try {
       const saved = await saveRule({
         data: {
-          id: rule?.id,
+          id: rule.id,
           name,
-          connectorId,
-          eventId,
-          actionId,
-          instruction,
+          connectorId: rule.connectorId,
+          workflowId: rule.workflowId,
+          guidance: guidance.trim() || null,
           agentId: agentId === DEFAULT_AGENT ? null : agentId,
-          conditions,
+          settings,
           enabled,
         },
       });
-      toast.success(rule ? `Saved ${saved.name}` : `Created ${saved.name}`);
+      toast.success(`Saved ${saved.name}`);
       await navigate({ to: "/rules" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -89,135 +80,83 @@ export function RuleForm({ rule }: { rule?: RuleView }) {
     }
   };
 
-  const event = manifest.events.find((entry) => entry.id === eventId);
-
   return (
     <div className="flex flex-col gap-6">
       <Card>
         <CardContent className="flex flex-col gap-5 pt-6">
+          <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-4 text-sm">
+            <Bell className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div className="flex flex-col gap-1">
+              <p>
+                When {workflow.trigger}, {connector?.name ?? rule.connectorId} hands it to an agent.
+              </p>
+              <p className="flex items-center gap-1.5 text-muted-foreground">
+                <ArrowRight className="size-3.5 shrink-0" />
+                It writes {workflow.writes}.
+              </p>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="rule-name">Name</Label>
             <Input
               id="rule-name"
               value={name}
-              placeholder="Review pull requests I am asked to review"
               onChange={(event) => setName(event.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Only for your benefit, and worth changing if you run this workflow more than once.
+            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {CONNECTOR_MANIFESTS.length > 1 ? (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="rule-connector">Service</Label>
-                <Select value={connectorId} onValueChange={chooseConnector}>
-                  <SelectTrigger id="rule-connector" className="w-full">
-                    <SelectValue>
-                      {(value: string) => connectorManifest(value)?.name ?? value}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONNECTOR_MANIFESTS.map((entry) => (
-                      <SelectItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="rule-event">When this happens</Label>
-              <Select value={eventId} onValueChange={chooseEvent}>
-                <SelectTrigger id="rule-event" className="w-full">
-                  <SelectValue>
-                    {(value: string) =>
-                      manifest.events.find((entry) => entry.id === value)?.name ?? value
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {manifest.events.map((entry) => (
-                    <SelectItem key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {event ? <p className="text-xs text-muted-foreground">{event.summary}</p> : null}
-            </div>
-          </div>
-
-          {fields.length > 0 ? (
+          {workflow.settings.length > 0 ? (
             <div className="flex flex-col gap-5 rounded-lg border p-4">
               <p className="text-sm font-medium">Only when</p>
               <SettingFieldInputs
-                fields={fields}
-                values={conditions}
-                idPrefix="condition-"
-                onChange={(key, value) => setConditions((prev) => ({ ...prev, [key]: value }))}
+                fields={workflow.settings}
+                values={settings}
+                idPrefix="setting-"
+                onChange={(key, value) => setSettings((prev) => ({ ...prev, [key]: value }))}
               />
             </div>
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="rule-instruction">Ask the agent to</Label>
+            <Label htmlFor="rule-guidance">Anything else the agent should know</Label>
             <p className="text-xs text-muted-foreground">
-              Loopable adds the context from the event. Write only what you want done with it.
+              Optional. Loopable already knows how to do this job; this is added to what it asks
+              for, so keep it to what is true of your team rather than of the job.
             </p>
             <Textarea
-              id="rule-instruction"
-              rows={5}
-              value={instruction}
-              placeholder="Review this pull request. Focus on correctness, security and missing tests."
-              onChange={(event) => setInstruction(event.target.value)}
+              id="rule-guidance"
+              rows={4}
+              value={guidance}
+              placeholder={workflow.guidancePlaceholder}
+              onChange={(event) => setGuidance(event.target.value)}
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="rule-action">Then</Label>
-              <Select value={actionId} onValueChange={(value) => value && setActionId(value)}>
-                <SelectTrigger id="rule-action" className="w-full">
-                  <SelectValue>
-                    {(value: string) =>
-                      manifest.actions.find((entry) => entry.id === value)?.name ?? value
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {manifest.actions.map((entry) => (
-                    <SelectItem key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Written back automatically.</p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="rule-agent">Using</Label>
-              <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
-                <SelectTrigger id="rule-agent" className="w-full">
-                  <SelectValue>
-                    {(value: string) =>
-                      value === DEFAULT_AGENT
-                        ? "The default agent"
-                        : (AGENT_MANIFESTS.find((entry) => entry.id === value)?.name ?? value)
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DEFAULT_AGENT}>The default agent</SelectItem>
-                  {AGENT_MANIFESTS.map((entry) => (
-                    <SelectItem key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-2 sm:max-w-xs">
+            <Label htmlFor="rule-agent">Run it with</Label>
+            <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
+              <SelectTrigger id="rule-agent" className="w-full">
+                <SelectValue>
+                  {(value: string) =>
+                    value === DEFAULT_AGENT
+                      ? "The default agent"
+                      : (AGENT_MANIFESTS.find((entry) => entry.id === value)?.name ?? value)
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DEFAULT_AGENT}>The default agent</SelectItem>
+                {AGENT_MANIFESTS.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id}>
+                    {entry.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center justify-between gap-4 border-t pt-5">
@@ -234,7 +173,7 @@ export function RuleForm({ rule }: { rule?: RuleView }) {
 
       <div className="flex items-center gap-2">
         <Button onClick={save} disabled={saving}>
-          {saving ? "Saving..." : rule ? "Save rule" : "Create rule"}
+          {saving ? "Saving..." : "Save rule"}
         </Button>
         <Button variant="ghost" onClick={() => navigate({ to: "/rules" })} disabled={saving}>
           Cancel

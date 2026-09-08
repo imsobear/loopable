@@ -133,9 +133,10 @@ export const tasks = sqliteTable(
 );
 
 /**
- * A rule says: when this connector reports this signal, ask an agent to do
- * this, and write the result back through this action. Conditions are a JSON
- * blob because only the connector knows what can be narrowed.
+ * One instance of one of a connector's workflows. The workflow decides what to
+ * watch for, what to ask, and where to write; a rule only carries the answers
+ * to the few questions the workflow asks. Settings are a JSON blob because
+ * only the connector knows what can be narrowed.
  */
 export const rules = sqliteTable(
   "rules",
@@ -146,15 +147,15 @@ export const rules = sqliteTable(
     /** Lowest first. The first matching rule wins, so order is meaningful. */
     priority: integer("priority").notNull(),
     connectorId: text("connector_id").notNull(),
-    eventId: text("event_id").notNull(),
-    conditions: text("conditions", { mode: "json" })
+    workflowId: text("workflow_id").notNull(),
+    settings: text("settings", { mode: "json" })
       .$type<ConnectionSettings>()
       .notNull()
       .default({}),
-    instruction: text("instruction").notNull(),
+    /** Added to the workflow's own prompt. Most rules leave it empty. */
+    guidance: text("guidance"),
     /** Null means whichever agent is currently the default. */
     agentId: text("agent_id"),
-    actionId: text("action_id").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

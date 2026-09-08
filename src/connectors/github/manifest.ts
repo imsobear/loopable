@@ -18,10 +18,65 @@ const ignoreDrafts: SettingField = {
   default: true,
 };
 
+const ignoreBots: SettingField = {
+  key: "ignoreBots",
+  kind: "boolean",
+  label: "Skip pull requests opened by bots",
+  help: "Dependabot and friends open a great many, and each one costs a full run.",
+  default: true,
+};
+
+/**
+ * Not a quality setting so much as a cost one: the largest pull requests give
+ * the shallowest reviews and take the longest to produce them.
+ */
+const sizeLimit: SettingField = {
+  key: "maxChangedFiles",
+  kind: "select",
+  label: "Skip very large pull requests",
+  options: [
+    { value: "0", label: "Never skip" },
+    { value: "25", label: "More than 25 files changed" },
+    { value: "50", label: "More than 50 files changed" },
+    { value: "100", label: "More than 100 files changed" },
+  ],
+  default: "50",
+};
+
+/**
+ * Written once, here, rather than left to whoever creates the rule. A review
+ * is a well-understood job and the connector should be good at it by default.
+ */
+const REVIEW_PROMPT = [
+  "Review this pull request the way an experienced engineer on this team would.",
+  "",
+  "Look for correctness bugs, security problems, races, unhandled errors, and",
+  "changes that quietly break existing behaviour. Check whether the change is",
+  "tested, and say plainly when it is not.",
+  "",
+  "Point at specific files and lines rather than describing the change back to",
+  "its author. Say when something is done well; a review that lists only faults",
+  "reads as hostile. Skip anything a linter or formatter already enforces, and",
+  "do not restate what the diff obviously does.",
+  "",
+  "Where you cannot see enough of the code to judge something, say so instead of",
+  "guessing.",
+].join("\n");
+
+const PLAN_PROMPT = [
+  "Write a short implementation plan for this issue.",
+  "",
+  "Say what should change, in which files where you can tell, and what to watch",
+  "out for. Stay inside what the issue actually supports: if it is too vague to",
+  "plan, say what is missing rather than inventing the requirements.",
+  "",
+  "Do not write the implementation.",
+].join("\n");
+
 export const githubManifest = defineManifest({
   id: "github",
   name: "GitHub",
-  tagline: "Pick up review requests, assigned issues and failing checks.",
+  tagline: "Pick up review requests and assigned issues.",
   docsUrl: "https://docs.github.com/rest",
   icon: "Github",
   accent: "bg-neutral-900 text-white",
@@ -30,30 +85,31 @@ export const githubManifest = defineManifest({
     scopes: GITHUB_SCOPES,
     needsAppRegistration: true,
   },
-  events: [
+  workflows: [
     {
-      id: "pull_request.review_requested_of_me",
-      name: "Review requested",
-      summary: "Someone asked you to review a pull request.",
-      conditions: [repositories, ignoreDrafts],
+      id: "github.review_requested",
+      name: "Review pull requests I am asked to review",
+      summary: "Reads the change and posts a review whenever someone asks for yours.",
+      // Team requests matter more than they sound: in most repositories with a
+      // CODEOWNERS file, review arrives addressed to a team rather than a person.
+      trigger: "your review is requested, either directly or through a team you belong to",
+      writes: "a review on the pull request, as a comment rather than an approval",
+      settings: [repositories, ignoreDrafts, ignoreBots, sizeLimit],
+      prompt: REVIEW_PROMPT,
+      guidancePlaceholder:
+        "Anything specific to your team. For example: we require a test for every new endpoint.",
+      actionId: "github.submit_review",
     },
     {
-      id: "issue.assigned_to_me",
-      name: "Issue assigned",
-      summary: "An issue was assigned to you.",
-      conditions: [repositories],
-    },
-    {
-      id: "pull_request.commented_on_mine",
-      name: "Comment on your pull request",
-      summary: "Someone replied on a pull request you opened.",
-      conditions: [repositories, ignoreDrafts],
-    },
-    {
-      id: "pull_request.check_failed",
-      name: "Checks failed",
-      summary: "CI failed on a pull request you opened.",
-      conditions: [repositories, ignoreDrafts],
+      id: "github.issue_assigned",
+      name: "Plan issues assigned to me",
+      summary: "Posts a short implementation plan when an issue lands on you.",
+      trigger: "an issue is assigned to you",
+      writes: "a comment on the issue",
+      settings: [repositories],
+      prompt: PLAN_PROMPT,
+      guidancePlaceholder: "Anything specific to this codebase worth knowing before planning.",
+      actionId: "github.post_issue_comment",
     },
   ],
   actions: [
@@ -71,48 +127,6 @@ export const githubManifest = defineManifest({
   // Nothing to configure per account: what the account can see is what GitHub
   // decides, and every narrowing choice belongs to a rule.
   settings: [],
-  ruleTemplates: [
-    {
-      id: "review-requested",
-      name: "Review pull requests I am asked to review",
-      summary: "Drafts a review whenever someone requests yours.",
-      eventId: "pull_request.review_requested_of_me",
-      actionId: "github.submit_review",
-      instruction:
-        "Review this pull request. Focus on correctness, security and missing tests. Point at specific lines, and say plainly when something looks fine.",
-      conditions: { repositories: [], ignoreDrafts: true },
-    },
-    {
-      id: "issue-assigned",
-      name: "Plan issues assigned to me",
-      summary: "Drafts a short implementation plan as a comment.",
-      eventId: "issue.assigned_to_me",
-      actionId: "github.post_issue_comment",
-      instruction:
-        "Write a short implementation plan for this issue: what to change, in which files, and what to watch out for. Do not write the code.",
-      conditions: { repositories: [] },
-    },
-    {
-      id: "comments-on-mine",
-      name: "Answer comments on my pull requests",
-      summary: "Drafts a reply to review comments you received.",
-      eventId: "pull_request.commented_on_mine",
-      actionId: "github.post_issue_comment",
-      instruction:
-        "Read the review comments and draft a reply. Say what you would change and why, and push back politely where the comment is mistaken.",
-      conditions: { repositories: [], ignoreDrafts: false },
-    },
-    {
-      id: "ci-failed",
-      name: "Explain failing checks on my pull requests",
-      summary: "Drafts an explanation of the failure and a suggested fix.",
-      eventId: "pull_request.check_failed",
-      actionId: "github.post_issue_comment",
-      instruction:
-        "Work out why the checks failed. Explain the cause in a few sentences and suggest the smallest fix. Quote the part of the log that matters.",
-      conditions: { repositories: [], ignoreDrafts: true },
-    },
-  ],
   // The redirect authorizes whichever account the browser is already signed in
   // as, so a second account is out of reach without signing out of GitHub
   // first. Connections are still rows, so this is a product decision only.

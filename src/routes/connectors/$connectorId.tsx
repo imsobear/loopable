@@ -102,17 +102,18 @@ function ConnectorDetailPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <CapabilityList
-            title="Signals it watches"
-            items={manifest.events.map((event) => ({
-              id: event.id,
-              name: event.name,
-              summary: event.summary,
+            title="Workflows it offers"
+            note="Turn one on from the rules page."
+            items={manifest.workflows.map((workflow) => ({
+              id: workflow.id,
+              name: workflow.name,
+              summary: workflow.summary,
             }))}
           />
           <Separator />
           <CapabilityList
-            title="Actions it can propose"
-            note="A rule can write these back on its own."
+            title="What it writes"
+            note="A rule writes these back on its own."
             items={manifest.actions.map((action) => ({
               id: action.id,
               name: action.name,

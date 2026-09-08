@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   createRule,
-  createRuleFromTemplate,
+  createRuleFromWorkflow,
   deleteRule,
   getRule,
   listRules,
@@ -45,6 +45,6 @@ export const reorderRule = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; direction: "up" | "down" }) => data)
   .handler(({ data }) => moveRule(data.id, data.direction));
 
-export const addRuleFromTemplate = createServerFn({ method: "POST" })
-  .inputValidator((data: { connectorId: string; templateId: string }) => data)
-  .handler(({ data }) => createRuleFromTemplate(data.connectorId, data.templateId));
+export const addRuleForWorkflow = createServerFn({ method: "POST" })
+  .inputValidator((data: { connectorId: string; workflowId: string }) => data)
+  .handler(({ data }) => createRuleFromWorkflow(data.connectorId, data.workflowId));

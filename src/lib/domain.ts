@@ -66,20 +66,20 @@ export type TaskView = {
   updatedAt: string;
 };
 
-/** A rule as the browser sees it. */
+/** A rule as the browser sees it: a workflow plus the answers it asked for. */
 export type RuleView = {
   id: string;
   name: string;
   enabled: boolean;
   priority: number;
   connectorId: string;
-  eventId: string;
-  /** Keys are declared by the event in the connector manifest. */
-  conditions: ConnectionSettings;
-  instruction: string;
+  workflowId: string;
+  /** Keys are declared by the workflow in the connector manifest. */
+  settings: ConnectionSettings;
+  /** Added to the workflow's own prompt. Usually null. */
+  guidance: string | null;
   /** Null means whichever agent is the default when the rule runs. */
   agentId: string | null;
-  actionId: string;
   createdAt: string;
   updatedAt: string;
 };
