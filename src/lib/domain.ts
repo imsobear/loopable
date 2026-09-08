@@ -84,6 +84,24 @@ export type RuleView = {
   updatedAt: string;
 };
 
+/** Something that was already waiting when a rule was created. */
+export type BacklogItem = {
+  key: string;
+  sourceKind: TaskSourceKind;
+  sourceRepo: string;
+  sourceNumber: number;
+  sourceTitle: string;
+  sourceUrl: string;
+  seenAt: string;
+};
+
+/** Whether a rule is really watching, which is the thing a page cannot infer. */
+export type RulePollState = {
+  polledAt: string | null;
+  pollError: string | null;
+  backlog: BacklogItem[];
+};
+
 /** What a rule needs to run, resolved when the page loads rather than stored. */
 export type RuleReadiness = {
   connectedConnectorIds: string[];

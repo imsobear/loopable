@@ -1,3 +1,4 @@
+import { createPoller } from "#/server/poller.ts";
 import { sweepRunDirs } from "#/server/tasks.ts";
 import { createWorker } from "#/server/worker.ts";
 import { claimSingleInstance, releaseSingleInstance } from "./instance.ts";
@@ -26,14 +27,18 @@ async function main(): Promise<void> {
   if (swept > 0) log(`cleared ${swept} old run director${swept === 1 ? "y" : "ies"}`);
 
   const worker = createWorker({ log });
+  const poller = createPoller({ log });
   log(`daemon started (pid ${process.pid})`);
   worker.start();
+  poller.start();
+  log(`watching for signals every ${Math.round(poller.intervalMs / 1000)}s`);
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`${signal}: stopping`);
+    poller.stop();
     await worker.stop();
     releaseSingleInstance();
     log("stopped");

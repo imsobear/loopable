@@ -85,7 +85,17 @@ Rules can be written before anything is connected or installed. The page says wh
 
 A task is one run of one rule against one thing: fetch the context, let the agent work, write the result back. It is kept whether it wrote anything or not, because a rule that runs on its own is only worth having if you can see afterwards what it did. The inbox is every task in the order it happened; a rule's own page shows the same records filtered to that rule, next to the settings that produced them.
 
-Signals do not arrive on their own yet, so a task starts by pasting a link on the rule's page. Dry run prepares the result and shows it without writing, which is how a rule gets shaped without leaving marks on a real repository.
+A task usually starts on its own, from a poll. A rule can also be pointed at a link on its own page, which is how one gets shaped without waiting for a real signal to turn up; dry run prepares the result and shows it without writing, so shaping leaves no marks on a real repository.
+
+## Watching
+
+Nothing calls Loopable back. It runs on a laptop, which has no address for GitHub to reach and no business having one, so the daemon asks instead: every two minutes it asks each rule's connector what matches right now. A connector answers with the present state rather than with what changed, because working out what is new needs to know what has already been acted on, and only Loopable knows that.
+
+What stops a rule acting twice is the key the connector puts on each signal, which has to change exactly when there is something new to do and not otherwise. A pull request is keyed by its head commit: a new push is worth reviewing again, another comment on it is not. An assigned issue is keyed by the issue alone, since being assigned it twice is not a reason to write a second plan.
+
+**The first look never acts.** Whatever is already waiting when a rule is created is that rule's backlog, and turning on a rule is not a request to run an agent over a review queue that has been piling up for a month. It is recorded rather than discarded, so the rule's page can offer to run it on purpose. A look that fails does not spend that first look, or a token that expired overnight would swallow the backlog silently.
+
+When two rules want the same pull request, the one that comes first in the list gets it and the other records that it was taken. Order already decides which rule runs; this is the same rule applied to the only case where it could be ambiguous.
 
 A run passes through `preparing` and, if it has something to say, `applying`, ending at `done` with a link to what was written. Two other endings matter as much. `skipped` is the agent answering `NOTHING_TO_DO`, which the prompt asks for explicitly: a rule that runs by itself must be able to stay quiet, or it posts filler. `prepared` is output with nothing written, which today means a dry run and later will mean a rule that asked to be checked first.
 

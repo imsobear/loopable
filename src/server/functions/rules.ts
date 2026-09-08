@@ -11,6 +11,7 @@ import {
   updateRule,
   type RuleDraft,
 } from "../rules.ts";
+import { rulePollState, runBacklog } from "../signals.ts";
 
 const draft = (data: RuleDraft & { id?: string }) => data;
 
@@ -48,3 +49,11 @@ export const reorderRule = createServerFn({ method: "POST" })
 export const addRuleForWorkflow = createServerFn({ method: "POST" })
   .inputValidator((data: { connectorId: string; workflowId: string }) => data)
   .handler(({ data }) => createRuleFromWorkflow(data.connectorId, data.workflowId));
+
+export const getRulePollState = createServerFn({ method: "GET" })
+  .inputValidator((data: { id: string }) => data)
+  .handler(({ data }) => rulePollState(data.id));
+
+export const runRuleBacklog = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: string }) => data)
+  .handler(({ data }) => ({ queued: runBacklog(data.id) }));

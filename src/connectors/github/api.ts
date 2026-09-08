@@ -38,6 +38,8 @@ export type PullRequest = {
   draft: boolean;
   html_url: string;
   user: { login: string };
+  head: { sha: string };
+  changed_files: number;
 };
 
 export type Issue = {
@@ -71,6 +73,32 @@ export function listPullFiles(
   number: number,
 ): Promise<PullFile[]> {
   return request<PullFile[]>(accessToken, `/repos/${repo}/pulls/${number}/files?per_page=100`);
+}
+
+/**
+ * One search result. Search returns issue-shaped items even for pull
+ * requests, which is why the repository has to be read back out of the URL and
+ * why anything specific to a pull request needs a second request.
+ */
+export type SearchItem = {
+  number: number;
+  title: string;
+  html_url: string;
+  repository_url: string;
+  draft?: boolean;
+  user: { login: string; type?: string };
+  pull_request?: unknown;
+};
+
+/**
+ * Search is capped at one page on purpose. A hundred things waiting on you is
+ * already past the point where running an agent on all of them is the right
+ * answer, and paginating would only make a bad situation more expensive.
+ */
+export async function searchIssues(accessToken: string, query: string): Promise<SearchItem[]> {
+  const path = `/search/issues?q=${encodeURIComponent(query)}&per_page=100&advanced_search=true`;
+  const result = await request<{ items: SearchItem[] }>(accessToken, path);
+  return result.items;
 }
 
 /**

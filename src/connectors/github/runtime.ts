@@ -2,6 +2,7 @@ import { defineRuntime } from "../define.ts";
 import type { ConnectorAccount } from "../types.ts";
 import { getViewer, postIssueComment, submitReview } from "./api.ts";
 import { githubAppRegistration } from "./app-registration.ts";
+import { pollGithub } from "./poll.ts";
 import { parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
   buildAuthorizeUrl,
@@ -67,6 +68,11 @@ export const githubRuntime = defineRuntime({
   async resolveWorkItem({ url, credential }) {
     const { accessToken } = await usableToken(credential as GithubCredential);
     return resolveWorkItem(url, accessToken);
+  },
+
+  async poll({ workflowId, settings, credential }) {
+    const { accessToken } = await usableToken(credential as GithubCredential);
+    return pollGithub({ workflowId, settings, accessToken });
   },
 
   async applyAction({ actionId, item, body, credential }) {

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { PermissionMode } from "#/agents/types.ts";
 import type {
   ConnectionSettings,
@@ -110,8 +110,9 @@ export const tasks = sqliteTable(
     leaseUntil: integer("lease_until", { mode: "timestamp_ms" }),
     cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
     /**
-     * Set once signals arrive on their own, to keep one rule from reviewing the
-     * same commit twice. Unused while every task comes from a pasted link.
+     * Set when the task came from a signal rather than from a pasted link.
+     * The signals table already prevents a rule acting twice; this is the
+     * second lock, held by the database, in case two polls overlap.
      */
     dedupeKey: text("dedupe_key"),
     durationMs: integer("duration_ms"),
@@ -156,6 +157,14 @@ export const rules = sqliteTable(
     guidance: text("guidance"),
     /** Null means whichever agent is currently the default. */
     agentId: text("agent_id"),
+    /**
+     * Null until the rule has been looked at once. That first look is what
+     * separates the backlog that predates the rule from everything after it,
+     * so it is worth being able to tell the two apart.
+     */
+    polledAt: integer("polled_at", { mode: "timestamp_ms" }),
+    /** Why the last look failed, if it did. Cleared by a look that works. */
+    pollError: text("poll_error"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -164,6 +173,47 @@ export const rules = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (table) => [index("rules_priority_idx").on(table.priority)],
+);
+
+/**
+ * What a rule has already noticed. A rule acts once per key and never again,
+ * which is the whole of not reviewing the same commit twice.
+ */
+export const SIGNAL_OUTCOME = [
+  /** A task was made for it. */
+  "queued",
+  /** It was already waiting when the rule was created, so it was left alone. */
+  "backlog",
+  /** A rule that comes first took it. */
+  "superseded",
+] as const;
+export type SignalOutcome = (typeof SIGNAL_OUTCOME)[number];
+
+export const signals = sqliteTable(
+  "signals",
+  {
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => rules.id, { onDelete: "cascade" }),
+    /** The connector's own idea of identity: changing it means act again. */
+    key: text("key").notNull(),
+    outcome: text("outcome").$type<SignalOutcome>().notNull(),
+    /** Enough to show and to act on later, without asking the service again. */
+    sourceKind: text("source_kind").$type<TaskSourceKind>().notNull(),
+    sourceRepo: text("source_repo").notNull(),
+    sourceNumber: integer("source_number").notNull(),
+    sourceTitle: text("source_title").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    taskId: text("task_id"),
+    seenAt: integer("seen_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ruleId, table.key] }),
+    /** The backlog question: what is this rule holding and has never run? */
+    index("signals_outcome_idx").on(table.ruleId, table.outcome),
+  ],
 );
 
 /**
@@ -191,6 +241,7 @@ export const appSettings = sqliteTable("app_settings", {
 
 export type Task = typeof tasks.$inferSelect;
 export type Rule = typeof rules.$inferSelect;
+export type Signal = typeof signals.$inferSelect;
 export type NewRule = typeof rules.$inferInsert;
 export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;

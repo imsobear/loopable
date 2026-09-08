@@ -6,13 +6,13 @@ import { agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
-import type { WorkItem, WorkflowDescriptor } from "#/connectors/types.ts";
+import type { Signal, WorkItem, WorkItemRef, WorkflowDescriptor } from "#/connectors/types.ts";
 import type { TaskView } from "#/lib/domain.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
 import { dataDir, runDir } from "./paths.ts";
-import { rules, tasks, type Task } from "./db/schema.ts";
+import { rules, tasks, type Rule, type Task } from "./db/schema.ts";
 
 /**
  * The agent says this when the honest answer is "nothing". Without it a rule
@@ -109,6 +109,55 @@ export function updateTask(id: string, values: Partial<Task>): void {
     .run();
 }
 
+/** The one place a task is created, whether a person or a poll asked for it. */
+function queue(input: {
+  rule: Rule;
+  workflow: WorkflowDescriptor;
+  ref: WorkItemRef;
+  url: string;
+  title?: string;
+  dryRun: boolean;
+  dedupeKey?: string;
+}): TaskView {
+  const id = randomUUID();
+  db()
+    .insert(tasks)
+    .values({
+      id,
+      ruleId: input.rule.id,
+      connectorId: input.rule.connectorId,
+      state: "queued",
+      sourceUrl: input.url.trim(),
+      sourceKind: input.ref.kind,
+      sourceRepo: input.ref.repo,
+      sourceNumber: input.ref.number,
+      sourceTitle: input.title,
+      dryRun: input.dryRun,
+      actionId: input.workflow.actionId,
+      dedupeKey: input.dedupeKey,
+    })
+    .run();
+  return getTask(id)!;
+}
+
+/** Everything a rule needs before it can produce a task, or a reason it cannot. */
+function runnable(ruleId: string): { rule: Rule; workflow: WorkflowDescriptor } {
+  const rule = db().select().from(rules).where(eq(rules.id, ruleId)).get();
+  if (!rule) throw new Error("Rule not found");
+
+  const manifest = connectorManifest(rule.connectorId);
+  if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
+  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  if (!workflow) {
+    throw new Error(`${manifest.name} no longer offers the workflow this rule was built on.`);
+  }
+  const runtime = connectorRuntime(rule.connectorId);
+  if (!runtime.resolveWorkItem || !runtime.applyAction) {
+    throw new Error(`${manifest.name} cannot run tasks yet.`);
+  }
+  return { rule, workflow };
+}
+
 /**
  * Queues a run and returns at once. Identifying the link needs no network, so
  * a typo still fails while the person is looking at the box, but everything
@@ -119,42 +168,34 @@ export function enqueueTask(input: {
   url: string;
   dryRun: boolean;
 }): TaskView {
-  const rule = db().select().from(rules).where(eq(rules.id, input.ruleId)).get();
-  if (!rule) throw new Error("Rule not found");
-
-  const manifest = connectorManifest(rule.connectorId);
-  if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
-  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
-  if (!workflow) {
-    throw new Error(`${manifest.name} no longer offers the workflow this rule was built on.`);
-  }
+  const { rule, workflow } = runnable(input.ruleId);
+  const manifest = connectorManifest(rule.connectorId)!;
   const runtime = connectorRuntime(rule.connectorId);
-  if (!runtime.identifyLink || !runtime.resolveWorkItem || !runtime.applyAction) {
-    throw new Error(`${manifest.name} cannot run tasks yet.`);
-  }
+  if (!runtime.identifyLink) throw new Error(`${manifest.name} cannot read links.`);
 
   const ref = runtime.identifyLink(input.url);
   if (!ref) {
     throw new Error(`That does not look like a ${manifest.name} link Loopable can work on.`);
   }
+  return queue({ rule, workflow, ref, url: input.url, dryRun: input.dryRun });
+}
 
-  const id = randomUUID();
-  db()
-    .insert(tasks)
-    .values({
-      id,
-      ruleId: rule.id,
-      connectorId: rule.connectorId,
-      state: "queued",
-      sourceUrl: input.url.trim(),
-      sourceKind: ref.kind,
-      sourceRepo: ref.repo,
-      sourceNumber: ref.number,
-      dryRun: input.dryRun,
-      actionId: workflow.actionId,
-    })
-    .run();
-  return getTask(id)!;
+/**
+ * Queues a run for something a poll noticed. The title is already known, so
+ * the inbox can say what the task is about before the worker has fetched
+ * anything.
+ */
+export function enqueueSignal(input: { rule: Rule; signal: Signal }): TaskView {
+  const { rule, workflow } = runnable(input.rule.id);
+  return queue({
+    rule,
+    workflow,
+    ref: input.signal,
+    url: input.signal.url,
+    title: input.signal.title,
+    dryRun: false,
+    dedupeKey: `${rule.id}:${input.signal.key}`,
+  });
 }
 
 /** The tail is what matters while a run is going; the whole thing rarely is. */

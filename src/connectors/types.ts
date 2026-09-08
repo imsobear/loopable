@@ -167,6 +167,19 @@ export type WorkItemRef = {
   number: number;
 };
 
+/**
+ * One thing a workflow is watching for, as it stands right now.
+ *
+ * The key is what stops a rule acting twice, so it has to change exactly when
+ * the thing deserves a fresh run and not otherwise: a new commit on a pull
+ * request is worth reviewing again, another comment on it is not.
+ */
+export type Signal = WorkItemRef & {
+  key: string;
+  title: string;
+  url: string;
+};
+
 export type ConnectorRuntime = {
   readiness(): Promise<Readiness>;
   /**
@@ -177,6 +190,17 @@ export type ConnectorRuntime = {
   identifyLink?(url: string): WorkItemRef | null;
   /** Turn a link a person pasted into something a rule can act on. */
   resolveWorkItem?(input: { url: string; credential: unknown }): Promise<WorkItem>;
+  /**
+   * Everything matching this workflow at this moment. Asked repeatedly, so it
+   * answers with the present state rather than with what has changed: working
+   * out what is new is the caller's job, and only the caller knows what it has
+   * already acted on.
+   */
+  poll?(input: {
+    workflowId: string;
+    settings: Record<string, unknown>;
+    credential: unknown;
+  }): Promise<Signal[]>;
   /** Carry out one of the manifest's actions. This is the part that writes. */
   applyAction?(input: {
     actionId: string;
