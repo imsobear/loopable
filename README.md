@@ -107,9 +107,19 @@ A claim is a lease, renewed while the work goes on. That is what tells a run sti
 
 Retries are deliberately lopsided, because the phases cost wildly different amounts. Fetching and writing are milliseconds and fail for reasons that pass, so a connector marks those as transient and they are tried again with a growing wait. The agent is minutes of compute and real money, and a prompt that failed will fail the same way, so it is never repeated. Once output is stored it stays stored: a write that fails because GitHub returned 502 resumes at the write, and nobody pays for the review twice.
 
-The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into `~/.loopable/runs/<task>/` as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess.
+The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into `~/.loopable/runs/<task>/` as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess. What the agent replied is kept alongside them, because when a reply cannot be made sense of, the reply is the only thing worth looking at.
 
 Written work is signed, so nobody has to wonder whether a person or a rule wrote it.
+
+## Reviews that point at lines
+
+A review that describes a change back to the person who wrote it is worth little. A workflow therefore says what shape its answer takes: prose to post, or a summary plus findings that get attached to particular lines.
+
+Anchoring is the whole difficulty, because GitHub refuses an entire review if one comment names a line outside the diff. One wrong number would lose everything the agent had to say, so every anchor is checked against the diff first and a finding that cannot be placed is moved into the body with its location written out: losing the point is worse than losing its position. Where there is nothing to check against, nothing is anchored rather than anchored on a guess.
+
+The diff the agent reads carries its own line numbers, written into each line, and removed lines are deliberately left unnumbered so they cannot be aimed at. An agent can work the numbers out from the `@@` headers and gets them wrong often enough to point a few lines off, which in a review is worse than useless.
+
+The reply is read leniently at the edges and strictly inside. An agent that answered in prose is taken at its word and gets a review with no anchors. Several blocks may look like the answer — a streamed reply can arrive twice, once in pieces and once whole — so each is tried and the first that parses wins. An agent that plainly meant to answer in JSON and produced nothing readable is an error, because the alternative is posting the wreckage to somebody's pull request.
 
 ## Agents
 

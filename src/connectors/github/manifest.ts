@@ -98,6 +98,7 @@ export const githubManifest = defineManifest({
       prompt: REVIEW_PROMPT,
       guidancePlaceholder:
         "Anything specific to your team. For example: we require a test for every new endpoint.",
+      answer: "review",
       actionId: "github.submit_review",
     },
     {
@@ -109,6 +110,7 @@ export const githubManifest = defineManifest({
       settings: [repositories],
       prompt: PLAN_PROMPT,
       guidancePlaceholder: "Anything specific to this codebase worth knowing before planning.",
+      answer: "text",
       actionId: "github.post_issue_comment",
     },
   ],

@@ -8,6 +8,7 @@ import type {
   TaskSourceKind,
   TaskState,
 } from "#/lib/domain.ts";
+import type { Finding } from "#/lib/review.ts";
 
 /**
  * One row per connected account, so a connector can be connected several times
@@ -89,6 +90,12 @@ export const tasks = sqliteTable(
     agentCommand: text("agent_command"),
     /** What the agent produced, which is also what gets written back. */
     output: text("output"),
+    /**
+     * Findings that were checked against the diff and can be attached to a
+     * line. Kept because a write that failed on a bad connection has to be
+     * repeatable without paying for the review a second time.
+     */
+    comments: text("comments", { mode: "json" }).$type<Finding[]>(),
     actionId: text("action_id").notNull(),
     /** Where the write landed, once it has. */
     resultUrl: text("result_url"),

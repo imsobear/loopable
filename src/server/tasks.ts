@@ -8,6 +8,7 @@ import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts"
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type { Signal, WorkItem, WorkItemRef, WorkflowDescriptor } from "#/connectors/types.ts";
 import type { TaskView } from "#/lib/domain.ts";
+import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
@@ -39,6 +40,7 @@ function toView(row: Task & { ruleName?: string | null }): TaskView {
     agentId: row.agentId,
     agentCommand: row.agentCommand,
     output: row.output,
+    comments: row.comments ?? [],
     actionId: row.actionId,
     resultUrl: row.resultUrl,
     error: row.error,
@@ -67,6 +69,7 @@ function select() {
       agentId: tasks.agentId,
       agentCommand: tasks.agentCommand,
       output: tasks.output,
+      comments: tasks.comments,
       actionId: tasks.actionId,
       resultUrl: tasks.resultUrl,
       error: tasks.error,
@@ -255,7 +258,9 @@ export function isCancellation(error: unknown): boolean {
 /**
  * The workflow's prompt is the job; a rule's guidance is house rules layered
  * on top. Guidance is added rather than substituted, so a rule cannot quietly
- * turn a review into something else.
+ * turn a review into something else. How the answer should be shaped is the
+ * machinery's business and is added here, so a workflow only has to describe
+ * the work.
  */
 function promptFor(input: {
   workflow: WorkflowDescriptor;
@@ -263,6 +268,11 @@ function promptFor(input: {
   item: WorkItem;
   files: string[];
 }): string {
+  const shape =
+    input.workflow.answer === "review"
+      ? [REVIEW_FORMAT]
+      : [`Reply with only the text to post. No preamble, no explanation of what you are about to do.`];
+
   return [
     `You are working on ${input.item.repo} ${input.item.kind === "pull_request" ? "pull request" : "issue"} #${input.item.number}.`,
     `Read ${input.files.join(" and ")} in this directory first.`,
@@ -271,9 +281,31 @@ function promptFor(input: {
     input.workflow.prompt,
     ...(input.guidance ? [``, `From the person who set this up:`, input.guidance] : []),
     ``,
-    `Reply with only the text to post. No preamble, no explanation of what you are about to do.`,
+    ...shape,
+    ``,
     `If there is genuinely nothing worth posting, reply with exactly ${NOTHING}.`,
   ].join("\n");
+}
+
+/**
+ * Turns what the agent said into what will be posted. A review is parsed and
+ * its findings checked against the diff; anything that cannot be attached to a
+ * line goes into the body with its location written out, because losing the
+ * point is worse than losing its position.
+ */
+function answerFor(
+  workflow: WorkflowDescriptor,
+  item: WorkItem,
+  text: string,
+): { output: string; comments: Finding[] } {
+  if (workflow.answer !== "review") return { output: text, comments: [] };
+
+  const { summary, findings } = parseReview(text);
+  const { comments, loose } = anchorFindings(findings, item.commentable);
+  const body = reviewBody(summary, loose);
+  // An agent that went straight to the lines leaves nothing for the body, and
+  // a review whose body is only a signature reads like a mistake.
+  return { output: body || "Comments are on the lines they are about.", comments };
 }
 
 /**
@@ -305,8 +337,11 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
   const item = await runtime.resolveWorkItem({ url: task.sourceUrl, credential });
   updateTask(id, { sourceTitle: item.title });
 
+  // Null means the agent has not run; empty means it ran and had little to
+  // say. Telling those apart is what stops a retry paying for the agent twice.
   let output = task.output;
-  if (!output) {
+  let comments = task.comments ?? [];
+  if (output === null) {
     stop();
     const agentId = task.agentId ?? (await defaultAgentFor(rule.agentId));
     updateTask(id, { state: "preparing", agentId });
@@ -338,14 +373,24 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
       // Never transient: the same prompt and the same timeout would fail again.
       throw new Error(result.detail ?? "The agent did not finish.");
     }
-    output = result.output.trim();
-    if (!output) throw new Error("The agent produced nothing.");
+    const said = result.output.trim();
+    // Kept before anything is made of it. When a reply will not parse, what
+    // the agent actually said is the only thing worth looking at.
+    writeFileSync(join(workspace, "reply.txt"), said);
+    if (!said) throw new Error("The agent produced nothing.");
 
-    if (output.replace(/[`*_.\s]/g, "").toUpperCase() === NOTHING) {
-      finish(id, task, { state: "skipped", output });
+    // Checked before parsing, because the way out of a review is a plain word
+    // rather than a document saying there is nothing to say.
+    if (said.replace(/[`*_.\s]/g, "").toUpperCase() === NOTHING) {
+      finish(id, task, { state: "skipped", output: said });
       return getTask(id)!;
     }
-    updateTask(id, { output });
+
+    ({ output, comments } = answerFor(workflow, item, said));
+    if (!output && comments.length === 0) {
+      throw new Error("The agent produced nothing worth posting.");
+    }
+    updateTask(id, { output, comments });
   }
 
   if (task.dryRun) {
@@ -359,6 +404,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     actionId: task.actionId,
     item,
     body: output + SIGNATURE,
+    comments,
     credential,
   });
   finish(id, task, { state: "done", resultUrl: outcome.url });

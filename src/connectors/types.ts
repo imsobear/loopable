@@ -11,6 +11,8 @@
  * Adding a connector must not require touching any page.
  */
 
+import type { Commentable, Finding } from "#/lib/review.ts";
+
 export type ConnectorId = string;
 
 /** How a user connects an account. The UI renders from this, so the set is closed. */
@@ -84,6 +86,11 @@ export type WorkflowDescriptor = {
   /** Owned here. A rule's guidance is appended, never substituted. */
   prompt: string;
   guidancePlaceholder?: string;
+  /**
+   * What shape the answer takes. "text" is one block of prose to post;
+   * "review" is a summary plus findings that get attached to lines.
+   */
+  answer: "text" | "review";
   /** Which action carries the answer back. Not a choice a rule makes. */
   actionId: string;
 };
@@ -144,7 +151,7 @@ export type CompleteAuthorizationContext = {
   verifier: string;
 };
 
-/** What a rule is acting on, resolved from a link or, later, from a signal. */
+/** What a rule is acting on, resolved from a link or from a signal. */
 export type WorkItem = {
   kind: "pull_request" | "issue";
   repo: string;
@@ -153,6 +160,12 @@ export type WorkItem = {
   url: string;
   /** Files the agent should read before it writes anything. */
   context: Array<{ name: string; body: string }>;
+  /**
+   * Which lines of which files a comment can be attached to. Absent when the
+   * connector cannot say, in which case nothing is anchored rather than
+   * anchored on a guess.
+   */
+  commentable?: Commentable;
 };
 
 export type ActionOutcome = {
@@ -206,6 +219,8 @@ export type ConnectorRuntime = {
     actionId: string;
     item: WorkItem;
     body: string;
+    /** Anchored comments, already checked against the diff by the caller. */
+    comments?: Finding[];
     credential: unknown;
   }): Promise<ActionOutcome>;
   auth: {

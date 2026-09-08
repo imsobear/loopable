@@ -1,5 +1,7 @@
 /** Types shared by the server and the pages. No runtime dependencies. */
 
+import type { Finding } from "./review.ts";
+
 export const CONNECTION_STATUS = ["connected", "needs_reauth", "error", "paused"] as const;
 export type ConnectionStatus = (typeof CONNECTION_STATUS)[number];
 
@@ -54,6 +56,8 @@ export type TaskView = {
   agentId: string | null;
   agentCommand: string | null;
   output: string | null;
+  /** Findings that will be attached to lines, rather than to the review body. */
+  comments: Finding[];
   actionId: string;
   resultUrl: string | null;
   error: string | null;

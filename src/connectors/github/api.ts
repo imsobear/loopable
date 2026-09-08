@@ -101,19 +101,37 @@ export async function searchIssues(accessToken: string, query: string): Promise<
   return result.items;
 }
 
+/** One comment attached to a line of the diff, on the new side of it. */
+export type ReviewComment = {
+  path: string;
+  line: number;
+  start_line?: number;
+  side: "RIGHT";
+  start_side?: "RIGHT";
+  body: string;
+};
+
 /**
  * Reviews are submitted as COMMENT, never APPROVE: a rule may say what it
  * thinks, but whether a pull request is approved stays a human judgement.
+ *
+ * A comment on a line outside the diff makes GitHub refuse the whole review,
+ * so callers check their anchors before getting here.
  */
 export function submitReview(
   accessToken: string,
   repo: string,
   pull: number,
   body: string,
+  comments: ReviewComment[] = [],
 ): Promise<{ html_url: string }> {
   return request<{ html_url: string }>(accessToken, `/repos/${repo}/pulls/${pull}/reviews`, {
     method: "POST",
-    body: JSON.stringify({ event: "COMMENT", body }),
+    body: JSON.stringify({
+      event: "COMMENT",
+      body,
+      ...(comments.length > 0 ? { comments } : {}),
+    }),
   });
 }
 

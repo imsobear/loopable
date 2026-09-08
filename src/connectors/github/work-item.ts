@@ -1,5 +1,7 @@
+import type { Commentable } from "#/lib/review.ts";
 import type { WorkItem } from "../types.ts";
 import { getIssue, getPull, listPullFiles, type PullFile } from "./api.ts";
+import { ANNOTATION_LEGEND, annotate } from "./diff.ts";
 
 const HOSTS = new Set(["github.com", "www.github.com"]);
 
@@ -42,23 +44,36 @@ const TOTAL_LIMIT = 200_000;
 /** No file is cut below this, however many files there are. */
 const MIN_PER_FILE = 8_000;
 
-function patchOf(file: PullFile, budget: number): string {
+/**
+ * A file's patch as the agent sees it, and the lines it may comment on. A cut
+ * patch keeps only the anchors that are still visible: a comment on a line the
+ * agent was never shown would be a guess.
+ */
+function patchOf(file: PullFile, budget: number): { body: string; lines: number[] } {
   const patch = file.patch;
   if (!patch) {
-    return file.status === "renamed" ? "_Renamed, no content change._" : "_No diff available._";
+    return {
+      body: file.status === "renamed" ? "_Renamed, no content change._" : "_No diff available._",
+      lines: [],
+    };
   }
-  if (patch.length <= budget) return `\`\`\`diff\n${patch}\n\`\`\``;
 
-  const kept = patch.slice(0, budget);
-  const cutAtLine = kept.slice(0, kept.lastIndexOf("\n"));
-  const droppedLines = patch.slice(cutAtLine.length).split("\n").length;
-  return [
-    `\`\`\`diff\n${cutAtLine}\n\`\`\``,
-    `**The diff for this file was cut here: ${droppedLines} more lines are not shown. Do not draw conclusions about the part you cannot see.**`,
-  ].join("\n\n");
+  const whole = patch.length <= budget ? patch : patch.slice(0, patch.lastIndexOf("\n", budget));
+  const { text, lines } = annotate(whole);
+  const block = `\`\`\`diff\n${text}\n\`\`\``;
+  if (patch.length <= budget) return { body: block, lines };
+
+  const droppedLines = patch.slice(whole.length).split("\n").length;
+  return {
+    body: [
+      block,
+      `**The diff for this file was cut here: ${droppedLines} more lines are not shown. Do not draw conclusions about the part you cannot see.**`,
+    ].join("\n\n"),
+    lines,
+  };
 }
 
-function diffOf(files: PullFile[]): string {
+function diffOf(files: PullFile[]): { body: string; commentable: Commentable } {
   const total = files.reduce((sum, file) => sum + (file.patch?.length ?? 0), 0);
   // A fair share only comes into play once the whole diff cannot fit, so the
   // common case of a normal-sized pull request arrives complete.
@@ -67,7 +82,8 @@ function diffOf(files: PullFile[]): string {
       ? Number.POSITIVE_INFINITY
       : Math.max(MIN_PER_FILE, Math.floor(TOTAL_LIMIT / files.length));
 
-  const sections: string[] = [];
+  const sections: string[] = [ANNOTATION_LEGEND];
+  const commentable: Commentable = {};
   let budget = TOTAL_LIMIT;
   let shown = 0;
 
@@ -79,8 +95,9 @@ function diffOf(files: PullFile[]): string {
     ]
       .filter(Boolean)
       .join(" ");
-    const body = patchOf(file, Math.min(share, budget));
+    const { body, lines } = patchOf(file, Math.min(share, budget));
     sections.push(`### ${file.filename}\n\n${file.status}${counts ? ` ${counts}` : ""}\n\n${body}`);
+    if (lines.length > 0) commentable[file.filename] = lines;
     budget -= body.length;
     shown += 1;
   }
@@ -94,7 +111,7 @@ function diffOf(files: PullFile[]): string {
         .join(", ")}**`,
     );
   }
-  return sections.join("\n\n");
+  return { body: sections.join("\n\n"), commentable };
 }
 
 /**
@@ -110,8 +127,10 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
   if (parsed.kind === "pull_request") {
     const pull = await getPull(accessToken, parsed.repo, parsed.number);
     const files = await listPullFiles(accessToken, parsed.repo, parsed.number);
+    const diff = diffOf(files);
     return {
       kind: "pull_request",
+      commentable: diff.commentable,
       repo: parsed.repo,
       number: pull.number,
       title: pull.title,
@@ -133,7 +152,7 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
             pull.body?.trim() || "_No description._",
           ].join("\n"),
         },
-        { name: "CHANGES.md", body: diffOf(files) || "_No file changes returned._" },
+        { name: "CHANGES.md", body: diff.body || "_No file changes returned._" },
       ],
     };
   }

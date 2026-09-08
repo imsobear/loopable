@@ -1,5 +1,5 @@
 import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, CircleStop, ExternalLink, Loader } from "lucide-react";
+import { ArrowLeft, CircleStop, ExternalLink, FileCode, Loader } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { TaskStateLabel, taskTitle } from "@/components/task-list";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { connectorManifest } from "@/connectors/manifests.ts";
 import { isTaskActive, type TaskView } from "@/lib/domain.ts";
+import type { Finding } from "@/lib/review.ts";
 import { getTaskById, getTaskLog, stopTask } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/inbox/$taskId")({
@@ -94,8 +95,9 @@ function TaskPage() {
               </Button>
             ) : null}
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
             <pre className="whitespace-pre-wrap break-words text-sm">{task.output}</pre>
+            {task.comments.length > 0 ? <Comments comments={task.comments} /> : null}
           </CardContent>
         </Card>
       ) : null}
@@ -135,6 +137,36 @@ function TaskPage() {
           ) : null}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * The findings that go on the lines rather than in the body. Shown separately
+ * because that is what they are: on GitHub they will be spread across the
+ * diff, and this is the only place they can be read as a list.
+ */
+function Comments({ comments }: { comments: Finding[] }) {
+  return (
+    <div className="flex flex-col gap-3 border-t pt-4">
+      <p className="text-xs text-muted-foreground">
+        {comments.length === 1
+          ? "One comment, on the line it is about"
+          : `${comments.length} comments, each on the line it is about`}
+      </p>
+      {comments.map((comment, index) => (
+        <div key={`${comment.path}:${comment.line}:${index}`} className="flex flex-col gap-1">
+          <p className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+            <FileCode className="size-3.5 shrink-0" />
+            <span className="truncate">
+              {comment.path}:{comment.startLine ? `${comment.startLine}-${comment.line}` : comment.line}
+            </span>
+          </p>
+          <pre className="whitespace-pre-wrap break-words border-l-2 pl-3 text-sm">
+            {comment.body}
+          </pre>
+        </div>
+      ))}
     </div>
   );
 }
