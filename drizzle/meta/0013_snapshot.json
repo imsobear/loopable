@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "63b57a3d-8577-4618-a6fc-8904b4a84dbd",
+  "id": "8abbead9-f6a7-47c9-a35f-86b24848c2df",
   "prevId": "e86186a6-81e6-44f0-8d22-af9f26c04370",
   "tables": {
     "agent_settings": {
@@ -323,6 +323,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'{}'"
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         },
         "guidance": {
           "name": "guidance",
