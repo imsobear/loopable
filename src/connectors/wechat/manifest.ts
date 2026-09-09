@@ -76,8 +76,8 @@ export const wechatManifest: ConnectorManifest = {
   name: "WeChat",
   tagline: "Bind a bot to your WeChat by scanning a code.",
   docsUrl: "https://github.com/Tencent/openclaw-weixin/blob/main/docs/protocol.md",
-  icon: "MessageCircle",
-  accent: "bg-emerald-600 text-white",
+  icon: "Wechat",
+  accent: "bg-[#07c160] text-white",
   auth: {
     kind: "qr_scan",
     note: "Scanning binds a bot to your WeChat account. Loopable can then read what people send that bot and answer as it, and nothing else on your account.",

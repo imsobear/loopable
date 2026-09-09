@@ -14,7 +14,11 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Loopable" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+    ],
   }),
   shellComponent: RootDocument,
   component: AppLayout,
@@ -28,7 +32,13 @@ function AppLayout() {
         {/* No header: the only thing it held was the sidebar toggle, which now
             lives in the sidebar itself, above what it collapses. */}
         <div className="flex-1 p-6">
-          <Outlet />
+          {/* Capped and centred. Every page here is a list of sentences, and
+              stretched to a wide monitor they run past the width an eye can
+              track back from, while the button belonging to a row ends up a
+              hand's width from the row's own words. */}
+          <div className="mx-auto w-full max-w-4xl">
+            <Outlet />
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

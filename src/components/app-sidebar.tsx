@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Bot, Inbox, Plug, Settings, Workflow } from "lucide-react";
+import { LoopableMark } from "@/components/brand";
 import { EngineStatus } from "@/components/engine-status";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -84,8 +85,10 @@ export function AppSidebar() {
             to="/connectors"
             className="flex min-w-0 flex-1 items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:hidden"
           >
+            {/* Its own mark, not the icon the Loops item uses: a logo that is
+                also a menu item reads as a fourth menu item. */}
             <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Workflow className="size-4" />
+              <LoopableMark className="size-4.5" />
             </span>
             <span className="truncate font-medium">Loopable</span>
           </Link>

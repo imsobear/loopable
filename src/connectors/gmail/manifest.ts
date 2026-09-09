@@ -80,8 +80,10 @@ export const gmailManifest = defineManifest({
   name: "Gmail",
   tagline: "Read new mail and have an agent tell you what matters.",
   docsUrl: "https://developers.google.com/gmail/api/guides",
-  icon: "Mail",
-  accent: "bg-red-600 text-white",
+  icon: "Gmail",
+  // Gmail's own red, now that the mark is Gmail's own too. A near miss on a
+  // colour people know is more noticeable than a different colour entirely.
+  accent: "bg-[#ea4335] text-white",
   auth: {
     kind: "oauth_redirect",
     scopes: GMAIL_SCOPES,

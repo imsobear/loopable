@@ -51,6 +51,13 @@ export function taskTitle(task: Pick<TaskView, "sourceTitle" | "sourceRef">) {
   return task.sourceTitle ?? task.sourceRef;
 }
 
+/**
+ * Kinds whose reference a person can read. A repository and a number say
+ * where the work is; a mail or a message id is a handle for fetching it
+ * again and means nothing on a page.
+ */
+const NAMED_REF = new Set<WorkItemKind>(["pull_request", "issue"]);
+
 /** What to call the thing a task is about, where a sentence needs a noun. */
 export const KIND_LABEL: Record<WorkItemKind, string> = {
   pull_request: "Pull request",
@@ -105,21 +112,29 @@ export function TaskList({
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{taskTitle(task)}</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {task.sourceRef}
-              </p>
+              {/* Only where it says something. "acme/web#7" is which change,
+                  on which repository; "mail#1a083e9c7f407c82" is an id, and a
+                  line of those down the page is a line of noise between every
+                  title and what happened to it. */}
+              {NAMED_REF.has(task.sourceKind) && task.sourceTitle ? (
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.sourceRef}</p>
+              ) : null}
               <TaskMeta task={task} showLoop={showLoop} />
+              {/* Indented with the title rather than spanning the card. Out
+                  here it began under the icon and ran the full width, which
+                  is a line long enough that the eye loses its place coming
+                  back, for the one part of the row worth actually reading. */}
+              {task.output ? (
+                <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{task.output}</p>
+              ) : task.error ? (
+                <p className="mt-2 line-clamp-2 text-xs text-destructive">{task.error}</p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {task.dryRun ? <Badge variant="outline">Dry run</Badge> : null}
               <TaskStateLabel state={task.state} />
             </div>
           </div>
-          {task.output ? (
-            <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{task.output}</p>
-          ) : task.error ? (
-            <p className="mt-2 line-clamp-2 text-xs text-destructive">{task.error}</p>
-          ) : null}
         </Link>
       ))}
     </div>
