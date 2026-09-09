@@ -171,6 +171,10 @@ const SESSION_GONE = -14;
  * reads only `ret` would call that a success and let a signed-out account look
  * connected.
  */
+function signedOut(body: Answer): boolean {
+  return body.ret === SESSION_GONE || body.errcode === SESSION_GONE;
+}
+
 function refusal(body: Answer): string | null {
   const codes = [body.ret, body.errcode].filter((code): code is number => typeof code === "number");
   const bad = codes.find((code) => code !== 0);
@@ -303,5 +307,17 @@ export async function sendMessage(
     }),
   });
   const refused = refusal(body);
-  if (refused) throw new Error(refused);
+  if (!refused) return;
+  // A message with no token is one nobody asked for, and WeChat carries those
+  // only for about half a day after the person last wrote to the bot. What it
+  // says once that has run out is "prepare failed", which reads like a fault
+  // in this program rather than the one thing that would fix it.
+  if (!input.contextToken && !signedOut(body)) {
+    throw new Error(
+      `WeChat would not take a message nobody asked for (it said: ${refused}). ` +
+        "It only delivers those for about half a day after you last write to the bot, " +
+        "so send the bot anything and this will go through.",
+    );
+  }
+  throw new Error(refused);
 }

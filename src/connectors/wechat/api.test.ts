@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTransient } from "../errors.ts";
-import { notifyStart, qrCodeStatus, requestQrCode, type WechatCredential } from "./api.ts";
+import {
+  notifyStart,
+  qrCodeStatus,
+  requestQrCode,
+  sendMessage,
+  type WechatCredential,
+} from "./api.ts";
 
 type Reply = { status?: number; body?: unknown; throws?: boolean };
 
@@ -154,5 +160,31 @@ describe("checking a stored login", () => {
   it("does not read a zero in one field as success when the other refused", async () => {
     givenWechat({ body: { errcode: 0, ret: -4 } });
     await expect(notifyStart(credential)).rejects.toThrow(/refused the request \(-4\)/);
+  });
+});
+
+describe("sending", () => {
+  const send = { toUserId: "user-1", clientId: "c1", text: "hello" };
+
+  it("explains a refused message nobody asked for", async () => {
+    // What WeChat answers once too long has passed since the person last wrote
+    // to the bot. On its own it reads as a fault in this program, and eleven
+    // runs were recorded as failed under it before anyone could tell it apart
+    // from a bug.
+    givenWechat({ body: { ret: -1, errmsg: "prepare failed" } });
+    await expect(sendMessage(credential, send)).rejects.toThrow(/last write to the bot/);
+    await expect(sendMessage(credential, send)).rejects.toThrow(/prepare failed/);
+  });
+
+  it("says nothing about the window when answering somebody", async () => {
+    givenWechat({ body: { ret: -1, errmsg: "prepare failed" } });
+    const reply = { ...send, contextToken: "ctx" };
+    await expect(sendMessage(credential, reply)).rejects.toThrow("prepare failed");
+    await expect(sendMessage(credential, reply)).rejects.not.toThrow(/last write to the bot/);
+  });
+
+  it("still says a dead token is a dead token", async () => {
+    givenWechat({ body: { errcode: -14 } });
+    await expect(sendMessage(credential, send)).rejects.toThrow(/signed this bot out/);
   });
 });

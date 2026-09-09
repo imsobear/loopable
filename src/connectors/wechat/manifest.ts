@@ -40,7 +40,7 @@ const recipient: SettingField = {
   key: "to",
   kind: "select",
   label: "Who to send it to",
-  help: "WeChat only reliably delivers a reply to a conversation you started. Sending to yourself out of the blue may not arrive unless you have messaged the bot in the last day or two.",
+  help: "WeChat only reliably delivers a reply to a conversation you started. Sending to yourself out of the blue is refused unless you have written to the bot in the last half day or so, which makes this a poor fit for anything that has to arrive overnight.",
   options: [
     { value: "source", label: "Whoever asked" },
     { value: "me", label: "Me" },
