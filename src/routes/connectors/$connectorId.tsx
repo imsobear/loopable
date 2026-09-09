@@ -5,6 +5,7 @@ import { ArrowLeft, ExternalLink, RefreshCw, RotateCcw, Trash2 } from "lucide-re
 import { ConnectionSettingsForm } from "@/components/connection-settings-form";
 import { ConnectionStatusBadge } from "@/components/connection-status";
 import { ConnectorIcon } from "@/components/connector-icon";
+import { QrConnect } from "@/components/qr-connect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,8 @@ function ConnectorDetailPage() {
   const manifest = connectorManifest(connectorId)!;
   const canAddAccount =
     manifest.allowsMultipleAccounts || state.connections.length === 0;
+  const scans = manifest.auth.kind === "qr_scan";
+  const [scanning, setScanning] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,11 +59,25 @@ function ConnectorDetailPage() {
           <p className="mt-1 text-sm text-muted-foreground">{manifest.tagline}</p>
         </div>
         {state.readiness.ready && canAddAccount ? (
-          <Button render={<a href={`/api/connectors/${connectorId}/authorize`} />}>
-            {state.connections.length > 0 ? "Add another account" : "Connect"}
-          </Button>
+          scans ? (
+            <Button onClick={() => setScanning((open) => !open)}>
+              {scanning ? "Cancel" : "Connect"}
+            </Button>
+          ) : (
+            <Button render={<a href={`/api/connectors/${connectorId}/authorize`} />}>
+              {state.connections.length > 0 ? "Add another account" : "Connect"}
+            </Button>
+          )
         ) : null}
       </header>
+
+      {scanning && manifest.auth.kind === "qr_scan" ? (
+        <QrConnect
+          connectorId={connectorId}
+          note={manifest.auth.note}
+          onDone={() => setScanning(false)}
+        />
+      ) : null}
 
       {!state.readiness.ready ? (
         <Alert variant="destructive">
@@ -77,7 +94,7 @@ function ConnectorDetailPage() {
         </Alert>
       ) : null}
 
-      {state.connections.length === 0 && state.readiness.ready ? (
+      {state.connections.length === 0 && state.readiness.ready && !scanning ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             No account connected yet.
@@ -88,6 +105,7 @@ function ConnectorDetailPage() {
                 {manifest.auth.scopes.join(", ")}.
               </>
             ) : null}
+            {manifest.auth.kind === "qr_scan" ? " Connecting shows a code to scan." : null}
           </CardContent>
         </Card>
       ) : null}
@@ -104,6 +122,7 @@ function ConnectorDetailPage() {
           <CapabilityList
             title="Workflows it offers"
             note="Turn one on from the rules page."
+            empty="None yet. An account can be connected, but no rule can be built on it."
             items={manifest.workflows.map((workflow) => ({
               id: workflow.id,
               name: workflow.name,
@@ -114,6 +133,7 @@ function ConnectorDetailPage() {
           <CapabilityList
             title="What it writes"
             note="A rule writes these back on its own."
+            empty="Nothing. Loopable can read this account but cannot write to it."
             items={manifest.actions.map((action) => ({
               id: action.id,
               name: action.name,
@@ -140,24 +160,33 @@ function ConnectorDetailPage() {
 function CapabilityList({
   title,
   note,
+  empty,
   items,
 }: {
   title: string;
   note?: string;
+  /** What to say when there are none, since a bare heading reads as a bug. */
+  empty: string;
   items: Array<{ id: string; name: string; summary: string }>;
 }) {
   return (
     <div>
       <h3 className="text-sm font-medium">{title}</h3>
-      {note ? <p className="mt-0.5 text-xs text-muted-foreground">{note}</p> : null}
-      <ul className="mt-3 flex flex-col gap-2">
-        {items.map((item) => (
-          <li key={item.id} className="text-sm">
-            <span className="font-medium">{item.name}</span>
-            <span className="text-muted-foreground"> — {item.summary}</span>
-          </li>
-        ))}
-      </ul>
+      {note && items.length > 0 ? (
+        <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>
+      ) : null}
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-2">
+          {items.map((item) => (
+            <li key={item.id} className="text-sm">
+              <span className="font-medium">{item.name}</span>
+              <span className="text-muted-foreground"> — {item.summary}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

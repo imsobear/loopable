@@ -11,6 +11,7 @@
  * Adding a connector must not require touching any page.
  */
 
+import type { JsonValue } from "#/lib/domain.ts";
 import type { Commentable, Finding } from "#/lib/review.ts";
 
 export type ConnectorId = string;
@@ -29,6 +30,11 @@ export type AuthDescriptor =
       fields: TokenField[];
       /** Where the user creates the token. */
       helpUrl?: string;
+    }
+  | {
+      kind: "qr_scan";
+      /** What the person is about to bind, since a scan says less than a consent screen. */
+      note: string;
     };
 
 export type TokenField = {
@@ -158,6 +164,28 @@ export type CompleteAuthorizationContext = {
   verifier: string;
 };
 
+/**
+ * A login finished on a phone rather than in the browser.
+ *
+ * `attempt` is the connector's own business and travels back and forth through
+ * the page untouched, because these codes live about two minutes and holding
+ * them on the server would lose every login in progress to a reload. Nothing
+ * secret goes in it: whatever identifies the code is on screen already, in the
+ * code itself.
+ */
+export type QrChallenge = {
+  attempt: JsonValue;
+  /** What the QR code should contain. Rendering is the caller's business. */
+  encode: string;
+  /** Roughly how long the provider will honour it, so the page can offer another. */
+  expiresInMs: number;
+};
+
+export type QrOutcome =
+  | { state: "pending"; attempt: JsonValue; hint?: string }
+  | { state: "expired"; reason?: string }
+  | { state: "confirmed"; result: AuthResult };
+
 /** What a rule is acting on, resolved from a link or from a signal. */
 export type WorkItem = {
   kind: "pull_request" | "issue";
@@ -249,6 +277,9 @@ export type ConnectorRuntime = {
     completeAuthorization?(ctx: CompleteAuthorizationContext): Promise<AuthResult>;
     /** Required when auth.kind is "token". */
     connectWithFields?(fields: Record<string, string>): Promise<AuthResult>;
+    /** Both required when auth.kind is "qr_scan". */
+    startQrLogin?(): Promise<QrChallenge>;
+    pollQrLogin?(attempt: JsonValue): Promise<QrOutcome>;
     /** Re-read the account to prove a stored credential still works. */
     identity(credential: unknown): Promise<IdentityResult>;
     revoke?(credential: unknown): Promise<void>;

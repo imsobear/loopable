@@ -1,10 +1,12 @@
 import { githubRuntime } from "./github/runtime.ts";
+import { wechatRuntime } from "./wechat/runtime.ts";
 import type { Connector, ConnectorId } from "./types.ts";
 import { CONNECTOR_MANIFESTS } from "./manifests.ts";
 
 /** Server-only registry. Never import this from a component. */
 const RUNTIMES: Record<ConnectorId, Connector["runtime"]> = {
   github: githubRuntime,
+  wechat: wechatRuntime,
 };
 
 export function connectorRuntime(id: ConnectorId): Connector["runtime"] {

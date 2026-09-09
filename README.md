@@ -69,6 +69,16 @@ PKCE is what actually protects a login: an intercepted authorization code cannot
 
 What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's machine. Anyone who wants their own registration, or who is on GitHub Enterprise, can set the environment variables above instead.
 
+### WeChat, and logins that finish on a phone
+
+WeChat is reached through Tencent's iLink bot API, the one their OpenClaw plugin speaks. Loopable speaks it directly rather than running that plugin: nothing else has to be installed, nothing else is listening to the same account, and there is no second daemon to keep alive. Tencent [documents the protocol](https://github.com/Tencent/openclaw-weixin/blob/main/docs/protocol.md) for exactly this and leaves a field for clients to name themselves in, which is where `Loopable/0.1` goes. Nothing needs registering; there is no app and no secret.
+
+Connecting means scanning, which the browser-redirect flow has no room for, so authorizing has a third shape. The connector hands over what the code should contain and a way to ask how the scan is going; the page renders it and asks every couple of seconds. A code lasts about two minutes — measured, not documented — so the page says when one has gone stale and offers another, because a dead square with no explanation is the thing people stare at.
+
+Two details are deliberate. The code's identity travels to the page and back rather than being held on the server, because these logins are short and a reload should not silently kill one in progress; nothing secret is in it, since whatever identifies the code is already on screen inside the code. And the token never reaches the browser at all: a confirmed scan is saved server-side, and the page is told only that it worked.
+
+There are no WeChat workflows yet. Binding an account is worth having on its own, and what a rule should do with a message is better answered by watching real ones arrive than by guessing first.
+
 ## Rules
 
 A connector declares **workflows**: whole jobs, named the way a person would name them. "Review pull requests I am asked to review" is one. A workflow owns what to watch for, what to ask the agent, and where the answer is written; a **rule** is one instance of a workflow with its few knobs set. Rules run by themselves and nobody has to click anything; a per-rule "check this before it goes out" switch is a door left open for later.
