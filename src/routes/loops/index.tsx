@@ -37,7 +37,7 @@ function LoopsPage() {
         </Button>
       </header>
 
-      <Gaps readiness={readiness} hasLoops={loops.length > 0} />
+      <Gaps readiness={readiness} loops={loops} />
 
       {loops.length === 0 ? (
         <Card>
@@ -66,9 +66,10 @@ function LoopsPage() {
 }
 
 /** Says what a loop still needs, without standing in the way of writing one. */
-function Gaps({ readiness, hasLoops }: { readiness: LoopReadiness; hasLoops: boolean }) {
+function Gaps({ readiness, loops }: { readiness: LoopReadiness; loops: LoopView[] }) {
   const missing: string[] = [];
-  if (readiness.connectedConnectorIds.length === 0) {
+  const connected = new Set(readiness.connectedConnectorIds);
+  if (connected.size === 0) {
     missing.push("No account is connected yet, so no signal can arrive.");
   }
   if (readiness.installedAgentIds.length === 0) {
@@ -76,9 +77,24 @@ function Gaps({ readiness, hasLoops }: { readiness: LoopReadiness; hasLoops: boo
   } else if (!readiness.defaultAgentId) {
     missing.push("No default agent is chosen, so loops that do not name one cannot run.");
   }
-  if (missing.length === 0 || !hasLoops) {
-    if (missing.length === 0) return null;
+
+  // Two services to be connected to now, since a loop can answer somewhere it
+  // does not watch. Skipped entirely when nothing is connected, because
+  // saying so once is enough.
+  if (connected.size > 0) {
+    const name = (id: string) => connectorManifest(id)?.name ?? id;
+    for (const loop of loops) {
+      if (!connected.has(loop.connectorId)) {
+        missing.push(`${loop.name} watches ${name(loop.connectorId)}, which has no account.`);
+      }
+      if (!connected.has(loop.actionConnectorId)) {
+        missing.push(
+          `${loop.name} answers on ${name(loop.actionConnectorId)}, which has no account.`,
+        );
+      }
+    }
   }
+  if (missing.length === 0) return null;
 
   return (
     <Alert>
