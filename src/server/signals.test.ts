@@ -15,7 +15,7 @@ vi.mock("#/connectors/runtimes.ts", () => ({
   connectorRuntime: () => ({
     poll: async () => {
       if (answer instanceof Error) throw answer;
-      return answer;
+      return { signals: answer };
     },
     resolveWorkItem: async () => ({}),
     applyAction: async () => ({ url: "" }),

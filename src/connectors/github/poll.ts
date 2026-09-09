@@ -67,7 +67,7 @@ function candidates(items: SearchItem[], repositories: string[]): Candidate[] {
  */
 function query(workflowId: string): string {
   const workflow = githubManifest.workflows.find((entry) => entry.id === workflowId);
-  if (!workflow) throw new Error(`GitHub cannot watch for ${workflowId}.`);
+  if (!workflow?.watches) throw new Error(`GitHub cannot watch for ${workflowId}.`);
   return workflow.watches;
 }
 

@@ -90,10 +90,21 @@ export type WorkflowDescriptor = {
    * so that "when your review is requested" can be checked rather than taken
    * on trust, and read by the connector when it polls, so what a rule says it
    * watches for cannot drift from what it asks.
+   *
+   * Absent when there is no query to show: a stream of messages is not
+   * something one can be written for, and an invented one shown as if it were
+   * real is worse than saying nothing.
    */
-  watches: string;
+  watches?: string;
   /** What gets written, as a sentence. */
   writes: string;
+  /**
+   * Where the agent runs. "temp" is a scratch directory holding the context
+   * files and nothing else, which is right for judging a diff. "folder" is a
+   * directory the rule names, for work that has to read the code around it;
+   * the rule supplies it under the `folder` setting.
+   */
+  runsIn?: "temp" | "folder";
   /** The knobs a rule may set, in the connector's own words. */
   settings: SettingField[];
   /** Owned here. A rule's guidance is appended, never substituted. */
@@ -198,6 +209,12 @@ export type WorkItem = WorkItemRef & {
    * anchored on a guess.
    */
   commentable?: Commentable;
+  /**
+   * Whatever the write will need and cannot look up again: the token that says
+   * which conversation a reply belongs to, and the like. Set when the item is
+   * resolved and handed back untouched at `applyAction`.
+   */
+  carry?: JsonValue;
 };
 
 export type ActionOutcome = {
@@ -240,6 +257,13 @@ export type Signal = WorkItemRef & {
    * between this and the settings that filter things out entirely.
    */
   hold?: string;
+  /**
+   * What the connector saw, for sources that cannot be read twice. A pull
+   * request can be fetched again from its URL an hour later; a message is
+   * handed over once and is gone from the stream, so what it said has to be
+   * kept here or it is lost between noticing it and acting on it.
+   */
+  payload?: JsonValue;
 };
 
 export type ConnectorRuntime = {
@@ -250,8 +274,16 @@ export type ConnectorRuntime = {
    * than becoming a queued task that fails a second later.
    */
   identifyLink?(url: string): WorkItemRef | null;
-  /** Turn a link a person pasted into something a rule can act on. */
-  resolveWorkItem?(input: { url: string; credential: unknown }): Promise<WorkItem>;
+  /**
+   * Turn a link a person pasted, or what a poll kept, into something a rule
+   * can act on. `payload` is whatever this connector put on the signal, and is
+   * null for a task that came from a pasted link.
+   */
+  resolveWorkItem?(input: {
+    url: string;
+    payload: JsonValue | null;
+    credential: unknown;
+  }): Promise<WorkItem>;
   /**
    * Everything matching this workflow at this moment. Asked repeatedly, so it
    * answers with the present state rather than with what has changed: working
@@ -262,7 +294,14 @@ export type ConnectorRuntime = {
     workflowId: string;
     settings: Record<string, unknown>;
     credential: unknown;
-  }): Promise<Signal[]>;
+    /**
+     * Whatever this connector returned last time, or null on a first look.
+     * Kept per rule rather than per account: a stream hands each message over
+     * once, so two rules sharing one position would divide the messages
+     * between them instead of each seeing all of them.
+     */
+    cursor: JsonValue | null;
+  }): Promise<{ signals: Signal[]; cursor?: JsonValue }>;
   /** Carry out one of the manifest's actions. This is the part that writes. */
   applyAction?(input: {
     actionId: string;

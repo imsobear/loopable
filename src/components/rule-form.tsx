@@ -111,16 +111,25 @@ export function RuleForm({ rule }: { rule: RuleView }) {
 
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">What it looks for</p>
-            <code className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs">
-              {workflow.watches}
-            </code>
-            <p className="text-xs text-muted-foreground">
-              Word for word what Loopable asks {connector?.name ?? rule.connectorId} every couple
-              of minutes
-              {workflow.settings.length > 0
-                ? ", before anything below narrows it further."
-                : "."}
-            </p>
+            {workflow.watches ? (
+              <>
+                <code className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs">
+                  {workflow.watches}
+                </code>
+                <p className="text-xs text-muted-foreground">
+                  Word for word what Loopable asks {connector?.name ?? rule.connectorId} every
+                  couple of minutes
+                  {workflow.settings.length > 0
+                    ? ", before anything below narrows it further."
+                    : "."}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Nothing is asked for. {connector?.name ?? rule.connectorId} sends this over as it
+                happens, and Loopable picks it up within a couple of minutes.
+              </p>
+            )}
           </div>
 
           {workflow.settings.length > 0 ? (

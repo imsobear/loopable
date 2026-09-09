@@ -1,0 +1,1 @@
+ALTER TABLE `rules` ADD `poll_cursor` text;

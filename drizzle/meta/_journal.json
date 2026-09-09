@@ -71,6 +71,20 @@
       "when": 1788919214219,
       "tag": "0009_work_item_ref",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788919589006,
+      "tag": "0010_signal_payload",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788919929732,
+      "tag": "0011_rule_poll_cursor",
+      "breakpoints": true
     }
   ]
 }

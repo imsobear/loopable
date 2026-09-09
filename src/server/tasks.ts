@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type { Signal, WorkItem, WorkItemRef, WorkflowDescriptor } from "#/connectors/types.ts";
-import type { TaskView, WorkItemKind } from "#/lib/domain.ts";
+import type { JsonValue, TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -24,7 +24,9 @@ const NOTHING = "NOTHING_TO_DO";
 /** Written work should say where it came from. */
 const SIGNATURE = "\n\n---\n*Written by Loopable, running locally.*";
 
-function toView(row: Task & { ruleName?: string | null }): TaskView {
+// The payload is the connector's own record and stays on the server: it is
+// the only field here that no page has any business reading.
+function toView(row: Omit<Task, "sourcePayload"> & { ruleName?: string | null }): TaskView {
   return {
     id: row.id,
     ruleId: row.ruleId,
@@ -115,6 +117,7 @@ function queue(input: {
   rule: Rule;
   workflow: WorkflowDescriptor;
   item: WorkItemRef;
+  payload?: JsonValue;
   url: string;
   title?: string;
   dryRun: boolean;
@@ -131,6 +134,7 @@ function queue(input: {
       sourceUrl: input.url.trim(),
       sourceKind: input.item.kind,
       sourceRef: input.item.ref,
+      sourcePayload: input.payload,
       sourceTitle: input.title,
       dryRun: input.dryRun,
       actionId: input.workflow.actionId,
@@ -191,6 +195,7 @@ export function enqueueSignal(input: { rule: Rule; signal: Signal }): TaskView {
     rule,
     workflow,
     item: input.signal,
+    payload: input.signal.payload,
     url: input.signal.url,
     title: input.signal.title,
     dryRun: false,
@@ -259,6 +264,20 @@ export function isCancellation(error: unknown): boolean {
  * machinery's business and is added here, so a workflow only has to describe
  * the work.
  */
+/**
+ * The directory a rule says its agent should work in. Checked here rather than
+ * left to the agent, which would otherwise run somewhere unexpected and answer
+ * confidently about the wrong code.
+ */
+function folderFor(rule: Rule): string {
+  const folder = typeof rule.settings.folder === "string" ? rule.settings.folder.trim() : "";
+  if (!folder) throw new Error("This rule has no folder set. Set one and try again.");
+  if (!isAbsolute(folder)) throw new Error(`The folder must be an absolute path: ${folder}`);
+  if (!existsSync(folder)) throw new Error(`There is no folder at ${folder}.`);
+  if (!statSync(folder).isDirectory()) throw new Error(`${folder} is not a folder.`);
+  return folder;
+}
+
 const KIND_NOUN: Record<WorkItemKind, string> = {
   pull_request: "pull request",
   issue: "issue",
@@ -278,7 +297,7 @@ function promptFor(input: {
 
   return [
     `You are working on ${KIND_NOUN[input.item.kind]} ${input.item.ref}.`,
-    `Read ${input.files.join(" and ")} in this directory first.`,
+    `Read ${input.files.join(" and ")} first.`,
     ``,
     `Your task:`,
     input.workflow.prompt,
@@ -337,7 +356,11 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
 
   stop();
   const { credential } = await credentialForConnector(task.connectorId);
-  const item = await runtime.resolveWorkItem({ url: task.sourceUrl, credential });
+  const item = await runtime.resolveWorkItem({
+    url: task.sourceUrl,
+    payload: task.sourcePayload ?? null,
+    credential,
+  });
   updateTask(id, { sourceTitle: item.title });
 
   // Null means the agent has not run; empty means it ran and had little to
@@ -356,14 +379,17 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     const logPath = join(workspace, "agent.log");
     updateTask(id, { logPath });
 
+    // Context always lands in the run directory, never in the folder being
+    // worked in: a workflow that reads someone's checkout should not leave
+    // files in it.
     const result = await agentRuntime(agentId).run({
       prompt: promptFor({
         workflow,
         guidance: rule.guidance,
         item,
-        files: item.context.map((file) => file.name),
+        files: item.context.map((file) => join(workspace, file.name)),
       }),
-      cwd: workspace,
+      cwd: workflow.runsIn === "folder" ? folderFor(rule) : workspace,
       settings: settingsFor(agentId),
       outputFile: join(workspace, "answer.txt"),
       signal,

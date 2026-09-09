@@ -60,11 +60,13 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
     const { credential } = await credentialForConnector(rule.connectorId);
     // Settings a rule was saved before are missing rather than false, so the
     // connector fills the gaps from what the workflow declares.
-    const found = await runtime.poll({
+    const answer = await runtime.poll({
       workflowId: rule.workflowId,
       settings: rule.settings,
       credential,
+      cursor: rule.pollCursor ?? null,
     });
+    const found = answer.signals;
     report.found = found.length;
 
     const known = new Set(
@@ -108,6 +110,7 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
           sourceTitle: signal.title,
           sourceUrl: signal.url,
           hold: signal.hold,
+          sourcePayload: signal.payload,
           taskId: task?.id,
         })
         .onConflictDoNothing()
@@ -117,9 +120,16 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
       report[outcome] += 1;
     }
 
+    // The cursor moves only once everything the last answer carried is on
+    // disk. A stream will not hand those messages over twice, so saving the
+    // new position before the signals would lose whatever fell in between.
     db()
       .update(rules)
-      .set({ polledAt: new Date(), pollError: null })
+      .set({
+        polledAt: new Date(),
+        pollError: null,
+        ...(answer.cursor !== undefined ? { pollCursor: answer.cursor } : {}),
+      })
       .where(eq(rules.id, rule.id))
       .run();
   } catch (error) {
@@ -212,6 +222,7 @@ export function runBacklog(ruleId: string): number {
         ref: row.sourceRef,
         title: row.sourceTitle,
         url: row.sourceUrl,
+        payload: row.sourcePayload ?? undefined,
       },
     });
     db()

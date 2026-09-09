@@ -79,6 +79,8 @@ export const tasks = sqliteTable(
     sourceKind: text("source_kind").$type<WorkItemKind>().notNull(),
     /** Names the thing inside its own connector. See `WorkItemRef`. */
     sourceRef: text("source_ref").notNull(),
+    /** What the connector kept, when the source cannot be read twice. */
+    sourcePayload: text("source_payload", { mode: "json" }).$type<JsonValue>(),
     /**
      * Identifying a link needs no network, but the title does, so it arrives
      * when the worker fetches rather than when the task is queued.
@@ -172,6 +174,8 @@ export const rules = sqliteTable(
     polledAt: integer("polled_at", { mode: "timestamp_ms" }),
     /** Why the last look failed, if it did. Cleared by a look that works. */
     pollError: text("poll_error"),
+    /** Where a stream got to. The connector's own business. See `poll`. */
+    pollCursor: text("poll_cursor", { mode: "json" }).$type<JsonValue>(),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -210,6 +214,7 @@ export const signals = sqliteTable(
     /** Enough to show and to act on later, without asking the service again. */
     sourceKind: text("source_kind").$type<WorkItemKind>().notNull(),
     sourceRef: text("source_ref").notNull(),
+    sourcePayload: text("source_payload", { mode: "json" }).$type<JsonValue>(),
     sourceTitle: text("source_title").notNull(),
     sourceUrl: text("source_url").notNull(),
     /** In the words shown to whoever has to decide whether to run it anyway. */

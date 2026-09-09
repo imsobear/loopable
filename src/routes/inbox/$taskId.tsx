@@ -90,7 +90,7 @@ function TaskPage() {
                 nativeButton={false}
                 render={<a href={task.resultUrl} target="_blank" rel="noreferrer" />}
               >
-                See it on GitHub
+                See it on {manifest?.name ?? task.connectorId}
                 <ExternalLink />
               </Button>
             ) : null}
@@ -110,15 +110,22 @@ function TaskPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
           <Row label="Source">
-            <a
-              href={task.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 underline"
-            >
-              {KIND_LABEL[task.sourceKind]} {task.sourceRef}
-              <ExternalLink className="size-3" />
-            </a>
+            {/* A chat message has no address, so there is nothing to link to. */}
+            {task.sourceUrl ? (
+              <a
+                href={task.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 underline"
+              >
+                {KIND_LABEL[task.sourceKind]} {task.sourceRef}
+                <ExternalLink className="size-3" />
+              </a>
+            ) : (
+              <span>
+                {KIND_LABEL[task.sourceKind]} {task.sourceRef}
+              </span>
+            )}
           </Row>
           <Row label="Action">{action?.name ?? task.actionId}</Row>
           <Row label="Agent">{task.agentId ?? "unknown"}</Row>

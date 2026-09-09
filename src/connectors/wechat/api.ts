@@ -198,3 +198,110 @@ export async function notifyStart(credential: WechatCredential): Promise<void> {
   const refused = refusal(body);
   if (refused) throw new Error(refused);
 }
+
+/** `1` is a person typing at us. `2` is the bot, which is to say ourselves. */
+const FROM_USER = 1;
+const TEXT_ITEM = 1;
+
+type MessageItem = { type?: number; text_item?: { text?: string } };
+
+export type WeixinMessage = {
+  message_id?: number;
+  from_user_id?: string;
+  session_id?: string;
+  group_id?: string;
+  message_type?: number;
+  item_list?: MessageItem[];
+  /** Says which conversation a reply belongs to. Expires; see `sendMessage`. */
+  context_token?: string;
+  create_time_ms?: number;
+};
+
+/** What someone actually typed, with the parts we cannot read left out. */
+export function textOf(message: WeixinMessage): string {
+  return (message.item_list ?? [])
+    .filter((item) => item.type === TEXT_ITEM)
+    .map((item) => item.text_item?.text?.trim())
+    .filter((text): text is string => Boolean(text))
+    .join("\n")
+    .trim();
+}
+
+export function isFromPerson(message: WeixinMessage): boolean {
+  return message.message_type === FROM_USER;
+}
+
+/**
+ * How long to hold the connection open waiting for someone to type. This is a
+ * long poll and the server decides when to answer, so the limit is ours: the
+ * caller is a loop with other rules to get to, and an empty answer costs it a
+ * turn rather than the whole minute.
+ */
+const WAIT_MS = 10_000;
+
+/**
+ * Messages since the last call, and the cursor to hand back on the next one.
+ *
+ * Unlike everything else Loopable polls, this is a stream: what it returns, it
+ * will not return again. Nothing is lost by giving up on a slow request, since
+ * the cursor only moves when an answer arrives, but an answer that is thrown
+ * away takes its messages with it.
+ */
+export async function getUpdates(
+  credential: WechatCredential,
+  cursor: string,
+): Promise<{ messages: WeixinMessage[]; cursor: string }> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), WAIT_MS);
+  let body: Answer & { msgs?: WeixinMessage[]; get_updates_buf?: string };
+  try {
+    body = await call(`${credential.baseUrl}/ilink/bot/getupdates`, {
+      method: "POST",
+      headers: postHeaders(credential.botToken),
+      body: JSON.stringify({ get_updates_buf: cursor, base_info: BASE_INFO }),
+      signal: abort.signal,
+    });
+  } catch (error) {
+    // Our own deadline, not WeChat's problem: nobody typed in time.
+    if (abort.signal.aborted) return { messages: [], cursor };
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const refused = refusal(body);
+  if (refused) throw new Error(refused);
+  return { messages: body.msgs ?? [], cursor: body.get_updates_buf || cursor };
+}
+
+/**
+ * Replies to whoever sent `contextToken`.
+ *
+ * The token comes off the message being answered and cannot be invented: it is
+ * what tells WeChat which conversation this belongs to, and it goes stale
+ * after a couple of days, which is why a reply is worth queueing but not worth
+ * retrying for a week. `clientId` is what stops a retry saying it twice.
+ */
+export async function sendMessage(
+  credential: WechatCredential,
+  input: { toUserId: string; contextToken?: string; clientId: string; text: string },
+): Promise<void> {
+  const body = await call<Answer>(`${credential.baseUrl}/ilink/bot/sendmessage`, {
+    method: "POST",
+    headers: postHeaders(credential.botToken),
+    body: JSON.stringify({
+      msg: {
+        from_user_id: "",
+        to_user_id: input.toUserId,
+        client_id: input.clientId,
+        message_type: 2,
+        message_state: 2,
+        ...(input.contextToken ? { context_token: input.contextToken } : {}),
+        item_list: [{ type: TEXT_ITEM, text_item: { text: input.text } }],
+      },
+      base_info: BASE_INFO,
+    }),
+  });
+  const refused = refusal(body);
+  if (refused) throw new Error(refused);
+}

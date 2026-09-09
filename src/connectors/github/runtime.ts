@@ -74,7 +74,9 @@ export const githubRuntime = defineRuntime({
 
   async poll({ workflowId, settings, credential }) {
     const { accessToken } = await usableToken(credential as GithubCredential);
-    return pollGithub({ workflowId, settings, accessToken });
+    // No cursor: GitHub is asked what matches now, and the answer is complete
+    // every time, so there is no position to keep.
+    return { signals: await pollGithub({ workflowId, settings, accessToken }) };
   },
 
   async applyAction({ actionId, item, body, comments, credential }) {
