@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { agentManifest } from "@/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
 import type { LoopReadiness, LoopView } from "@/lib/domain.ts";
+import { gapsFor } from "@/lib/gaps.ts";
 import { getLoopsPage, removeLoop, reorderLoop, toggleLoop } from "@/server/functions/loops.ts";
 
 export const Route = createFileRoute("/loops/")({
@@ -67,33 +68,7 @@ function LoopsPage() {
 
 /** Says what a loop still needs, without standing in the way of writing one. */
 function Gaps({ readiness, loops }: { readiness: LoopReadiness; loops: LoopView[] }) {
-  const missing: string[] = [];
-  const connected = new Set(readiness.connectedConnectorIds);
-  if (connected.size === 0) {
-    missing.push("No account is connected yet, so no signal can arrive.");
-  }
-  if (readiness.installedAgentIds.length === 0) {
-    missing.push("No coding agent was found on this machine, so nothing can be prepared.");
-  } else if (!readiness.defaultAgentId) {
-    missing.push("No default agent is chosen, so loops that do not name one cannot run.");
-  }
-
-  // Two services to be connected to now, since a loop can answer somewhere it
-  // does not watch. Skipped entirely when nothing is connected, because
-  // saying so once is enough.
-  if (connected.size > 0) {
-    const name = (id: string) => connectorManifest(id)?.name ?? id;
-    for (const loop of loops) {
-      if (!connected.has(loop.connectorId)) {
-        missing.push(`${loop.name} watches ${name(loop.connectorId)}, which has no account.`);
-      }
-      if (!connected.has(loop.actionConnectorId)) {
-        missing.push(
-          `${loop.name} answers on ${name(loop.actionConnectorId)}, which has no account.`,
-        );
-      }
-    }
-  }
+  const missing = gapsFor(readiness, loops);
   if (missing.length === 0) return null;
 
   return (
@@ -124,8 +99,13 @@ function Gaps({ readiness, loops }: { readiness: LoopReadiness; loops: LoopView[
 function writesOf(loop: LoopView): string {
   const action = connectorAction(loop.actionConnectorId, loop.actionId);
   if (!action) return `it writes with ${loop.actionId}, which is no longer offered`;
+  // Named only when it differs from where the loop watches, since saying
+  // "on GitHub" twice in one sentence reads as though something moved.
   const writer = connectorManifest(loop.actionConnectorId);
-  const where = loop.actionConnectorId === loop.connectorId ? "" : ` on ${writer?.name ?? loop.actionConnectorId}`;
+  const where =
+    loop.actionConnectorId === loop.connectorId
+      ? ""
+      : ` on ${writer?.name ?? loop.actionConnectorId}`;
   return `it will ${action.name.toLowerCase()}${where}`;
 }
 

@@ -97,6 +97,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
   const [saving, setSaving] = useState(false);
 
   const action = connectorAction(actionConnectorId, actionId);
+  const writerName = connectorManifest(actionConnectorId)?.name ?? actionConnectorId;
 
   /** Changing where the answer goes changes what has to be said about it. */
   const chooseAction = (connectorId: string, id: string) => {
@@ -159,7 +160,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               <p className="flex items-center gap-1.5 text-muted-foreground">
                 <ArrowRight className="size-3.5 shrink-0" />
                 {action
-                  ? `Then, on ${connectorManifest(actionConnectorId)?.name ?? actionConnectorId}: ${action.name.toLowerCase()}.`
+                  ? `Then, on ${writerName}: ${action.name.toLowerCase()}.`
                   : "Where the answer goes is no longer offered; choose again below."}
               </p>
             </div>
@@ -295,9 +296,9 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               <Alert>
                 <AlertTitle>This writes somewhere it did not read</AlertTitle>
                 <AlertDescription>
-                  {connectorManifest(actionConnectorId)?.name ?? actionConnectorId} has no way to
-                  answer something on {connector?.name ?? loop.connectorId}, so choose below where
-                  this should land. Both accounts have to be connected for the loop to run.
+                  {writerName} has no way to answer something on{" "}
+                  {connector?.name ?? loop.connectorId}, so choose below where this should land.
+                  Both accounts have to be connected for the loop to run.
                 </AlertDescription>
               </Alert>
             ) : null}
