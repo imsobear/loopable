@@ -1,6 +1,11 @@
 import { githubManifest } from "./github/manifest.ts";
 import { wechatManifest } from "./wechat/manifest.ts";
-import type { ConnectorId, ConnectorManifest, WorkflowDescriptor } from "./types.ts";
+import type {
+  ActionDescriptor,
+  ConnectorId,
+  ConnectorManifest,
+  WorkflowDescriptor,
+} from "./types.ts";
 
 /**
  * Client-safe registry. Imports are explicit rather than a glob so the bundler
@@ -17,6 +22,13 @@ export function connectorWorkflow(
   workflowId: string,
 ): WorkflowDescriptor | undefined {
   return connectorManifest(connectorId)?.workflows.find((entry) => entry.id === workflowId);
+}
+
+export function connectorAction(
+  connectorId: ConnectorId,
+  actionId: string,
+): ActionDescriptor | undefined {
+  return connectorManifest(connectorId)?.actions.find((entry) => entry.id === actionId);
 }
 
 /** Every workflow on offer, for the page that asks which one to turn on. */

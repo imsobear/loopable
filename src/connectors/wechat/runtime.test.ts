@@ -117,17 +117,23 @@ describe("wechat poll", () => {
 });
 
 describe("wechat reply", () => {
-  const item = {
+  const source = {
+    connectorId: "wechat",
     kind: "message" as const,
     ref: "msg#1",
     title: "what broke the build",
     url: "",
-    context: [],
     carry: { toUserId: "owner@im.wechat", contextToken: "ctx" },
   };
 
-  const reply = (body: string) =>
-    wechatRuntime.applyAction!({ actionId: "wechat.reply", item, body, credential: account });
+  const reply = (body: string, target: Record<string, unknown> = {}) =>
+    wechatRuntime.applyAction!({
+      actionId: "wechat.reply",
+      target,
+      source,
+      body,
+      credential: account,
+    });
 
   it("echoes the token that says which conversation this belongs to", async () => {
     const sent = givenWechat([]);
@@ -167,10 +173,35 @@ describe("wechat reply", () => {
     await expect(
       wechatRuntime.applyAction!({
         actionId: "wechat.reply",
-        item: { ...item, carry: {} },
+        target: {},
+        source: { ...source, carry: {} },
         body: "hello",
         credential: account,
       }),
     ).rejects.toThrow(/nobody to reply to/);
+  });
+
+  it("sends to the bound account when the loop says to, with no conversation to echo", async () => {
+    // The case a loop triggered on another service needs: nothing asked, so
+    // there is no token, and the answer still has to reach someone.
+    const sent = givenWechat([]);
+    await reply("Your review is ready.", { to: "me" });
+
+    const msg = sent[0]!.body.msg as Record<string, unknown>;
+    expect(msg.to_user_id).toBe("owner@im.wechat");
+    expect(msg).not.toHaveProperty("context_token");
+  });
+
+  it("says where to write when the loop was triggered somewhere else", async () => {
+    givenWechat([]);
+    await expect(
+      wechatRuntime.applyAction!({
+        actionId: "wechat.reply",
+        target: {},
+        source: { ...source, connectorId: "github", ref: "acme/web#12", carry: undefined },
+        body: "hello",
+        credential: account,
+      }),
+    ).rejects.toThrow(/no chat behind this task/);
   });
 });

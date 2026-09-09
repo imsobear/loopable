@@ -4,9 +4,15 @@ import { isAbsolute, join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
-import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
+import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
-import type { Signal, WorkItem, WorkItemRef, WorkflowDescriptor } from "#/connectors/types.ts";
+import type {
+  ActionDescriptor,
+  Signal,
+  WorkItem,
+  WorkItemRef,
+  WorkflowDescriptor,
+} from "#/connectors/types.ts";
 import type { JsonValue, TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
 import { listAgents, settingsFor } from "./agents.ts";
@@ -317,13 +323,19 @@ function promptFor(input: {
  */
 function answerFor(
   workflow: WorkflowDescriptor,
+  action: ActionDescriptor,
   item: WorkItem,
   text: string,
 ): { output: string; comments: Finding[] } {
   if (workflow.answer !== "review") return { output: text, comments: [] };
 
   const { summary, findings } = parseReview(text);
-  const { comments, loose } = anchorFindings(findings, item.commentable);
+  // Where a review goes is a choice a loop makes; whether it says everything
+  // it found is not. An action with no lines to attach to gets every point
+  // written into the body instead of losing them.
+  const { comments, loose } = action.accepts.includes("review")
+    ? anchorFindings(findings, item.commentable)
+    : { comments: [] as Finding[], loose: findings };
   const body = reviewBody(summary, loose);
   // An agent that went straight to the lines leaves nothing for the body, and
   // a review whose body is only a signature reads like a mistake.
@@ -353,6 +365,8 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
   if (!runtime.resolveWorkItem || !runtime.applyAction) {
     throw new Error(`${task.connectorId} cannot run tasks.`);
   }
+  const action = connectorAction(task.connectorId, task.actionId);
+  if (!action) throw new Error(`${task.connectorId} no longer offers ${task.actionId}.`);
 
   stop();
   const { credential } = await credentialForConnector(task.connectorId);
@@ -415,7 +429,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
       return getTask(id)!;
     }
 
-    ({ output, comments } = answerFor(workflow, item, said));
+    ({ output, comments } = answerFor(workflow, action, item, said));
     if (!output && comments.length === 0) {
       throw new Error("The agent produced nothing worth posting.");
     }
@@ -431,7 +445,15 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
   updateTask(id, { state: "applying" });
   const outcome = await runtime.applyAction({
     actionId: task.actionId,
-    item,
+    target: {},
+    source: {
+      connectorId: task.connectorId,
+      kind: item.kind,
+      ref: item.ref,
+      title: item.title,
+      url: item.url,
+      carry: item.carry,
+    },
     body: output + SIGNATURE,
     comments,
     credential,

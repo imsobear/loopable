@@ -45,11 +45,31 @@ export type TokenField = {
   optional?: boolean;
 };
 
+/** What form an answer takes, and so what can be done with it. */
+export type AnswerShape = "text" | "review";
+
 /** Something the connector can do to the outside world, on a loop's behalf. */
 export type ActionDescriptor = {
   id: string;
   name: string;
   summary: string;
+  /**
+   * What this needs to know about where to write.
+   *
+   * Empty is the ordinary case and means the answer goes back to whatever
+   * triggered the loop, which for most of the work there is to do is the only
+   * sensible place: a review belongs on the pull request it is about. A field
+   * appears here for the actions that can write somewhere else, and is filled
+   * in when the trigger is on another service entirely and so has nothing in
+   * it that this connector could write to.
+   */
+  target: SettingField[];
+  /**
+   * The shapes of answer this can carry as they are. A review reaching an
+   * action that can only post text is flattened into it rather than refused,
+   * because a review read as prose still says everything it found.
+   */
+  accepts: AnswerShape[];
 };
 
 /**
@@ -114,8 +134,8 @@ export type WorkflowDescriptor = {
    * What shape the answer takes. "text" is one block of prose to post;
    * "review" is a summary plus findings that get attached to lines.
    */
-  answer: "text" | "review";
-  /** Which action carries the answer back. Not a choice a loop makes. */
+  answer: AnswerShape;
+  /** Which action a loop starts out carrying the answer with. */
   actionId: string;
 };
 
@@ -223,6 +243,22 @@ export type ActionOutcome = {
 };
 
 /**
+ * What the answer is about, handed to whichever action writes it.
+ *
+ * Less than the work item, on purpose. An action can always say what the work
+ * was and link to it, but `ref` and `carry` were written by the connector the
+ * source came from and mean nothing outside it. `connectorId` is what makes
+ * that checkable: an action reading either of those has to find its own name
+ * here first, and ask the loop where to write when it does not.
+ */
+export type ActionSource = WorkItemRef & {
+  connectorId: ConnectorId;
+  title: string;
+  url: string;
+  carry?: JsonValue;
+};
+
+/**
  * What a link points at, as far as can be told without asking the service.
  *
  * `ref` names the thing within its connector and nothing more: a pull request
@@ -305,7 +341,13 @@ export type ConnectorRuntime = {
   /** Carry out one of the manifest's actions. This is the part that writes. */
   applyAction?(input: {
     actionId: string;
-    item: WorkItem;
+    /**
+     * Where to write, as the loop set it, against the action's own `target`
+     * fields. Empty means the answer goes back to the source.
+     */
+    target: Record<string, unknown>;
+    /** What the answer is about, and where it came from. */
+    source: ActionSource;
     body: string;
     /** Anchored comments, already checked against the diff by the caller. */
     comments?: Finding[];

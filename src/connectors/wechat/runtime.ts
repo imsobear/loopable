@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import type { JsonValue } from "#/lib/domain.ts";
-import type { ConnectorRuntime, QrChallenge, QrOutcome, Signal, WorkItem } from "../types.ts";
+import type {
+  ActionSource,
+  ConnectorRuntime,
+  QrChallenge,
+  QrOutcome,
+  Signal,
+  WorkItem,
+} from "../types.ts";
 import {
   getUpdates,
   isFromPerson,
@@ -82,6 +89,31 @@ function chunked(text: string): string[] {
   }
   if (rest) parts.push(rest);
   return parts;
+}
+
+/**
+ * Who the reply goes to, with the token that says which conversation it
+ * belongs to when there is one.
+ *
+ * Answering whoever asked has that token off the message itself, and is the
+ * case WeChat supports. Telling yourself about something that happened
+ * elsewhere has no message behind it and so no token; that is sent anyway,
+ * because refusing it would mean this cannot be offered at all, and the
+ * setting says as much where it is chosen.
+ */
+function recipientFor(
+  target: Record<string, unknown>,
+  source: ActionSource,
+  account: WechatCredential,
+): { userId: string; contextToken?: string } {
+  if (target.to === "me") return { userId: account.userId };
+
+  if (source.connectorId !== "wechat") {
+    throw new Error("There is no chat behind this task. Choose who to send it to on the loop.");
+  }
+  const carry = (source.carry ?? {}) as { toUserId?: string; contextToken?: string };
+  if (!carry.toUserId) throw new Error("There is nobody to reply to on this task.");
+  return { userId: carry.toUserId, contextToken: carry.contextToken };
 }
 
 /** The account, said the way a person would recognise it. */
@@ -165,16 +197,15 @@ export const wechatRuntime: ConnectorRuntime = {
     };
   },
 
-  async applyAction({ actionId, item, body, credential }) {
+  async applyAction({ actionId, target, source, body, credential }) {
     if (actionId !== "wechat.reply") throw new Error(`WeChat cannot ${actionId}.`);
     const account = credential as WechatCredential;
-    const carry = (item.carry ?? {}) as { toUserId?: string; contextToken?: string };
-    if (!carry.toUserId) throw new Error("There is nobody to reply to on this task.");
+    const to = recipientFor(target, source, account);
 
     for (const part of chunked(body)) {
       await sendMessage(account, {
-        toUserId: carry.toUserId,
-        contextToken: carry.contextToken,
+        toUserId: to.userId,
+        contextToken: to.contextToken,
         // Unique per piece, so a retry cannot post half an answer twice.
         clientId: randomUUID(),
         text: part,

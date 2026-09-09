@@ -29,6 +29,25 @@ const askers: SettingField = {
   default: "me",
 };
 
+/**
+ * Whoever asked is the answer for a loop that a message started, and the only
+ * case WeChat handles properly: the reply carries the token off the message it
+ * is answering. A loop triggered somewhere else has no message behind it and
+ * so no token, which the help says plainly rather than letting someone find
+ * out from a notification that never arrives.
+ */
+const recipient: SettingField = {
+  key: "to",
+  kind: "select",
+  label: "Who to send it to",
+  help: "WeChat only reliably delivers a reply to a conversation you started. Sending to yourself out of the blue may not arrive unless you have messaged the bot in the last day or two.",
+  options: [
+    { value: "source", label: "Whoever asked" },
+    { value: "me", label: "Me" },
+  ],
+  default: "source",
+};
+
 const ASK_PROMPT = [
   "Someone has sent you a message. Do what it asks, working in this directory,",
   "and then answer them.",
@@ -86,6 +105,10 @@ export const wechatManifest: ConnectorManifest = {
       id: "wechat.reply",
       name: "Reply in the chat",
       summary: "Send a message back to whoever asked.",
+      target: [recipient],
+      // A chat message is text. A review sent here reads as prose, with the
+      // file and line of each point written out.
+      accepts: ["text"],
     },
   ],
   settings: [],

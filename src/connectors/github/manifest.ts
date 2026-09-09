@@ -44,6 +44,19 @@ const sizeLimit: SettingField = {
 };
 
 /**
+ * Left empty by every loop that answers what it read, which is most of them.
+ * Filled in when the trigger is somewhere else entirely and there is no issue
+ * in it to comment on.
+ */
+const issueTarget: SettingField = {
+  key: "issue",
+  kind: "text",
+  label: "Issue or pull request",
+  help: "A GitHub URL. Leave empty to write back to whatever triggered the loop.",
+  placeholder: "https://github.com/acme/web/issues/12",
+};
+
+/**
  * Written once, here, rather than left to whoever creates the loop. A review
  * is a well-understood job and the connector should be good at it by default.
  */
@@ -123,11 +136,21 @@ export const githubManifest = defineManifest({
       id: "github.submit_review",
       name: "Submit a review",
       summary: "Post a review on a pull request, as a comment rather than an approval.",
+      // Nothing to configure, and nothing that could be: a review is anchored
+      // to the lines of one diff, so it can only go on the pull request the
+      // loop read. Reviewing something a loop was not triggered by would mean
+      // reviewing the same change every time it ran.
+      target: [],
+      accepts: ["text", "review"],
     },
     {
       id: "github.post_issue_comment",
       name: "Comment on an issue",
       summary: "Post a comment on an issue or pull request.",
+      target: [issueTarget],
+      // A comment is one body of markdown with nowhere to attach anything, so
+      // a review arrives here with its findings written into the prose.
+      accepts: ["text"],
     },
   ],
   // Nothing to configure per account: what the account can see is what GitHub

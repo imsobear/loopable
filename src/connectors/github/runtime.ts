@@ -1,5 +1,5 @@
 import { defineRuntime } from "../define.ts";
-import type { ConnectorAccount } from "../types.ts";
+import type { ActionSource, ConnectorAccount } from "../types.ts";
 import { getViewer, postIssueComment, submitReview } from "./api.ts";
 import { githubAppRegistration } from "./app-registration.ts";
 import { pollGithub } from "./poll.ts";
@@ -28,6 +28,25 @@ function accountFrom(user: Awaited<ReturnType<typeof getViewer>>): ConnectorAcco
     avatarUrl: user.user.avatar_url,
     scopes: user.scopes,
   };
+}
+
+/**
+ * Where the loop was triggered, read as a GitHub ref. Only possible when
+ * GitHub is where it came from: another connector's ref is a label this one
+ * has no business taking apart, so a loop that crosses services has to say
+ * where the answer goes instead of leaving it to be guessed.
+ */
+function sourceRef(source: ActionSource, what: string): { repo: string; number: number } {
+  if (source.connectorId !== "github") {
+    throw new Error(`${what} needs a GitHub issue or pull request. Choose one on the loop.`);
+  }
+  return parseGithubRef(source.ref);
+}
+
+function namedRef(url: string): { repo: string; number: number } {
+  const parsed = parseGithubUrl(url);
+  if (!parsed) throw new Error(`That is not a GitHub issue or pull request: ${url}`);
+  return { repo: parsed.repo, number: parsed.number };
 }
 
 /**
@@ -79,11 +98,11 @@ export const githubRuntime = defineRuntime({
     return { signals: await pollGithub({ workflowId, settings, accessToken }) };
   },
 
-  async applyAction({ actionId, item, body, comments, credential }) {
+  async applyAction({ actionId, target, source, body, comments, credential }) {
     const { accessToken } = await usableToken(credential as GithubCredential);
-    const { repo, number } = parseGithubRef(item.ref);
     if (actionId === "github.submit_review") {
-      if (item.kind !== "pull_request") {
+      const { repo, number } = sourceRef(source, "A review");
+      if (source.kind !== "pull_request") {
         throw new Error("A review can only be submitted on a pull request.");
       }
       const review = await submitReview(
@@ -104,6 +123,8 @@ export const githubRuntime = defineRuntime({
       return { url: review.html_url };
     }
     if (actionId === "github.post_issue_comment") {
+      const named = typeof target.issue === "string" ? target.issue.trim() : "";
+      const { repo, number } = named ? namedRef(named) : sourceRef(source, "A comment");
       const comment = await postIssueComment(accessToken, repo, number, body);
       return { url: comment.html_url };
     }
