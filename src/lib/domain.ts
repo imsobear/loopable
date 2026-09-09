@@ -38,7 +38,12 @@ export function isTaskActive(state: TaskState): boolean {
   return (TASK_ACTIVE_STATES as readonly TaskState[]).includes(state);
 }
 
-export type TaskSourceKind = "pull_request" | "issue";
+/**
+ * The sort of thing a rule acts on. Widened by whichever connector needs it:
+ * the list is closed so that the few places which phrase a kind for a person
+ * have to say something for every one of them.
+ */
+export type WorkItemKind = "pull_request" | "issue" | "message";
 
 export type TaskView = {
   id: string;
@@ -47,9 +52,8 @@ export type TaskView = {
   connectorId: string;
   state: TaskState;
   sourceUrl: string;
-  sourceKind: TaskSourceKind;
-  sourceRepo: string;
-  sourceNumber: number;
+  sourceKind: WorkItemKind;
+  sourceRef: string;
   /** Only known once the connector has fetched it. */
   sourceTitle: string | null;
   dryRun: boolean;
@@ -91,9 +95,8 @@ export type RuleView = {
 /** Something a rule noticed and did not act on, and the reason it did not. */
 export type BacklogItem = {
   key: string;
-  sourceKind: TaskSourceKind;
-  sourceRepo: string;
-  sourceNumber: number;
+  sourceKind: WorkItemKind;
+  sourceRef: string;
   sourceTitle: string;
   sourceUrl: string;
   /** Why it was held back, or null when it was simply there before the rule. */

@@ -2,7 +2,7 @@ import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-rout
 import { ArrowLeft, CircleStop, ExternalLink, FileCode, Loader } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { TaskStateLabel, taskTitle } from "@/components/task-list";
+import { KIND_LABEL, TaskStateLabel, taskTitle } from "@/components/task-list";
 import { useLiveTasks } from "@/components/use-live-tasks.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,7 @@ function TaskPage() {
         <div className="flex-1">
           <h1 className="text-xl font-semibold tracking-tight">{taskTitle(task)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {task.sourceRepo} #{task.sourceNumber} ·{" "}
+            {task.sourceRef} ·{" "}
             <Link to="/rules/$ruleId" params={{ ruleId: task.ruleId }} className="underline">
               {task.ruleName}
             </Link>
@@ -116,7 +116,7 @@ function TaskPage() {
               rel="noreferrer"
               className="inline-flex items-center gap-1 underline"
             >
-              {task.sourceKind === "pull_request" ? "Pull request" : "Issue"} #{task.sourceNumber}
+              {KIND_LABEL[task.sourceKind]} {task.sourceRef}
               <ExternalLink className="size-3" />
             </a>
           </Row>

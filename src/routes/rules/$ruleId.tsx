@@ -152,7 +152,7 @@ function Watching({
             <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
               {poll.backlog.slice(0, 8).map((item) => (
                 <li key={item.key} className="truncate">
-                  {item.sourceRepo} #{item.sourceNumber} · {item.sourceTitle}
+                  {item.sourceRef} · {item.sourceTitle}
                   {item.hold ? <span className="text-foreground"> · {item.hold}</span> : null}
                 </li>
               ))}

@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { parseGithubUrl } from "./work-item.ts";
+import { githubRef, parseGithubRef, parseGithubUrl } from "./work-item.ts";
+
+describe("githubRef", () => {
+  it("survives the round trip that a write depends on", () => {
+    for (const [repo, number] of [
+      ["acme/web", 1],
+      ["acme/web.js", 4321],
+      ["Acme-Corp/under_score", 7],
+    ] as const) {
+      expect(parseGithubRef(githubRef(repo, number))).toEqual({ repo, number });
+    }
+  });
+
+  it("refuses anything it did not write, rather than guessing a repository", () => {
+    // A ref belongs to the connector that made it. Reading someone else's as
+    // if it were a repository and a number is how a write lands in the wrong
+    // place, so this is loud instead.
+    for (const ref of ["acme/web", "#12", "acme/web#", "wechat:o9cq808@im.wechat", ""]) {
+      expect(() => parseGithubRef(ref), ref).toThrow(/Not a GitHub ref/);
+    }
+  });
+});
 
 describe("parseGithubUrl", () => {
   it("reads a pull request link", () => {

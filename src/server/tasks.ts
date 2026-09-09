@@ -7,7 +7,7 @@ import { agentRuntime } from "#/agents/runtimes.ts";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type { Signal, WorkItem, WorkItemRef, WorkflowDescriptor } from "#/connectors/types.ts";
-import type { TaskView } from "#/lib/domain.ts";
+import type { TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -33,8 +33,7 @@ function toView(row: Task & { ruleName?: string | null }): TaskView {
     state: row.state,
     sourceUrl: row.sourceUrl,
     sourceKind: row.sourceKind,
-    sourceRepo: row.sourceRepo,
-    sourceNumber: row.sourceNumber,
+    sourceRef: row.sourceRef,
     sourceTitle: row.sourceTitle,
     dryRun: row.dryRun,
     agentId: row.agentId,
@@ -62,8 +61,7 @@ function select() {
       state: tasks.state,
       sourceUrl: tasks.sourceUrl,
       sourceKind: tasks.sourceKind,
-      sourceRepo: tasks.sourceRepo,
-      sourceNumber: tasks.sourceNumber,
+      sourceRef: tasks.sourceRef,
       sourceTitle: tasks.sourceTitle,
       dryRun: tasks.dryRun,
       agentId: tasks.agentId,
@@ -116,7 +114,7 @@ export function updateTask(id: string, values: Partial<Task>): void {
 function queue(input: {
   rule: Rule;
   workflow: WorkflowDescriptor;
-  ref: WorkItemRef;
+  item: WorkItemRef;
   url: string;
   title?: string;
   dryRun: boolean;
@@ -131,9 +129,8 @@ function queue(input: {
       connectorId: input.rule.connectorId,
       state: "queued",
       sourceUrl: input.url.trim(),
-      sourceKind: input.ref.kind,
-      sourceRepo: input.ref.repo,
-      sourceNumber: input.ref.number,
+      sourceKind: input.item.kind,
+      sourceRef: input.item.ref,
       sourceTitle: input.title,
       dryRun: input.dryRun,
       actionId: input.workflow.actionId,
@@ -176,11 +173,11 @@ export function enqueueTask(input: {
   const runtime = connectorRuntime(rule.connectorId);
   if (!runtime.identifyLink) throw new Error(`${manifest.name} cannot read links.`);
 
-  const ref = runtime.identifyLink(input.url);
-  if (!ref) {
+  const item = runtime.identifyLink(input.url);
+  if (!item) {
     throw new Error(`That does not look like a ${manifest.name} link Loopable can work on.`);
   }
-  return queue({ rule, workflow, ref, url: input.url, dryRun: input.dryRun });
+  return queue({ rule, workflow, item, url: input.url, dryRun: input.dryRun });
 }
 
 /**
@@ -193,7 +190,7 @@ export function enqueueSignal(input: { rule: Rule; signal: Signal }): TaskView {
   return queue({
     rule,
     workflow,
-    ref: input.signal,
+    item: input.signal,
     url: input.signal.url,
     title: input.signal.title,
     dryRun: false,
@@ -262,6 +259,12 @@ export function isCancellation(error: unknown): boolean {
  * machinery's business and is added here, so a workflow only has to describe
  * the work.
  */
+const KIND_NOUN: Record<WorkItemKind, string> = {
+  pull_request: "pull request",
+  issue: "issue",
+  message: "the message",
+};
+
 function promptFor(input: {
   workflow: WorkflowDescriptor;
   guidance: string | null;
@@ -274,7 +277,7 @@ function promptFor(input: {
       : [`Reply with only the text to post. No preamble, no explanation of what you are about to do.`];
 
   return [
-    `You are working on ${input.item.repo} ${input.item.kind === "pull_request" ? "pull request" : "issue"} #${input.item.number}.`,
+    `You are working on ${KIND_NOUN[input.item.kind]} ${input.item.ref}.`,
     `Read ${input.files.join(" and ")} in this directory first.`,
     ``,
     `Your task:`,

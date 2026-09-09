@@ -25,7 +25,7 @@ export type PollReport = {
  * this is what one rule tells the next about what it has taken.
  */
 function claimOf(rule: Rule, signal: Signal): string {
-  return `${rule.connectorId}:${signal.repo}#${signal.number}`;
+  return `${rule.connectorId}:${signal.ref}`;
 }
 
 /**
@@ -104,8 +104,7 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
           key: signal.key,
           outcome,
           sourceKind: signal.kind,
-          sourceRepo: signal.repo,
-          sourceNumber: signal.number,
+          sourceRef: signal.ref,
           sourceTitle: signal.title,
           sourceUrl: signal.url,
           hold: signal.hold,
@@ -157,8 +156,7 @@ function toBacklogItem(row: typeof signals.$inferSelect): BacklogItem {
   return {
     key: row.key,
     sourceKind: row.sourceKind,
-    sourceRepo: row.sourceRepo,
-    sourceNumber: row.sourceNumber,
+    sourceRef: row.sourceRef,
     sourceTitle: row.sourceTitle,
     sourceUrl: row.sourceUrl,
     hold: row.hold,
@@ -181,7 +179,7 @@ export function rulePollState(ruleId: string): RulePollState {
     .select()
     .from(signals)
     .where(and(eq(signals.ruleId, ruleId), inArray(signals.outcome, [...WAITING])))
-    .orderBy(asc(signals.sourceRepo), asc(signals.sourceNumber))
+    .orderBy(asc(signals.sourceRef))
     .all();
   return {
     polledAt: rule?.polledAt?.toISOString() ?? null,
@@ -211,8 +209,7 @@ export function runBacklog(ruleId: string): number {
       signal: {
         key: row.key,
         kind: row.sourceKind,
-        repo: row.sourceRepo,
-        number: row.sourceNumber,
+        ref: row.sourceRef,
         title: row.sourceTitle,
         url: row.sourceUrl,
       },

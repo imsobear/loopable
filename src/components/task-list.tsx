@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLiveTasks } from "@/components/use-live-tasks.ts";
 import { connectorManifest } from "@/connectors/manifests.ts";
-import type { TaskState, TaskView } from "@/lib/domain.ts";
+import type { TaskState, TaskView, WorkItemKind } from "@/lib/domain.ts";
 import { cn } from "@/lib/utils";
 
 const STATES: Record<
@@ -47,9 +47,16 @@ export function TaskStateLabel({ state }: { state: TaskState }) {
 }
 
 /** A queued task has no title yet: the connector has not fetched it. */
-export function taskTitle(task: Pick<TaskView, "sourceTitle" | "sourceRepo" | "sourceNumber">) {
-  return task.sourceTitle ?? `${task.sourceRepo} #${task.sourceNumber}`;
+export function taskTitle(task: Pick<TaskView, "sourceTitle" | "sourceRef">) {
+  return task.sourceTitle ?? task.sourceRef;
 }
+
+/** What to call the thing a task is about, where a sentence needs a noun. */
+export const KIND_LABEL: Record<WorkItemKind, string> = {
+  pull_request: "Pull request",
+  issue: "Issue",
+  message: "Message",
+};
 
 function when(iso: string): string {
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -98,7 +105,7 @@ export function TaskList({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{taskTitle(task)}</p>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {task.sourceRepo} #{task.sourceNumber}
+                {task.sourceRef}
               </p>
               <TaskMeta task={task} showRule={showRule} />
             </div>

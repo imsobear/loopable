@@ -49,8 +49,7 @@ function pull(number: number, sha = "sha1"): Signal {
   return {
     key: `acme/web#${number}@${sha}`,
     kind: "pull_request",
-    repo: "acme/web",
-    number,
+    ref: `acme/web#${number}`,
     title: `Change ${number}`,
     url: `https://github.com/acme/web/pull/${number}`,
   };
@@ -65,7 +64,7 @@ function signalsFor(ruleId: string) {
     .select()
     .from(signals)
     .where(eq(signals.ruleId, ruleId))
-    .orderBy(asc(signals.sourceNumber))
+    .orderBy(asc(signals.sourceRef))
     .all();
 }
 
@@ -99,7 +98,7 @@ describe("the first look", () => {
     const queued = tasksFor("a");
     expect(queued).toHaveLength(1);
     expect(queued[0]).toMatchObject({
-      sourceNumber: 2,
+      sourceRef: "acme/web#2",
       sourceTitle: "Change 2",
       state: "queued",
       dryRun: false,
@@ -195,7 +194,10 @@ describe("running the backlog", () => {
     answer = [pull(1), pull(2)];
     await pollAllRules();
 
-    expect(rulePollState("a").backlog.map((item) => item.sourceNumber)).toEqual([1, 2]);
+    expect(rulePollState("a").backlog.map((item) => item.sourceRef)).toEqual([
+      "acme/web#1",
+      "acme/web#2",
+    ]);
     expect(runBacklog("a")).toBe(2);
 
     const queued = tasksFor("a");
@@ -228,7 +230,7 @@ describe("something the connector will not run by itself", () => {
 
     const [waiting] = rulePollState("a").backlog;
     expect(waiting).toMatchObject({
-      sourceNumber: 1,
+      sourceRef: "acme/web#1",
       hold: "80 files changed, over this rule's 50",
     });
   });

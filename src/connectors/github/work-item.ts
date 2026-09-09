@@ -34,6 +34,22 @@ export function parseGithubUrl(
   };
 }
 
+/** How GitHub names a thing everywhere outside itself: `owner/name#12`. */
+export function githubRef(repo: string, number: number): string {
+  return `${repo}#${number}`;
+}
+
+/**
+ * The other direction, for the point where a write has to name a repository
+ * and a number again. Throws rather than returns null: a ref that this
+ * connector wrote and cannot read back is a bug, not a bad input.
+ */
+export function parseGithubRef(ref: string): { repo: string; number: number } {
+  const match = ref.match(/^([^/\s]+\/[^/\s#]+)#(\d+)$/);
+  if (!match) throw new Error(`Not a GitHub ref: ${ref}`);
+  return { repo: match[1], number: Number(match[2]) };
+}
+
 /**
  * Generous, because a review written against half a diff is worse than no
  * review: the agent hedges everything it could not see. Nothing is cut while
@@ -131,8 +147,7 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
     return {
       kind: "pull_request",
       commentable: diff.commentable,
-      repo: parsed.repo,
-      number: pull.number,
+      ref: githubRef(parsed.repo, pull.number),
       title: pull.title,
       url: pull.html_url,
       context: [
@@ -160,8 +175,7 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
   const issue = await getIssue(accessToken, parsed.repo, parsed.number);
   return {
     kind: "issue",
-    repo: parsed.repo,
-    number: issue.number,
+    ref: githubRef(parsed.repo, issue.number),
     title: issue.title,
     url: issue.html_url,
     context: [

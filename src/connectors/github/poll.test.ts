@@ -123,8 +123,7 @@ describe("pollGithub, review requested", () => {
     expect(first).toMatchObject({
       key: "acme/web#7@sha1",
       kind: "pull_request",
-      repo: "acme/web",
-      number: 7,
+      ref: "acme/web#7",
       url: "https://github.com/acme/web/pull/7",
     });
 
@@ -140,7 +139,7 @@ describe("pollGithub, review requested", () => {
       ],
     });
     const found = await poll({ repositories: ["acme/*"] });
-    expect(found.map((signal) => signal.repo)).toEqual(["acme/web"]);
+    expect(found.map((signal) => signal.ref)).toEqual(["acme/web#1"]);
   });
 
   it("skips bots and drafts without paying for a second request", async () => {
@@ -152,7 +151,7 @@ describe("pollGithub, review requested", () => {
       ],
     });
     const found = await poll();
-    expect(found.map((signal) => signal.number)).toEqual([3]);
+    expect(found.map((signal) => signal.ref)).toEqual(["acme/web#3"]);
     // One search, and one pull request: the two that were ruled out on the
     // search result alone were never fetched.
     expect(github.asked.filter((url) => url.includes("/pulls/"))).toHaveLength(1);
@@ -167,7 +166,7 @@ describe("pollGithub, review requested", () => {
       pulls: { "acme/web#2": { draft: true } },
     });
     const found = await poll({ ignoreDrafts: false, ignoreBots: false });
-    expect(found.map((signal) => signal.number)).toEqual([1, 2]);
+    expect(found.map((signal) => signal.ref)).toEqual(["acme/web#1", "acme/web#2"]);
   });
 
   it("holds a pull request that is too big rather than dropping it", async () => {
@@ -181,9 +180,9 @@ describe("pollGithub, review requested", () => {
     // Somebody asked for this review. It is still reported, with the reason it
     // will not happen on its own, so it can be seen and run on purpose.
     const found = await poll({ maxChangedFiles: "50" });
-    expect(found.map((signal) => [signal.number, signal.hold])).toEqual([
-      [1, "80 files changed, over this rule's 50"],
-      [2, undefined],
+    expect(found.map((signal) => [signal.ref, signal.hold])).toEqual([
+      ["acme/web#1", "80 files changed, over this rule's 50"],
+      ["acme/web#2", undefined],
     ]);
   });
 
@@ -204,7 +203,7 @@ describe("pollGithub, review requested", () => {
       ],
     });
     // A rule saved before ignoreBots existed still has to skip bots.
-    expect((await poll({ repositories: [] })).map((signal) => signal.number)).toEqual([2]);
+    expect((await poll({ repositories: [] })).map((signal) => signal.ref)).toEqual(["acme/web#2"]);
   });
 
   it("only becomes a draft after being fetched, and is still skipped", async () => {
@@ -228,8 +227,7 @@ describe("pollGithub, issue assigned", () => {
       {
         key: "acme/web#4",
         kind: "issue",
-        repo: "acme/web",
-        number: 4,
+        ref: "acme/web#4",
         title: "Add export",
         url: "https://github.com/acme/web/pull/4",
       },

@@ -64,6 +64,13 @@
       "when": 1788913023464,
       "tag": "0008_held_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788919214219,
+      "tag": "0009_work_item_ref",
+      "breakpoints": true
     }
   ]
 }

@@ -44,8 +44,7 @@ function givenTask(values: Partial<typeof tasks.$inferInsert> = {}): string {
       state: "queued",
       sourceUrl: "https://github.com/acme/web/pull/1",
       sourceKind: "pull_request",
-      sourceRepo: "acme/web",
-      sourceNumber: 1,
+      sourceRef: "acme/web#1",
       actionId: "github.submit_review",
       ...values,
     })

@@ -11,7 +11,7 @@
  * Adding a connector must not require touching any page.
  */
 
-import type { JsonValue } from "#/lib/domain.ts";
+import type { JsonValue, WorkItemKind } from "#/lib/domain.ts";
 import type { Commentable, Finding } from "#/lib/review.ts";
 
 export type ConnectorId = string;
@@ -187,10 +187,7 @@ export type QrOutcome =
   | { state: "confirmed"; result: AuthResult };
 
 /** What a rule is acting on, resolved from a link or from a signal. */
-export type WorkItem = {
-  kind: "pull_request" | "issue";
-  repo: string;
-  number: number;
+export type WorkItem = WorkItemRef & {
   title: string;
   url: string;
   /** Files the agent should read before it writes anything. */
@@ -208,11 +205,18 @@ export type ActionOutcome = {
   url: string;
 };
 
-/** What a link points at, as far as can be told without asking the service. */
+/**
+ * What a link points at, as far as can be told without asking the service.
+ *
+ * `ref` names the thing within its connector and nothing more: a pull request
+ * is `owner/name#12`, a chat is whoever is on the other end of it. Only the
+ * connector that wrote a ref reads it again, so the shape is its own business.
+ * Everything in between treats it as an opaque label that is stable for the
+ * life of the thing and short enough to show someone.
+ */
 export type WorkItemRef = {
-  kind: "pull_request" | "issue";
-  repo: string;
-  number: number;
+  kind: WorkItemKind;
+  ref: string;
 };
 
 /**

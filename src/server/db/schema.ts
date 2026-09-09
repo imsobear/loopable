@@ -5,7 +5,7 @@ import type {
   ConnectionSettings,
   ConnectionStatus,
   JsonValue,
-  TaskSourceKind,
+  WorkItemKind,
   TaskState,
 } from "#/lib/domain.ts";
 import type { Finding } from "#/lib/review.ts";
@@ -76,9 +76,9 @@ export const tasks = sqliteTable(
     state: text("state").$type<TaskState>().notNull().default("queued"),
     /** What the task is about, resolved once so the record survives the source. */
     sourceUrl: text("source_url").notNull(),
-    sourceKind: text("source_kind").$type<TaskSourceKind>().notNull(),
-    sourceRepo: text("source_repo").notNull(),
-    sourceNumber: integer("source_number").notNull(),
+    sourceKind: text("source_kind").$type<WorkItemKind>().notNull(),
+    /** Names the thing inside its own connector. See `WorkItemRef`. */
+    sourceRef: text("source_ref").notNull(),
     /**
      * Identifying a link needs no network, but the title does, so it arrives
      * when the worker fetches rather than when the task is queued.
@@ -208,9 +208,8 @@ export const signals = sqliteTable(
     key: text("key").notNull(),
     outcome: text("outcome").$type<SignalOutcome>().notNull(),
     /** Enough to show and to act on later, without asking the service again. */
-    sourceKind: text("source_kind").$type<TaskSourceKind>().notNull(),
-    sourceRepo: text("source_repo").notNull(),
-    sourceNumber: integer("source_number").notNull(),
+    sourceKind: text("source_kind").$type<WorkItemKind>().notNull(),
+    sourceRef: text("source_ref").notNull(),
     sourceTitle: text("source_title").notNull(),
     sourceUrl: text("source_url").notNull(),
     /** In the words shown to whoever has to decide whether to run it anyway. */

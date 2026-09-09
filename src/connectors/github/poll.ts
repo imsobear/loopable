@@ -1,6 +1,7 @@
 import type { Signal } from "../types.ts";
 import { getPull, searchIssues, type SearchItem } from "./api.ts";
 import { githubManifest } from "./manifest.ts";
+import { githubRef } from "./work-item.ts";
 
 /**
  * Search tells you which repository a result came from only through its API
@@ -107,10 +108,9 @@ export async function pollGithub(input: {
       const tooBig = maxFiles > 0 && pull.changed_files > maxFiles;
 
       signals.push({
-        key: `${repo}#${item.number}@${pull.head.sha}`,
+        key: `${githubRef(repo, item.number)}@${pull.head.sha}`,
         kind: "pull_request",
-        repo,
-        number: item.number,
+        ref: githubRef(repo, item.number),
         title: item.title,
         url: item.html_url,
         hold: tooBig ? `${pull.changed_files} files changed, over this rule's ${maxFiles}` : undefined,
@@ -124,10 +124,9 @@ export async function pollGithub(input: {
     // One plan per issue: being assigned again, or the issue being edited, is
     // not a reason to write a second one.
     return candidates(items, repositories).map(({ repo, item }) => ({
-      key: `${repo}#${item.number}`,
+      key: githubRef(repo, item.number),
       kind: "issue" as const,
-      repo,
-      number: item.number,
+      ref: githubRef(repo, item.number),
       title: item.title,
       url: item.html_url,
     }));

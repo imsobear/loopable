@@ -11,6 +11,11 @@ dist-ssr
 .vinxi
 __unconfig*
 
+# Throwaway probes: written to watch a service answer once, not to keep
+scratch-*.ts
+*-probe*.ts
+*-listen.ts
+
 # Local state and credentials
 .loopable/
 *.sqlite

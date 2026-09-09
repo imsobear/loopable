@@ -3,7 +3,7 @@ import type { ConnectorAccount } from "../types.ts";
 import { getViewer, postIssueComment, submitReview } from "./api.ts";
 import { githubAppRegistration } from "./app-registration.ts";
 import { pollGithub } from "./poll.ts";
-import { parseGithubUrl, resolveWorkItem } from "./work-item.ts";
+import { githubRef, parseGithubRef, parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
   buildAuthorizeUrl,
   createPkce,
@@ -62,7 +62,9 @@ export const githubRuntime = defineRuntime({
     };
   },
   identifyLink(url) {
-    return parseGithubUrl(url);
+    const parsed = parseGithubUrl(url);
+    if (!parsed) return null;
+    return { kind: parsed.kind, ref: githubRef(parsed.repo, parsed.number) };
   },
 
   async resolveWorkItem({ url, credential }) {
@@ -77,14 +79,15 @@ export const githubRuntime = defineRuntime({
 
   async applyAction({ actionId, item, body, comments, credential }) {
     const { accessToken } = await usableToken(credential as GithubCredential);
+    const { repo, number } = parseGithubRef(item.ref);
     if (actionId === "github.submit_review") {
       if (item.kind !== "pull_request") {
         throw new Error("A review can only be submitted on a pull request.");
       }
       const review = await submitReview(
         accessToken,
-        item.repo,
-        item.number,
+        repo,
+        number,
         body,
         (comments ?? []).map((comment) => ({
           path: comment.path,
@@ -99,7 +102,7 @@ export const githubRuntime = defineRuntime({
       return { url: review.html_url };
     }
     if (actionId === "github.post_issue_comment") {
-      const comment = await postIssueComment(accessToken, item.repo, item.number, body);
+      const comment = await postIssueComment(accessToken, repo, number, body);
       return { url: comment.html_url };
     }
     throw new Error(`GitHub cannot ${actionId}.`);
