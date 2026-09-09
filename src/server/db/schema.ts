@@ -191,6 +191,8 @@ export const SIGNAL_OUTCOME = [
   "queued",
   /** It was already waiting when the rule was created, so it was left alone. */
   "backlog",
+  /** Matched, but the connector would not run it by itself. `hold` says why. */
+  "held",
   /** A rule that comes first took it. */
   "superseded",
 ] as const;
@@ -211,6 +213,8 @@ export const signals = sqliteTable(
     sourceNumber: integer("source_number").notNull(),
     sourceTitle: text("source_title").notNull(),
     sourceUrl: text("source_url").notNull(),
+    /** In the words shown to whoever has to decide whether to run it anyway. */
+    hold: text("hold"),
     taskId: text("task_id"),
     seenAt: integer("seen_at", { mode: "timestamp_ms" })
       .notNull()

@@ -44,10 +44,11 @@ export function createPoller(options: PollerOptions = {}) {
       for (const report of reports) {
         if (report.error) {
           log(`poll ${report.ruleName}: ${report.error}`);
-        } else if (report.queued || report.backlog || report.superseded) {
+        } else if (report.queued || report.backlog || report.held || report.superseded) {
           const parts = [
             report.queued ? `${report.queued} queued` : null,
-            report.backlog ? `${report.backlog} held as backlog` : null,
+            report.backlog ? `${report.backlog} kept as backlog` : null,
+            report.held ? `${report.held} held back` : null,
             report.superseded ? `${report.superseded} taken by an earlier rule` : null,
           ].filter(Boolean);
           log(`poll ${report.ruleName}: ${report.found} matching, ${parts.join(", ")}`);

@@ -209,3 +209,82 @@ describe("running the backlog", () => {
     expect(tasksFor("a")).toHaveLength(2);
   });
 });
+
+describe("something the connector will not run by itself", () => {
+  const tooBig = (number: number): Signal => ({
+    ...pull(number),
+    hold: "80 files changed, over this rule's 50",
+  });
+
+  it("is kept and named rather than dropped, long after the first look", async () => {
+    givenRule("a", 1);
+    answer = [];
+    await pollAllRules();
+
+    answer = [tooBig(1)];
+    const [report] = await pollAllRules();
+    expect(report).toMatchObject({ found: 1, queued: 0, held: 1, backlog: 0 });
+    expect(tasksFor("a")).toHaveLength(0);
+
+    const [waiting] = rulePollState("a").backlog;
+    expect(waiting).toMatchObject({
+      sourceNumber: 1,
+      hold: "80 files changed, over this rule's 50",
+    });
+  });
+
+  it("is not held a second time once it is on the list", async () => {
+    givenRule("a", 1);
+    answer = [];
+    await pollAllRules();
+
+    answer = [tooBig(1)];
+    await pollAllRules();
+    const [again] = await pollAllRules();
+    expect(again).toMatchObject({ found: 1, held: 0 });
+    expect(rulePollState("a").backlog).toHaveLength(1);
+  });
+
+  it("runs when it is asked for on purpose", async () => {
+    givenRule("a", 1);
+    answer = [];
+    await pollAllRules();
+
+    answer = [tooBig(1)];
+    await pollAllRules();
+    expect(runBacklog("a")).toBe(1);
+
+    expect(tasksFor("a")).toHaveLength(1);
+    expect(rulePollState("a").backlog).toEqual([]);
+  });
+
+  it("still counts as taken, so a later rule does not pick it up", async () => {
+    givenRule("a", 1);
+    givenRule("b", 2);
+    answer = [];
+    await pollAllRules();
+
+    answer = [tooBig(1)];
+    const [first, second] = await pollAllRules();
+    expect(first).toMatchObject({ held: 1 });
+    expect(second).toMatchObject({ queued: 0, superseded: 1 });
+    expect(tasksFor("b")).toHaveLength(0);
+  });
+
+  it("leaves a new commit on it held as well", async () => {
+    givenRule("a", 1);
+    answer = [];
+    await pollAllRules();
+
+    answer = [tooBig(1)];
+    await pollAllRules();
+    answer = [{ ...pull(1, "sha2"), hold: "81 files changed, over this rule's 50" }];
+    const [report] = await pollAllRules();
+
+    expect(report).toMatchObject({ held: 1, queued: 0 });
+    expect(rulePollState("a").backlog.map((item) => item.hold)).toEqual([
+      "80 files changed, over this rule's 50",
+      "81 files changed, over this rule's 50",
+    ]);
+  });
+});

@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type { Signal } from "#/connectors/types.ts";
@@ -15,6 +15,7 @@ export type PollReport = {
   found: number;
   queued: number;
   backlog: number;
+  held: number;
   superseded: number;
   error: string | null;
 };
@@ -43,6 +44,7 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
     found: 0,
     queued: 0,
     backlog: 0,
+    held: 0,
     superseded: 0,
     error: null,
   };
@@ -84,7 +86,16 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
         continue;
       }
 
-      const outcome = first ? "backlog" : claimed.has(claim) ? "superseded" : "queued";
+      // Being taken settles it before any other reason, including a hold or a
+      // first look: the same thing sitting in two rules' lists would be run
+      // twice by whoever works through them.
+      const outcome = claimed.has(claim)
+        ? "superseded"
+        : signal.hold
+          ? "held"
+          : first
+            ? "backlog"
+            : "queued";
       const task = outcome === "queued" ? enqueueSignal({ rule, signal }) : null;
       db()
         .insert(signals)
@@ -97,6 +108,7 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
           sourceNumber: signal.number,
           sourceTitle: signal.title,
           sourceUrl: signal.url,
+          hold: signal.hold,
           taskId: task?.id,
         })
         .onConflictDoNothing()
@@ -149,9 +161,18 @@ function toBacklogItem(row: typeof signals.$inferSelect): BacklogItem {
     sourceNumber: row.sourceNumber,
     sourceTitle: row.sourceTitle,
     sourceUrl: row.sourceUrl,
+    hold: row.hold,
     seenAt: row.seenAt.toISOString(),
   };
 }
+
+/**
+ * Everything a rule has noticed and never acted on, whether it was already
+ * waiting when the rule was made or the connector held it back. They are one
+ * list because they are one question: this was asked of you and nothing has
+ * happened, do you want it run?
+ */
+const WAITING = ["backlog", "held"] as const;
 
 /** What the rule page needs to say whether the rule is actually watching. */
 export function rulePollState(ruleId: string): RulePollState {
@@ -159,7 +180,7 @@ export function rulePollState(ruleId: string): RulePollState {
   const backlog = db()
     .select()
     .from(signals)
-    .where(and(eq(signals.ruleId, ruleId), eq(signals.outcome, "backlog")))
+    .where(and(eq(signals.ruleId, ruleId), inArray(signals.outcome, [...WAITING])))
     .orderBy(asc(signals.sourceRepo), asc(signals.sourceNumber))
     .all();
   return {
@@ -170,9 +191,9 @@ export function rulePollState(ruleId: string): RulePollState {
 }
 
 /**
- * Run the things that were already waiting when the rule was created. Asked
- * for explicitly, because it is the one moment a rule does a month of work at
- * once.
+ * Run everything the rule is holding. Asked for explicitly, because it is the
+ * one moment a rule does a month of work at once, and because something held
+ * back for being too big is being run against the connector's advice.
  */
 export function runBacklog(ruleId: string): number {
   const rule = db().select().from(rules).where(eq(rules.id, ruleId)).get();
@@ -181,7 +202,7 @@ export function runBacklog(ruleId: string): number {
   const waiting = db()
     .select()
     .from(signals)
-    .where(and(eq(signals.ruleId, ruleId), eq(signals.outcome, "backlog")))
+    .where(and(eq(signals.ruleId, ruleId), inArray(signals.outcome, [...WAITING])))
     .all();
 
   for (const row of waiting) {

@@ -76,6 +76,10 @@ export async function pollGithub(input: {
     for (const { repo, item } of candidates(items, repositories)) {
       // Everything answerable from the search result is answered first, so a
       // skipped pull request costs nothing.
+      //
+      // Bots and drafts are dropped rather than held, because neither is a
+      // request going unanswered: a draft comes back by itself once it is
+      // marked ready, and a bot is a kind of work someone said not to review.
       if (ignoreBots && isBot(item.user)) continue;
       if (ignoreDrafts && item.draft) continue;
 
@@ -83,7 +87,11 @@ export async function pollGithub(input: {
       // new to review, and search does not carry it.
       const pull = await getPull(input.accessToken, repo, item.number);
       if (ignoreDrafts && pull.draft) continue;
-      if (maxFiles > 0 && pull.changed_files > maxFiles) continue;
+
+      // Size is different: a person asked for this review, the pull request
+      // will not get smaller, and nothing brings it back later. Dropping it
+      // would mean the request is never answered and never mentioned.
+      const tooBig = maxFiles > 0 && pull.changed_files > maxFiles;
 
       signals.push({
         key: `${repo}#${item.number}@${pull.head.sha}`,
@@ -92,6 +100,7 @@ export async function pollGithub(input: {
         number: item.number,
         title: item.title,
         url: item.html_url,
+        hold: tooBig ? `${pull.changed_files} files changed, over this rule's ${maxFiles}` : undefined,
       });
     }
     return signals;

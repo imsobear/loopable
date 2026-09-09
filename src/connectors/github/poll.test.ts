@@ -170,7 +170,7 @@ describe("pollGithub, review requested", () => {
     expect(found.map((signal) => signal.number)).toEqual([1, 2]);
   });
 
-  it("skips a pull request that is too big to review well", async () => {
+  it("holds a pull request that is too big rather than dropping it", async () => {
     givenGithub({
       items: [
         { repo: "acme/web", number: 1 },
@@ -178,8 +178,22 @@ describe("pollGithub, review requested", () => {
       ],
       pulls: { "acme/web#1": { changed_files: 80 }, "acme/web#2": { changed_files: 4 } },
     });
-    expect((await poll({ maxChangedFiles: "50" })).map((signal) => signal.number)).toEqual([2]);
-    expect((await poll({ maxChangedFiles: "0" })).map((signal) => signal.number)).toEqual([1, 2]);
+    // Somebody asked for this review. It is still reported, with the reason it
+    // will not happen on its own, so it can be seen and run on purpose.
+    const found = await poll({ maxChangedFiles: "50" });
+    expect(found.map((signal) => [signal.number, signal.hold])).toEqual([
+      [1, "80 files changed, over this rule's 50"],
+      [2, undefined],
+    ]);
+  });
+
+  it("holds nothing when the limit is off", async () => {
+    givenGithub({
+      items: [{ repo: "acme/web", number: 1 }],
+      pulls: { "acme/web#1": { changed_files: 800 } },
+    });
+    const found = await poll({ maxChangedFiles: "0" });
+    expect(found.map((signal) => signal.hold)).toEqual([undefined]);
   });
 
   it("treats a missing setting as the workflow's default rather than as off", async () => {

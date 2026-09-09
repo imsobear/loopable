@@ -1,0 +1,1 @@
+ALTER TABLE `signals` ADD `hold` text;

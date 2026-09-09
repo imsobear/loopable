@@ -88,7 +88,7 @@ export type RuleView = {
   updatedAt: string;
 };
 
-/** Something that was already waiting when a rule was created. */
+/** Something a rule noticed and did not act on, and the reason it did not. */
 export type BacklogItem = {
   key: string;
   sourceKind: TaskSourceKind;
@@ -96,6 +96,8 @@ export type BacklogItem = {
   sourceNumber: number;
   sourceTitle: string;
   sourceUrl: string;
+  /** Why it was held back, or null when it was simply there before the rule. */
+  hold: string | null;
   seenAt: string;
 };
 

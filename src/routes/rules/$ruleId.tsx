@@ -121,12 +121,12 @@ function Watching({
               <div>
                 <p className="text-sm font-medium">
                   {poll.backlog.length === 1
-                    ? "One thing was already waiting"
-                    : `${poll.backlog.length} things were already waiting`}
+                    ? "One thing is waiting"
+                    : `${poll.backlog.length} things are waiting`}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  These matched before the rule existed, so it left them alone. Run them if you
-                  want them dealt with too.
+                  Matched, but not run: either it was already there before the rule was made, or
+                  it was held back for the reason shown. Run them if you want them dealt with too.
                 </p>
               </div>
               <Button
@@ -153,6 +153,7 @@ function Watching({
               {poll.backlog.slice(0, 8).map((item) => (
                 <li key={item.key} className="truncate">
                   {item.sourceRepo} #{item.sourceNumber} · {item.sourceTitle}
+                  {item.hold ? <span className="text-foreground"> · {item.hold}</span> : null}
                 </li>
               ))}
               {poll.backlog.length > 8 ? <li>and {poll.backlog.length - 8} more</li> : null}

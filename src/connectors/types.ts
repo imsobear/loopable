@@ -191,6 +191,16 @@ export type Signal = WorkItemRef & {
   key: string;
   title: string;
   url: string;
+  /**
+   * Why this should not be run on its own, when it should not be. Something a
+   * connector recognises but cannot do well is held rather than dropped: a
+   * review that was asked for and then silently never happened is a worse
+   * answer than one that says the pull request was too big to read.
+   *
+   * A held signal can still be run deliberately, which is the difference
+   * between this and the settings that filter things out entirely.
+   */
+  hold?: string;
 };
 
 export type ConnectorRuntime = {
