@@ -485,7 +485,11 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
 
 function finish(id: string, task: Task, values: Partial<Task>): void {
   const started = task.startedAt?.getTime() ?? task.createdAt.getTime();
-  updateTask(id, { ...values, durationMs: Date.now() - started, leaseUntil: null });
+  // Every way of getting here is an attempt that came good, so whatever an
+  // earlier one left behind stops being true. A task is retried, and one that
+  // failed twice before working would otherwise sit in the log marked done
+  // with a reason it did not work next to it.
+  updateTask(id, { error: null, ...values, durationMs: Date.now() - started, leaseUntil: null });
 }
 
 async function defaultAgentFor(pinned: string | null): Promise<string> {

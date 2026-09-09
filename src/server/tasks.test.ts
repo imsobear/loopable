@@ -1,6 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionSource } from "#/connectors/types.ts";
 import type { ConnectionSettings } from "#/lib/domain.ts";
@@ -145,6 +146,32 @@ describe("runTask", () => {
     expect(write.comments).toEqual([{ path: "src/a.ts", line: 4, body: "Name this." }]);
     expect(write.body).toContain("Looks right.");
     expect(done.state).toBe("done");
+  });
+
+  /**
+   * A task is retried, so a run that finally works follows one that did not.
+   * Leaving the old reason on the row makes the log say a thing was done and,
+   * beside it, why it could not be.
+   */
+  it("clears what an earlier attempt failed with once it works", async () => {
+    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    said = "Looks right.";
+
+    const queued = enqueueTask({
+      loopId: LOOP_ID,
+      url: "https://github.com/acme/web/pull/7",
+      dryRun: false,
+    });
+    db()
+      .update(tasks)
+      .set({ error: "GitHub answered 500", attempts: 1 })
+      .where(eq(tasks.id, queued.id))
+      .run();
+
+    const done = await runTask(queued.id);
+
+    expect(done.state).toBe("done");
+    expect(done.error).toBeNull();
   });
 
   it("writes with the connector the loop chose, on its own account", async () => {

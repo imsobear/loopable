@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/connectors/$connectorId/callback")({
 
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
-        if (!code || !state) return failed("GitHub did not return an authorization code.");
+        if (!code || !state) return failed("No authorization code came back.");
 
         try {
           const attempt = takeAuthAttempt(state);
