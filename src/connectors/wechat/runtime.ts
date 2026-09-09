@@ -1,7 +1,7 @@
 import type { JsonValue } from "#/lib/domain.ts";
 import type { ConnectorRuntime, QrChallenge, QrOutcome } from "../types.ts";
 import {
-  getConfig,
+  notifyStart,
   qrCodeStatus,
   requestQrCode,
   WECHAT_API,
@@ -75,7 +75,7 @@ export const wechatRuntime: ConnectorRuntime = {
 
     async identity(credential: unknown) {
       const stored = credential as WechatCredential;
-      await getConfig(stored);
+      await notifyStart(stored);
       return { account: accountOf(stored) };
     },
   },

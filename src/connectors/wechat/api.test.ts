@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTransient } from "../errors.ts";
-import { getConfig, qrCodeStatus, requestQrCode, type WechatCredential } from "./api.ts";
+import { notifyStart, qrCodeStatus, requestQrCode, type WechatCredential } from "./api.ts";
 
 type Reply = { status?: number; body?: unknown; throws?: boolean };
 
@@ -128,14 +128,31 @@ describe("watching a code", () => {
 
 describe("checking a stored login", () => {
   it("passes when WeChat still knows the token", async () => {
-    const { seen } = givenWechat({ body: { ret: 0, typing_ticket: "t" } });
-    await expect(getConfig(credential)).resolves.toBeUndefined();
+    const { seen } = givenWechat({ body: { ret: 0 } });
+    await expect(notifyStart(credential)).resolves.toBeUndefined();
     const headers = seen[0].init?.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer tok");
   });
 
-  it("fails with what WeChat said when the token is no longer good", async () => {
-    givenWechat({ body: { ret: -14, errmsg: "session expired" } });
-    await expect(getConfig(credential)).rejects.toThrow("session expired");
+  it("catches a dead token even though it is reported in the other field", async () => {
+    // What the live API actually answers for a bad token: errcode, no ret. A
+    // check reading only `ret` would call this a success.
+    givenWechat({ body: { errcode: -14, errmsg: "session timeout" } });
+    await expect(notifyStart(credential)).rejects.toThrow(/signed this bot out/);
+  });
+
+  it("says plainly when the bot has been signed out, whichever field says so", async () => {
+    givenWechat({ body: { ret: -14 } });
+    await expect(notifyStart(credential)).rejects.toThrow(/Connect again by scanning/);
+  });
+
+  it("passes on what WeChat said for anything else", async () => {
+    givenWechat({ body: { ret: -4, errmsg: "GetTypingTicket rpc failed" } });
+    await expect(notifyStart(credential)).rejects.toThrow("GetTypingTicket rpc failed");
+  });
+
+  it("does not read a zero in one field as success when the other refused", async () => {
+    givenWechat({ body: { errcode: 0, ret: -4 } });
+    await expect(notifyStart(credential)).rejects.toThrow(/refused the request \(-4\)/);
   });
 });

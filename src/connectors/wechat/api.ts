@@ -158,20 +158,43 @@ export async function qrCodeStatus(qrcode: string, host: string): Promise<QrStat
   }
 }
 
+type Answer = { ret?: number; errcode?: number; errmsg?: string };
+
+/** A dead token, as opposed to a request WeChat merely disliked. */
+const SESSION_GONE = -14;
+
 /**
- * Reads the account's configuration, which is the cheapest thing that proves a
- * stored token is still good without sending anybody a message.
+ * Whether WeChat refused, and why.
+ *
+ * It reports trouble in two fields and not always the same one: a call with a
+ * dead token comes back `{errcode:-14}` with no `ret` at all, so a check that
+ * reads only `ret` would call that a success and let a signed-out account look
+ * connected.
  */
-export async function getConfig(credential: WechatCredential): Promise<void> {
-  const body = await call<{ ret?: number; errmsg?: string }>(
-    `${credential.baseUrl}/ilink/bot/getconfig`,
-    {
-      method: "POST",
-      headers: postHeaders(credential.botToken),
-      body: JSON.stringify({ ilink_user_id: credential.userId, base_info: BASE_INFO }),
-    },
-  );
-  if (body.ret !== undefined && body.ret !== 0) {
-    throw new Error(body.errmsg || `WeChat rejected the stored login (ret ${body.ret}).`);
+function refusal(body: Answer): string | null {
+  const codes = [body.ret, body.errcode].filter((code): code is number => typeof code === "number");
+  const bad = codes.find((code) => code !== 0);
+  if (bad === undefined) return null;
+  if (bad === SESSION_GONE) {
+    return "WeChat has signed this bot out. Connect again by scanning.";
   }
+  return body.errmsg || `WeChat refused the request (${bad}).`;
+}
+
+/**
+ * Tells WeChat a client is up, and doubles as the proof that a stored token
+ * still works: it needs nothing but the token, and a dead one is refused.
+ *
+ * Reading the account's config would be the obvious check and is the wrong
+ * one. It mints a typing ticket, which needs a conversation, so it fails on
+ * exactly the account that has just been connected and never messaged.
+ */
+export async function notifyStart(credential: WechatCredential): Promise<void> {
+  const body = await call<Answer>(`${credential.baseUrl}/ilink/bot/msg/notifystart`, {
+    method: "POST",
+    headers: postHeaders(credential.botToken),
+    body: JSON.stringify({ base_info: BASE_INFO }),
+  });
+  const refused = refusal(body);
+  if (refused) throw new Error(refused);
 }
