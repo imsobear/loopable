@@ -70,11 +70,11 @@ function when(iso: string): string {
 
 export function TaskList({
   tasks,
-  showRule = true,
+  showLoop = true,
   empty,
 }: {
   tasks: TaskView[];
-  showRule?: boolean;
+  showLoop?: boolean;
   empty: string;
 }) {
   useLiveTasks(tasks);
@@ -107,7 +107,7 @@ export function TaskList({
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {task.sourceRef}
               </p>
-              <TaskMeta task={task} showRule={showRule} />
+              <TaskMeta task={task} showLoop={showLoop} />
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {task.dryRun ? <Badge variant="outline">Dry run</Badge> : null}
@@ -127,15 +127,15 @@ export function TaskList({
 
 /**
  * What ran, and what it ran through. Which agent wrote the words matters when
- * two rules disagree, and it is only known once the worker has picked the task
+ * two loops disagree, and it is only known once the worker has picked the task
  * up, so it is absent rather than wrong while a task is queued.
  */
-function TaskMeta({ task, showRule }: { task: TaskView; showRule: boolean }) {
+function TaskMeta({ task, showLoop }: { task: TaskView; showLoop: boolean }) {
   const connector = connectorManifest(task.connectorId);
   const agent = task.agentId ? agentManifest(task.agentId) : undefined;
 
   const parts: Array<{ icon: typeof Workflow; label: string }> = [];
-  if (showRule) parts.push({ icon: Workflow, label: task.ruleName });
+  if (showLoop) parts.push({ icon: Workflow, label: task.loopName });
   if (connector) parts.push({ icon: Plug, label: connector.name });
   if (agent) parts.push({ icon: Bot, label: agent.name });
   parts.push({ icon: Clock, label: when(task.createdAt) });

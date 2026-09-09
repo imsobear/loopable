@@ -2,15 +2,15 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type { Signal } from "#/connectors/types.ts";
-import type { BacklogItem, RulePollState } from "#/lib/domain.ts";
+import type { BacklogItem, LoopPollState } from "#/lib/domain.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
-import { rules, signals, type Rule } from "./db/schema.ts";
+import { loops, signals, type Loop } from "./db/schema.ts";
 import { enqueueSignal } from "./tasks.ts";
 
 export type PollReport = {
-  ruleId: string;
-  ruleName: string;
+  loopId: string;
+  loopName: string;
   /** How many things the connector said match right now. */
   found: number;
   queued: number;
@@ -21,26 +21,26 @@ export type PollReport = {
 };
 
 /**
- * Two rules can want the same pull request. Only the first one gets it, so
- * this is what one rule tells the next about what it has taken.
+ * Two loops can want the same pull request. Only the first one gets it, so
+ * this is what one loop tells the next about what it has taken.
  */
-function claimOf(rule: Rule, signal: Signal): string {
-  return `${rule.connectorId}:${signal.ref}`;
+function claimOf(loop: Loop, signal: Signal): string {
+  return `${loop.connectorId}:${signal.ref}`;
 }
 
 /**
- * One look at what a rule is watching for.
+ * One look at what a loop is watching for.
  *
- * The first look never acts. Whatever is already waiting when a rule is
- * created is that rule's backlog, and running an agent over a review queue
- * that has been piling up for a month is not what someone turning on a rule
+ * The first look never acts. Whatever is already waiting when a loop is
+ * created is that loop's backlog, and running an agent over a review queue
+ * that has been piling up for a month is not what someone turning on a loop
  * is asking for. It is recorded rather than discarded, so it can still be run
  * on purpose afterwards.
  */
-export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollReport> {
+export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollReport> {
   const report: PollReport = {
-    ruleId: rule.id,
-    ruleName: rule.name,
+    loopId: loop.id,
+    loopName: loop.name,
     found: 0,
     queued: 0,
     backlog: 0,
@@ -50,21 +50,21 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
   };
 
   try {
-    const manifest = connectorManifest(rule.connectorId);
-    if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
-    const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
-    if (!workflow) throw new Error(`${manifest.name} no longer offers ${rule.workflowId}.`);
-    const runtime = connectorRuntime(rule.connectorId);
+    const manifest = connectorManifest(loop.connectorId);
+    if (!manifest) throw new Error(`Unknown connector: ${loop.connectorId}`);
+    const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
+    if (!workflow) throw new Error(`${manifest.name} no longer offers ${loop.workflowId}.`);
+    const runtime = connectorRuntime(loop.connectorId);
     if (!runtime.poll) throw new Error(`${manifest.name} cannot watch for anything yet.`);
 
-    const { credential } = await credentialForConnector(rule.connectorId);
-    // Settings a rule was saved before are missing rather than false, so the
+    const { credential } = await credentialForConnector(loop.connectorId);
+    // Settings a loop was saved before are missing rather than false, so the
     // connector fills the gaps from what the workflow declares.
     const answer = await runtime.poll({
-      workflowId: rule.workflowId,
-      settings: rule.settings,
+      workflowId: loop.workflowId,
+      settings: loop.settings,
       credential,
-      cursor: rule.pollCursor ?? null,
+      cursor: loop.pollCursor ?? null,
     });
     const found = answer.signals;
     report.found = found.length;
@@ -73,23 +73,23 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
       db()
         .select({ key: signals.key })
         .from(signals)
-        .where(eq(signals.ruleId, rule.id))
+        .where(eq(signals.loopId, loop.id))
         .all()
         .map((row) => row.key),
     );
-    const first = rule.polledAt === null;
+    const first = loop.polledAt === null;
 
     for (const signal of found) {
-      const claim = claimOf(rule, signal);
-      // Something this rule has already dealt with still counts as taken, or
-      // a rule further down the list would pick up its leftovers.
+      const claim = claimOf(loop, signal);
+      // Something this loop has already dealt with still counts as taken, or
+      // a loop further down the list would pick up its leftovers.
       if (known.has(signal.key)) {
         claimed.add(claim);
         continue;
       }
 
       // Being taken settles it before any other reason, including a hold or a
-      // first look: the same thing sitting in two rules' lists would be run
+      // first look: the same thing sitting in two loops' lists would be run
       // twice by whoever works through them.
       const outcome = claimed.has(claim)
         ? "superseded"
@@ -98,11 +98,11 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
           : first
             ? "backlog"
             : "queued";
-      const task = outcome === "queued" ? enqueueSignal({ rule, signal }) : null;
+      const task = outcome === "queued" ? enqueueSignal({ loop, signal }) : null;
       db()
         .insert(signals)
         .values({
-          ruleId: rule.id,
+          loopId: loop.id,
           key: signal.key,
           outcome,
           sourceKind: signal.kind,
@@ -124,40 +124,40 @@ export async function pollRule(rule: Rule, claimed: Set<string>): Promise<PollRe
     // disk. A stream will not hand those messages over twice, so saving the
     // new position before the signals would lose whatever fell in between.
     db()
-      .update(rules)
+      .update(loops)
       .set({
         polledAt: new Date(),
         pollError: null,
         ...(answer.cursor !== undefined ? { pollCursor: answer.cursor } : {}),
       })
-      .where(eq(rules.id, rule.id))
+      .where(eq(loops.id, loop.id))
       .run();
   } catch (error) {
     report.error = error instanceof Error ? error.message : String(error);
     // polledAt is deliberately left alone: a look that failed told us nothing
     // about the backlog, and moving the mark would silently swallow it.
-    db().update(rules).set({ pollError: report.error }).where(eq(rules.id, rule.id)).run();
+    db().update(loops).set({ pollError: report.error }).where(eq(loops.id, loop.id)).run();
   }
 
   return report;
 }
 
 /**
- * Every enabled rule, in the order a person put them in, because that order is
- * what decides who gets a thing two rules both want.
+ * Every enabled loop, in the order a person put them in, because that order is
+ * what decides who gets a thing two loops both want.
  */
-export async function pollAllRules(): Promise<PollReport[]> {
+export async function pollAllLoops(): Promise<PollReport[]> {
   const enabled = db()
     .select()
-    .from(rules)
-    .where(eq(rules.enabled, true))
-    .orderBy(asc(rules.priority))
+    .from(loops)
+    .where(eq(loops.enabled, true))
+    .orderBy(asc(loops.priority))
     .all();
 
   const claimed = new Set<string>();
   const reports: PollReport[] = [];
-  for (const rule of enabled) {
-    reports.push(await pollRule(rule, claimed));
+  for (const loop of enabled) {
+    reports.push(await pollLoop(loop, claimed));
   }
   return reports;
 }
@@ -175,47 +175,47 @@ function toBacklogItem(row: typeof signals.$inferSelect): BacklogItem {
 }
 
 /**
- * Everything a rule has noticed and never acted on, whether it was already
- * waiting when the rule was made or the connector held it back. They are one
+ * Everything a loop has noticed and never acted on, whether it was already
+ * waiting when the loop was made or the connector held it back. They are one
  * list because they are one question: this was asked of you and nothing has
  * happened, do you want it run?
  */
 const WAITING = ["backlog", "held"] as const;
 
-/** What the rule page needs to say whether the rule is actually watching. */
-export function rulePollState(ruleId: string): RulePollState {
-  const rule = db().select().from(rules).where(eq(rules.id, ruleId)).get();
+/** What the loop page needs to say whether the loop is actually watching. */
+export function loopPollState(loopId: string): LoopPollState {
+  const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
   const backlog = db()
     .select()
     .from(signals)
-    .where(and(eq(signals.ruleId, ruleId), inArray(signals.outcome, [...WAITING])))
+    .where(and(eq(signals.loopId, loopId), inArray(signals.outcome, [...WAITING])))
     .orderBy(asc(signals.sourceRef))
     .all();
   return {
-    polledAt: rule?.polledAt?.toISOString() ?? null,
-    pollError: rule?.pollError ?? null,
+    polledAt: loop?.polledAt?.toISOString() ?? null,
+    pollError: loop?.pollError ?? null,
     backlog: backlog.map(toBacklogItem),
   };
 }
 
 /**
- * Run everything the rule is holding. Asked for explicitly, because it is the
- * one moment a rule does a month of work at once, and because something held
+ * Run everything the loop is holding. Asked for explicitly, because it is the
+ * one moment a loop does a month of work at once, and because something held
  * back for being too big is being run against the connector's advice.
  */
-export function runBacklog(ruleId: string): number {
-  const rule = db().select().from(rules).where(eq(rules.id, ruleId)).get();
-  if (!rule) throw new Error("Rule not found");
+export function runBacklog(loopId: string): number {
+  const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
+  if (!loop) throw new Error("Loop not found");
 
   const waiting = db()
     .select()
     .from(signals)
-    .where(and(eq(signals.ruleId, ruleId), inArray(signals.outcome, [...WAITING])))
+    .where(and(eq(signals.loopId, loopId), inArray(signals.outcome, [...WAITING])))
     .all();
 
   for (const row of waiting) {
     const task = enqueueSignal({
-      rule,
+      loop,
       signal: {
         key: row.key,
         kind: row.sourceKind,
@@ -228,7 +228,7 @@ export function runBacklog(ruleId: string): number {
     db()
       .update(signals)
       .set({ outcome: "queued", taskId: task.id })
-      .where(and(eq(signals.ruleId, ruleId), eq(signals.key, row.key)))
+      .where(and(eq(signals.loopId, loopId), eq(signals.key, row.key)))
       .run();
   }
   return waiting.length;

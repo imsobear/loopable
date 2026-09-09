@@ -2,7 +2,7 @@ import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-rout
 import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, CircleAlert, Eye, Play } from "lucide-react";
-import { RuleForm } from "@/components/rule-form";
+import { LoopForm } from "@/components/loop-form";
 import { TaskList } from "@/components/task-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,40 +12,40 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { connectorManifest } from "@/connectors/manifests.ts";
-import type { RulePollState } from "@/lib/domain.ts";
-import { getRuleById, getRulePollState, runRuleBacklog } from "@/server/functions/rules.ts";
-import { getRuleTasks, runRuleNow } from "@/server/functions/tasks.ts";
+import type { LoopPollState } from "@/lib/domain.ts";
+import { getLoopById, getLoopPollState, runLoopBacklog } from "@/server/functions/loops.ts";
+import { getLoopTasks, runLoopNow } from "@/server/functions/tasks.ts";
 
-export const Route = createFileRoute("/rules/$ruleId")({
+export const Route = createFileRoute("/loops/$loopId")({
   loader: async ({ params }) => {
-    const rule = await getRuleById({ data: { id: params.ruleId } });
-    if (!rule) throw notFound();
+    const loop = await getLoopById({ data: { id: params.loopId } });
+    if (!loop) throw notFound();
     return {
-      rule,
-      tasks: await getRuleTasks({ data: { ruleId: params.ruleId } }),
-      poll: await getRulePollState({ data: { id: params.ruleId } }),
+      loop,
+      tasks: await getLoopTasks({ data: { loopId: params.loopId } }),
+      poll: await getLoopPollState({ data: { id: params.loopId } }),
     };
   },
-  component: RulePage,
+  component: LoopPage,
 });
 
-function RulePage() {
-  const { rule, tasks, poll } = Route.useLoaderData();
+function LoopPage() {
+  const { loop, tasks, poll } = Route.useLoaderData();
 
   return (
     <div className="flex flex-col gap-6">
       <Link
-        to="/rules"
+        to="/loops"
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        Rules
+        Loops
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">{rule.name}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{loop.name}</h1>
 
-      <Watching rule={rule} poll={poll} />
+      <Watching loop={loop} poll={poll} />
 
-      {/* Opening a rule is nearly always about changing it; its runs are in the
+      {/* Opening a loop is nearly always about changing it; its runs are in the
           inbox too. */}
       <Tabs defaultValue="settings">
         <TabsList>
@@ -54,12 +54,12 @@ function RulePage() {
         </TabsList>
 
         <TabsContent value="settings" className="pt-2">
-          <RuleForm rule={rule} />
+          <LoopForm loop={loop} />
         </TabsContent>
 
         <TabsContent value="tasks" className="flex flex-col gap-4 pt-2">
-          <RunBox rule={rule} />
-          <TaskList tasks={tasks} showRule={false} empty="This rule has not run yet." />
+          <RunBox loop={loop} />
+          <TaskList tasks={tasks} showLoop={false} empty="This loop has not run yet." />
         </TabsContent>
       </Tabs>
     </div>
@@ -71,23 +71,23 @@ function when(iso: string): string {
 }
 
 /**
- * Whether the rule is really watching is the one thing a page cannot work out
+ * Whether the loop is really watching is the one thing a page cannot work out
  * for itself, and the thing a person most wants to know after turning one on.
  */
 function Watching({
-  rule,
+  loop,
   poll,
 }: {
-  rule: { id: string; enabled: boolean };
-  poll: RulePollState;
+  loop: { id: string; enabled: boolean };
+  poll: LoopPollState;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  if (!rule.enabled) {
+  if (!loop.enabled) {
     return (
       <Alert>
-        <AlertTitle>This rule is off</AlertTitle>
+        <AlertTitle>This loop is off</AlertTitle>
         <AlertDescription>Nothing is being watched for until you turn it back on.</AlertDescription>
       </Alert>
     );
@@ -125,7 +125,7 @@ function Watching({
                     : `${poll.backlog.length} things are waiting`}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Matched, but not run: either it was already there before the rule was made, or
+                  Matched, but not run: either it was already there before the loop was made, or
                   it was held back for the reason shown. Run them if you want them dealt with too.
                 </p>
               </div>
@@ -136,7 +136,7 @@ function Watching({
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    const { queued } = await runRuleBacklog({ data: { id: rule.id } });
+                    const { queued } = await runLoopBacklog({ data: { id: loop.id } });
                     await router.invalidate();
                     toast.success(queued === 1 ? "Queued 1 run" : `Queued ${queued} runs`);
                   } catch (error) {
@@ -166,21 +166,21 @@ function Watching({
 }
 
 /**
- * A rule that runs by itself still has to be shaped, and waiting for a real
+ * A loop that runs by itself still has to be shaped, and waiting for a real
  * signal to arrive is a slow way to do it. Dry run means that shaping leaves
  * no marks on a real repository.
  */
-function RunBox({ rule }: { rule: { id: string; connectorId: string } }) {
+function RunBox({ loop }: { loop: { id: string; connectorId: string } }) {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
-  const manifest = connectorManifest(rule.connectorId);
+  const manifest = connectorManifest(loop.connectorId);
 
   const run = async () => {
     setRunning(true);
     try {
-      await runRuleNow({ data: { ruleId: rule.id, url: url.trim(), dryRun } });
+      await runLoopNow({ data: { loopId: loop.id, url: url.trim(), dryRun } });
       await router.invalidate();
       setUrl("");
       toast.success(dryRun ? "Queued as a dry run" : "Queued");
@@ -195,7 +195,7 @@ function RunBox({ rule }: { rule: { id: string; connectorId: string } }) {
     <Card>
       <CardContent className="flex flex-col gap-4 pt-6">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="run-url">Try this rule on a {manifest?.name ?? ""} link</Label>
+          <Label htmlFor="run-url">Try this loop on a {manifest?.name ?? ""} link</Label>
           <div className="flex gap-2">
             <Input
               id="run-url"
@@ -215,7 +215,7 @@ function RunBox({ rule }: { rule: { id: string; connectorId: string } }) {
             <p className="mt-1 text-xs text-muted-foreground">
               {dryRun
                 ? "Prepare the result and show it to you, without writing anything."
-                : "Write the result back, exactly as the rule would on its own."}
+                : "Write the result back, exactly as the loop would on its own."}
             </p>
           </div>
           <Switch id="run-dry" checked={dryRun} onCheckedChange={setDryRun} />

@@ -3,12 +3,12 @@ import { asc, eq, sql } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import type { SettingField } from "#/connectors/types.ts";
-import type { ConnectionSettings, RuleReadiness, RuleView } from "#/lib/domain.ts";
+import type { ConnectionSettings, LoopReadiness, LoopView } from "#/lib/domain.ts";
 import { listAgents } from "./agents.ts";
 import { db } from "./db/client.ts";
-import { connections, rules, type Rule } from "./db/schema.ts";
+import { connections, loops, type Loop } from "./db/schema.ts";
 
-export type RuleDraft = {
+export type LoopDraft = {
   name: string;
   connectorId: string;
   workflowId: string;
@@ -21,7 +21,7 @@ export type RuleDraft = {
 const NAME_LIMIT = 80;
 const GUIDANCE_LIMIT = 4000;
 
-function toView(row: Rule): RuleView {
+function toView(row: Loop): LoopView {
   return {
     id: row.id,
     name: row.name,
@@ -68,7 +68,7 @@ function cleanConditions(fields: SettingField[], input: ConnectionSettings): Con
   return cleaned;
 }
 
-function validate(draft: RuleDraft): RuleDraft {
+function validate(draft: LoopDraft): LoopDraft {
   const manifest = connectorManifest(draft.connectorId);
   if (!manifest) throw new Error(`Unknown connector: ${draft.connectorId}`);
 
@@ -80,7 +80,7 @@ function validate(draft: RuleDraft): RuleDraft {
   }
 
   const name = draft.name.trim();
-  if (!name) throw new Error("Give the rule a name.");
+  if (!name) throw new Error("Give the loop a name.");
   if (name.length > NAME_LIMIT) throw new Error(`Keep the name under ${NAME_LIMIT} characters.`);
 
   // The workflow already knows what to ask for, so guidance is genuinely
@@ -98,24 +98,24 @@ function validate(draft: RuleDraft): RuleDraft {
   };
 }
 
-export function listRules(): RuleView[] {
-  return db().select().from(rules).orderBy(asc(rules.priority)).all().map(toView);
+export function listLoops(): LoopView[] {
+  return db().select().from(loops).orderBy(asc(loops.priority)).all().map(toView);
 }
 
-export function getRule(id: string): RuleView | null {
-  const row = db().select().from(rules).where(eq(rules.id, id)).get();
+export function getLoop(id: string): LoopView | null {
+  const row = db().select().from(loops).where(eq(loops.id, id)).get();
   return row ? toView(row) : null;
 }
 
-export function createRule(draft: RuleDraft): RuleView {
+export function createLoop(draft: LoopDraft): LoopView {
   const checked = validate(draft);
   const last = db()
-    .select({ value: sql<number | null>`max(${rules.priority})` })
-    .from(rules)
+    .select({ value: sql<number | null>`max(${loops.priority})` })
+    .from(loops)
     .get();
   const id = randomUUID();
   db()
-    .insert(rules)
+    .insert(loops)
     .values({
       id,
       name: checked.name,
@@ -128,14 +128,14 @@ export function createRule(draft: RuleDraft): RuleView {
       agentId: checked.agentId,
     })
     .run();
-  return getRule(id)!;
+  return getLoop(id)!;
 }
 
-export function updateRule(id: string, draft: RuleDraft): RuleView {
-  if (!getRule(id)) throw new Error("Rule not found");
+export function updateLoop(id: string, draft: LoopDraft): LoopView {
+  if (!getLoop(id)) throw new Error("Loop not found");
   const checked = validate(draft);
   db()
-    .update(rules)
+    .update(loops)
     .set({
       name: checked.name,
       enabled: checked.enabled,
@@ -146,50 +146,50 @@ export function updateRule(id: string, draft: RuleDraft): RuleView {
       agentId: checked.agentId,
       updatedAt: new Date(),
     })
-    .where(eq(rules.id, id))
+    .where(eq(loops.id, id))
     .run();
-  return getRule(id)!;
+  return getLoop(id)!;
 }
 
-export function setRuleEnabled(id: string, enabled: boolean): RuleView {
-  if (!getRule(id)) throw new Error("Rule not found");
-  db().update(rules).set({ enabled, updatedAt: new Date() }).where(eq(rules.id, id)).run();
-  return getRule(id)!;
+export function setLoopEnabled(id: string, enabled: boolean): LoopView {
+  if (!getLoop(id)) throw new Error("Loop not found");
+  db().update(loops).set({ enabled, updatedAt: new Date() }).where(eq(loops.id, id)).run();
+  return getLoop(id)!;
 }
 
-export function deleteRule(id: string): void {
-  db().delete(rules).where(eq(rules.id, id)).run();
+export function deleteLoop(id: string): void {
+  db().delete(loops).where(eq(loops.id, id)).run();
 }
 
 /**
- * The first matching rule wins, so a person has to be able to say which comes
+ * The first matching loop wins, so a person has to be able to say which comes
  * first. Swapping with the neighbour keeps that to one obvious gesture.
  */
-export function moveRule(id: string, direction: "up" | "down"): RuleView[] {
-  const ordered = db().select().from(rules).orderBy(asc(rules.priority)).all();
+export function moveLoop(id: string, direction: "up" | "down"): LoopView[] {
+  const ordered = db().select().from(loops).orderBy(asc(loops.priority)).all();
   const index = ordered.findIndex((row) => row.id === id);
-  if (index === -1) throw new Error("Rule not found");
+  if (index === -1) throw new Error("Loop not found");
   const target = direction === "up" ? index - 1 : index + 1;
   if (target < 0 || target >= ordered.length) return ordered.map(toView);
 
   const moving = ordered[index]!;
   const neighbour = ordered[target]!;
   db().transaction((tx) => {
-    tx.update(rules).set({ priority: neighbour.priority }).where(eq(rules.id, moving.id)).run();
-    tx.update(rules).set({ priority: moving.priority }).where(eq(rules.id, neighbour.id)).run();
+    tx.update(loops).set({ priority: neighbour.priority }).where(eq(loops.id, moving.id)).run();
+    tx.update(loops).set({ priority: moving.priority }).where(eq(loops.id, neighbour.id)).run();
   });
-  return listRules();
+  return listLoops();
 }
 
 /**
  * Turn on one of a connector's workflows. Everything a workflow needs it
- * already declares a default for, so this is the whole of "adding a rule" in
+ * already declares a default for, so this is the whole of "adding a loop" in
  * the common case, and the form is only for changing one afterwards.
  */
-export function createRuleFromWorkflow(connectorId: string, workflowId: string): RuleView {
+export function createLoopFromWorkflow(connectorId: string, workflowId: string): LoopView {
   const workflow = connectorWorkflow(connectorId, workflowId);
   if (!workflow) throw new Error(`Unknown workflow: ${workflowId}`);
-  return createRule({
+  return createLoop({
     name: workflow.name,
     connectorId,
     workflowId,
@@ -201,10 +201,10 @@ export function createRuleFromWorkflow(connectorId: string, workflowId: string):
 }
 
 /**
- * A rule can be written before anything is connected or installed, so the page
+ * A loop can be written before anything is connected or installed, so the page
  * says what is still missing rather than refusing to save.
  */
-export async function ruleReadiness(): Promise<RuleReadiness> {
+export async function loopReadiness(): Promise<LoopReadiness> {
   const agents = await listAgents();
   const connected = db()
     .selectDistinct({ connectorId: connections.connectorId })

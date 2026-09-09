@@ -55,7 +55,7 @@ function postHeaders(token?: string): Record<string, string> {
 }
 
 /**
- * WeChat's own trouble is not ours to fail a rule over. A refused request is
+ * WeChat's own trouble is not ours to fail a loop over. A refused request is
  * an answer; an unreachable host or a 5xx is a bad minute.
  */
 async function call<T>(url: string, init: RequestInit): Promise<T> {
@@ -234,7 +234,7 @@ export function isFromPerson(message: WeixinMessage): boolean {
 /**
  * How long to hold the connection open waiting for someone to type. This is a
  * long poll and the server decides when to answer, so the limit is ours: the
- * caller is a loop with other rules to get to, and an empty answer costs it a
+ * caller is a loop with other loops to get to, and an empty answer costs it a
  * turn rather than the whole minute.
  */
 const WAIT_MS = 10_000;

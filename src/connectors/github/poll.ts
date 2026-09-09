@@ -38,7 +38,7 @@ function stringList(value: unknown): string[] {
 }
 
 /**
- * Missing means "the workflow's default", not "off". A rule saved before a
+ * Missing means "the workflow's default", not "off". A loop saved before a
  * setting existed must behave as if it had been there all along.
  */
 function boolean(value: unknown, fallback: boolean): boolean {
@@ -61,7 +61,7 @@ function candidates(items: SearchItem[], repositories: string[]): Candidate[] {
 
 /**
  * What the workflow says it watches for, which is what gets asked. Taking the
- * query from the manifest is the point: it is shown on the rule page, and a
+ * query from the manifest is the point: it is shown on the loop page, and a
  * search that quietly differed from the one on screen would be the worst kind
  * of wrong.
  */
@@ -113,7 +113,7 @@ export async function pollGithub(input: {
         ref: githubRef(repo, item.number),
         title: item.title,
         url: item.html_url,
-        hold: tooBig ? `${pull.changed_files} files changed, over this rule's ${maxFiles}` : undefined,
+        hold: tooBig ? `${pull.changed_files} files changed, over this loop's ${maxFiles}` : undefined,
       });
     }
     return signals;

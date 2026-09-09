@@ -23,9 +23,9 @@ type NavItem = {
   soon?: boolean;
 };
 
-const LOOP: NavItem[] = [
+const WORK: NavItem[] = [
   { label: "Inbox", to: "/inbox", icon: Inbox },
-  { label: "Rules", to: "/rules", icon: Workflow },
+  { label: "Loops", to: "/loops", icon: Workflow },
 ];
 
 const SETUP: NavItem[] = [
@@ -93,7 +93,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavGroup label="Loop" items={LOOP} />
+        <NavGroup label="Work" items={WORK} />
         <NavGroup label="Setup" items={SETUP} />
       </SidebarContent>
       <SidebarFooter>

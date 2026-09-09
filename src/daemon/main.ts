@@ -8,7 +8,7 @@ function log(message: string): void {
 }
 
 /**
- * The engine. Runs as its own process so a rule keeps working when nobody has
+ * The engine. Runs as its own process so a loop keeps working when nobody has
  * the app open, which is the whole point of a loop that runs by itself.
  *
  * It talks to the app only through SQLite: the app queues tasks and asks for

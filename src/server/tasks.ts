@@ -13,10 +13,10 @@ import { listAgents, settingsFor } from "./agents.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
 import { dataDir, runDir } from "./paths.ts";
-import { rules, tasks, type Rule, type Task } from "./db/schema.ts";
+import { loops, tasks, type Loop, type Task } from "./db/schema.ts";
 
 /**
- * The agent says this when the honest answer is "nothing". Without it a rule
+ * The agent says this when the honest answer is "nothing". Without it a loop
  * that runs by itself would post filler, which is worse than silence.
  */
 const NOTHING = "NOTHING_TO_DO";
@@ -26,11 +26,11 @@ const SIGNATURE = "\n\n---\n*Written by Loopable, running locally.*";
 
 // The payload is the connector's own record and stays on the server: it is
 // the only field here that no page has any business reading.
-function toView(row: Omit<Task, "sourcePayload"> & { ruleName?: string | null }): TaskView {
+function toView(row: Omit<Task, "sourcePayload"> & { loopName?: string | null }): TaskView {
   return {
     id: row.id,
-    ruleId: row.ruleId,
-    ruleName: row.ruleName ?? "Deleted rule",
+    loopId: row.loopId,
+    loopName: row.loopName ?? "Deleted loop",
     connectorId: row.connectorId,
     state: row.state,
     sourceUrl: row.sourceUrl,
@@ -58,7 +58,7 @@ function select() {
   return db()
     .select({
       id: tasks.id,
-      ruleId: tasks.ruleId,
+      loopId: tasks.loopId,
       connectorId: tasks.connectorId,
       state: tasks.state,
       sourceUrl: tasks.sourceUrl,
@@ -83,15 +83,15 @@ function select() {
       createdAt: tasks.createdAt,
       startedAt: tasks.startedAt,
       updatedAt: tasks.updatedAt,
-      ruleName: rules.name,
+      loopName: loops.name,
     })
     .from(tasks)
-    .leftJoin(rules, eq(tasks.ruleId, rules.id));
+    .leftJoin(loops, eq(tasks.loopId, loops.id));
 }
 
-export function listTasks(options: { ruleId?: string; limit?: number } = {}): TaskView[] {
+export function listTasks(options: { loopId?: string; limit?: number } = {}): TaskView[] {
   const query = select().orderBy(desc(tasks.createdAt)).limit(options.limit ?? 100);
-  const rows = options.ruleId ? query.where(eq(tasks.ruleId, options.ruleId)).all() : query.all();
+  const rows = options.loopId ? query.where(eq(tasks.loopId, options.loopId)).all() : query.all();
   return rows.map(toView);
 }
 
@@ -114,7 +114,7 @@ export function updateTask(id: string, values: Partial<Task>): void {
 
 /** The one place a task is created, whether a person or a poll asked for it. */
 function queue(input: {
-  rule: Rule;
+  loop: Loop;
   workflow: WorkflowDescriptor;
   item: WorkItemRef;
   payload?: JsonValue;
@@ -128,8 +128,8 @@ function queue(input: {
     .insert(tasks)
     .values({
       id,
-      ruleId: input.rule.id,
-      connectorId: input.rule.connectorId,
+      loopId: input.loop.id,
+      connectorId: input.loop.connectorId,
       state: "queued",
       sourceUrl: input.url.trim(),
       sourceKind: input.item.kind,
@@ -144,22 +144,22 @@ function queue(input: {
   return getTask(id)!;
 }
 
-/** Everything a rule needs before it can produce a task, or a reason it cannot. */
-function runnable(ruleId: string): { rule: Rule; workflow: WorkflowDescriptor } {
-  const rule = db().select().from(rules).where(eq(rules.id, ruleId)).get();
-  if (!rule) throw new Error("Rule not found");
+/** Everything a loop needs before it can produce a task, or a reason it cannot. */
+function runnable(loopId: string): { loop: Loop; workflow: WorkflowDescriptor } {
+  const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
+  if (!loop) throw new Error("Loop not found");
 
-  const manifest = connectorManifest(rule.connectorId);
-  if (!manifest) throw new Error(`Unknown connector: ${rule.connectorId}`);
-  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  const manifest = connectorManifest(loop.connectorId);
+  if (!manifest) throw new Error(`Unknown connector: ${loop.connectorId}`);
+  const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
   if (!workflow) {
-    throw new Error(`${manifest.name} no longer offers the workflow this rule was built on.`);
+    throw new Error(`${manifest.name} no longer offers the workflow this loop was built on.`);
   }
-  const runtime = connectorRuntime(rule.connectorId);
+  const runtime = connectorRuntime(loop.connectorId);
   if (!runtime.resolveWorkItem || !runtime.applyAction) {
     throw new Error(`${manifest.name} cannot run tasks yet.`);
   }
-  return { rule, workflow };
+  return { loop, workflow };
 }
 
 /**
@@ -168,20 +168,20 @@ function runnable(ruleId: string): { rule: Rule; workflow: WorkflowDescriptor } 
  * that can be slow or can fail belongs to the worker.
  */
 export function enqueueTask(input: {
-  ruleId: string;
+  loopId: string;
   url: string;
   dryRun: boolean;
 }): TaskView {
-  const { rule, workflow } = runnable(input.ruleId);
-  const manifest = connectorManifest(rule.connectorId)!;
-  const runtime = connectorRuntime(rule.connectorId);
+  const { loop, workflow } = runnable(input.loopId);
+  const manifest = connectorManifest(loop.connectorId)!;
+  const runtime = connectorRuntime(loop.connectorId);
   if (!runtime.identifyLink) throw new Error(`${manifest.name} cannot read links.`);
 
   const item = runtime.identifyLink(input.url);
   if (!item) {
     throw new Error(`That does not look like a ${manifest.name} link Loopable can work on.`);
   }
-  return queue({ rule, workflow, item, url: input.url, dryRun: input.dryRun });
+  return queue({ loop, workflow, item, url: input.url, dryRun: input.dryRun });
 }
 
 /**
@@ -189,17 +189,17 @@ export function enqueueTask(input: {
  * the inbox can say what the task is about before the worker has fetched
  * anything.
  */
-export function enqueueSignal(input: { rule: Rule; signal: Signal }): TaskView {
-  const { rule, workflow } = runnable(input.rule.id);
+export function enqueueSignal(input: { loop: Loop; signal: Signal }): TaskView {
+  const { loop, workflow } = runnable(input.loop.id);
   return queue({
-    rule,
+    loop,
     workflow,
     item: input.signal,
     payload: input.signal.payload,
     url: input.signal.url,
     title: input.signal.title,
     dryRun: false,
-    dedupeKey: `${rule.id}:${input.signal.key}`,
+    dedupeKey: `${loop.id}:${input.signal.key}`,
   });
 }
 
@@ -258,20 +258,20 @@ export function isCancellation(error: unknown): boolean {
 }
 
 /**
- * The workflow's prompt is the job; a rule's guidance is house rules layered
- * on top. Guidance is added rather than substituted, so a rule cannot quietly
+ * The workflow's prompt is the job; a loop's guidance is house loops layered
+ * on top. Guidance is added rather than substituted, so a loop cannot quietly
  * turn a review into something else. How the answer should be shaped is the
  * machinery's business and is added here, so a workflow only has to describe
  * the work.
  */
 /**
- * The directory a rule says its agent should work in. Checked here rather than
+ * The directory a loop says its agent should work in. Checked here rather than
  * left to the agent, which would otherwise run somewhere unexpected and answer
  * confidently about the wrong code.
  */
-function folderFor(rule: Rule): string {
-  const folder = typeof rule.settings.folder === "string" ? rule.settings.folder.trim() : "";
-  if (!folder) throw new Error("This rule has no folder set. Set one and try again.");
+function folderFor(loop: Loop): string {
+  const folder = typeof loop.settings.folder === "string" ? loop.settings.folder.trim() : "";
+  if (!folder) throw new Error("This loop has no folder set. Set one and try again.");
   if (!isAbsolute(folder)) throw new Error(`The folder must be an absolute path: ${folder}`);
   if (!existsSync(folder)) throw new Error(`There is no folder at ${folder}.`);
   if (!statSync(folder).isDirectory()) throw new Error(`${folder} is not a folder.`);
@@ -343,11 +343,11 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     if (signal?.aborted || taskRow(id)?.cancelRequested) throw new TaskCancelled();
   };
 
-  const rule = db().select().from(rules).where(eq(rules.id, task.ruleId)).get();
-  if (!rule) throw new Error("The rule behind this task has been deleted.");
-  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  const loop = db().select().from(loops).where(eq(loops.id, task.loopId)).get();
+  if (!loop) throw new Error("The loop behind this task has been deleted.");
+  const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
   if (!workflow) {
-    throw new Error(`${rule.connectorId} no longer offers ${rule.workflowId}.`);
+    throw new Error(`${loop.connectorId} no longer offers ${loop.workflowId}.`);
   }
   const runtime = connectorRuntime(task.connectorId);
   if (!runtime.resolveWorkItem || !runtime.applyAction) {
@@ -369,7 +369,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
   let comments = task.comments ?? [];
   if (output === null) {
     stop();
-    const agentId = task.agentId ?? (await defaultAgentFor(rule.agentId));
+    const agentId = task.agentId ?? (await defaultAgentFor(loop.agentId));
     updateTask(id, { state: "preparing", agentId });
 
     const workspace = runDir(id);
@@ -385,11 +385,11 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     const result = await agentRuntime(agentId).run({
       prompt: promptFor({
         workflow,
-        guidance: rule.guidance,
+        guidance: loop.guidance,
         item,
         files: item.context.map((file) => join(workspace, file.name)),
       }),
-      cwd: workflow.runsIn === "folder" ? folderFor(rule) : workspace,
+      cwd: workflow.runsIn === "folder" ? folderFor(loop) : workspace,
       settings: settingsFor(agentId),
       outputFile: join(workspace, "answer.txt"),
       signal,

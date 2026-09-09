@@ -10,21 +10,21 @@ process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
 
 const { db } = await import("./db/client.ts");
-const { rules, tasks } = await import("./db/schema.ts");
+const { loops, tasks } = await import("./db/schema.ts");
 const { createWorker } = await import("./worker.ts");
 const { writeSetting } = await import("./settings.ts");
 const { TransientError } = await import("#/connectors/errors.ts");
 const { TaskCancelled } = await import("./tasks.ts");
 const { eq } = await import("drizzle-orm");
 
-const RULE_ID = "rule-under-test";
+const LOOP_ID = "loop-under-test";
 
-function givenRule(): void {
+function givenLoop(): void {
   db()
-    .insert(rules)
+    .insert(loops)
     .values({
-      id: RULE_ID,
-      name: "Test rule",
+      id: LOOP_ID,
+      name: "Test loop",
       connectorId: "github",
       workflowId: "github.review_requested",
       priority: 1,
@@ -39,7 +39,7 @@ function givenTask(values: Partial<typeof tasks.$inferInsert> = {}): string {
     .insert(tasks)
     .values({
       id,
-      ruleId: RULE_ID,
+      loopId: LOOP_ID,
       connectorId: "github",
       state: "queued",
       sourceUrl: "https://github.com/acme/web/pull/1",
@@ -71,8 +71,8 @@ function fakeRun(behaviour: (id: string) => void | Promise<void>) {
 
 beforeEach(() => {
   db().delete(tasks).run();
-  db().delete(rules).run();
-  givenRule();
+  db().delete(loops).run();
+  givenLoop();
   writeSetting("runner.paused", false);
   writeSetting("runner.maxConcurrentRuns", 1);
 });

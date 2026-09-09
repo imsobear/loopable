@@ -1,4 +1,4 @@
-import { pollAllRules, type PollReport } from "./signals.ts";
+import { pollAllLoops, type PollReport } from "./signals.ts";
 import { runnerSettings } from "./settings.ts";
 
 export type PollerOptions = {
@@ -11,7 +11,7 @@ export type PollerOptions = {
 export type Poller = ReturnType<typeof createPoller>;
 
 /**
- * Asks every rule's connector what matches, over and over.
+ * Asks every loop's connector what matches, over and over.
  *
  * Polling rather than webhooks because Loopable runs on a laptop: there is no
  * address for GitHub to call back, and asking is something a laptop can do
@@ -20,7 +20,7 @@ export type Poller = ReturnType<typeof createPoller>;
  * rather than found later.
  */
 export function createPoller(options: PollerOptions = {}) {
-  const run = options.poll ?? pollAllRules;
+  const run = options.poll ?? pollAllLoops;
   const intervalMs = options.intervalMs ?? 120_000;
   const log = options.log ?? (() => {});
 
@@ -28,7 +28,7 @@ export function createPoller(options: PollerOptions = {}) {
   let busy = false;
 
   /**
-   * One pass over every rule. Never two at once: a slow pass would otherwise
+   * One pass over every loop. Never two at once: a slow pass would otherwise
    * overlap the next one and both would decide the same signal is new.
    */
   async function tick(): Promise<PollReport[]> {
@@ -43,15 +43,15 @@ export function createPoller(options: PollerOptions = {}) {
       const reports = await run();
       for (const report of reports) {
         if (report.error) {
-          log(`poll ${report.ruleName}: ${report.error}`);
+          log(`poll ${report.loopName}: ${report.error}`);
         } else if (report.queued || report.backlog || report.held || report.superseded) {
           const parts = [
             report.queued ? `${report.queued} queued` : null,
             report.backlog ? `${report.backlog} kept as backlog` : null,
             report.held ? `${report.held} held back` : null,
-            report.superseded ? `${report.superseded} taken by an earlier rule` : null,
+            report.superseded ? `${report.superseded} taken by an earlier loop` : null,
           ].filter(Boolean);
-          log(`poll ${report.ruleName}: ${report.found} matching, ${parts.join(", ")}`);
+          log(`poll ${report.loopName}: ${report.found} matching, ${parts.join(", ")}`);
         }
       }
       return reports;

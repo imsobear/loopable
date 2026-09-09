@@ -43,8 +43,8 @@ function TaskPage() {
           <h1 className="text-xl font-semibold tracking-tight">{taskTitle(task)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {task.sourceRef} ·{" "}
-            <Link to="/rules/$ruleId" params={{ ruleId: task.ruleId }} className="underline">
-              {task.ruleName}
+            <Link to="/loops/$loopId" params={{ loopId: task.loopId }} className="underline">
+              {task.loopName}
             </Link>
           </p>
         </div>

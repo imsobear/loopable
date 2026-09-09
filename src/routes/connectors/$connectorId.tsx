@@ -121,8 +121,8 @@ function ConnectorDetailPage() {
         <CardContent className="flex flex-col gap-4">
           <CapabilityList
             title="Workflows it offers"
-            note="Turn one on from the rules page."
-            empty="None yet. An account can be connected, but no rule can be built on it."
+            note="Turn one on from the loops page."
+            empty="None yet. An account can be connected, but no loop can be built on it."
             items={manifest.workflows.map((workflow) => ({
               id: workflow.id,
               name: workflow.name,
@@ -132,7 +132,7 @@ function ConnectorDetailPage() {
           <Separator />
           <CapabilityList
             title="What it writes"
-            note="A rule writes these back on its own."
+            note="A loop writes these back on its own."
             empty="Nothing. Loopable can read this account but cannot write to it."
             items={manifest.actions.map((action) => ({
               id: action.id,

@@ -102,7 +102,7 @@ describe("wechat poll", () => {
 
   it("gives up on a quiet stream without losing its place", async () => {
     vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
-      // A long poll that never answers: the caller has other rules to get to.
+      // A long poll that never answers: the caller has other loops to get to.
       return new Promise((_resolve, reject) => {
         init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
       });

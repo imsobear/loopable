@@ -45,7 +45,7 @@ export type TokenField = {
   optional?: boolean;
 };
 
-/** Something the connector can do to the outside world, on a rule's behalf. */
+/** Something the connector can do to the outside world, on a loop's behalf. */
 export type ActionDescriptor = {
   id: string;
   name: string;
@@ -54,7 +54,7 @@ export type ActionDescriptor = {
 
 /**
  * A configurable field, rendered generically as a form. Used both for
- * per-connection settings and for the conditions on a rule.
+ * per-connection settings and for the conditions on a loop.
  */
 export type SettingField =
   | { key: string; kind: "boolean"; label: string; help?: string; default: boolean }
@@ -71,24 +71,24 @@ export type SettingField =
 
 /**
  * A whole job, named the way a person would name it: watch for this, ask an
- * agent that, write the answer there. A rule is one instance of a workflow
+ * agent that, write the answer there. A loop is one instance of a workflow
  * with its knobs set.
  *
- * The prompt lives here rather than on the rule because "review a pull
+ * The prompt lives here rather than on the loop because "review a pull
  * request" is a problem the connector should solve once and get right, instead
- * of every person rediscovering it in an empty box. A rule may add to it, and
+ * of every person rediscovering it in an empty box. A loop may add to it, and
  * most never will.
  */
 export type WorkflowDescriptor = {
   id: string;
   name: string;
   summary: string;
-  /** What arrives, as a sentence a rule card can read back. */
+  /** What arrives, as a sentence a loop card can read back. */
   trigger: string;
   /**
    * The same thing exactly, in whatever the service itself understands. Shown
    * so that "when your review is requested" can be checked rather than taken
-   * on trust, and read by the connector when it polls, so what a rule says it
+   * on trust, and read by the connector when it polls, so what a loop says it
    * watches for cannot drift from what it asks.
    *
    * Absent when there is no query to show: a stream of messages is not
@@ -101,13 +101,13 @@ export type WorkflowDescriptor = {
   /**
    * Where the agent runs. "temp" is a scratch directory holding the context
    * files and nothing else, which is right for judging a diff. "folder" is a
-   * directory the rule names, for work that has to read the code around it;
-   * the rule supplies it under the `folder` setting.
+   * directory the loop names, for work that has to read the code around it;
+   * the loop supplies it under the `folder` setting.
    */
   runsIn?: "temp" | "folder";
-  /** The knobs a rule may set, in the connector's own words. */
+  /** The knobs a loop may set, in the connector's own words. */
   settings: SettingField[];
-  /** Owned here. A rule's guidance is appended, never substituted. */
+  /** Owned here. A loop's guidance is appended, never substituted. */
   prompt: string;
   guidancePlaceholder?: string;
   /**
@@ -115,7 +115,7 @@ export type WorkflowDescriptor = {
    * "review" is a summary plus findings that get attached to lines.
    */
   answer: "text" | "review";
-  /** Which action carries the answer back. Not a choice a rule makes. */
+  /** Which action carries the answer back. Not a choice a loop makes. */
   actionId: string;
 };
 
@@ -197,7 +197,7 @@ export type QrOutcome =
   | { state: "expired"; reason?: string }
   | { state: "confirmed"; result: AuthResult };
 
-/** What a rule is acting on, resolved from a link or from a signal. */
+/** What a loop is acting on, resolved from a link or from a signal. */
 export type WorkItem = WorkItemRef & {
   title: string;
   url: string;
@@ -239,7 +239,7 @@ export type WorkItemRef = {
 /**
  * One thing a workflow is watching for, as it stands right now.
  *
- * The key is what stops a rule acting twice, so it has to change exactly when
+ * The key is what stops a loop acting twice, so it has to change exactly when
  * the thing deserves a fresh run and not otherwise: a new commit on a pull
  * request is worth reviewing again, another comment on it is not.
  */
@@ -275,7 +275,7 @@ export type ConnectorRuntime = {
    */
   identifyLink?(url: string): WorkItemRef | null;
   /**
-   * Turn a link a person pasted, or what a poll kept, into something a rule
+   * Turn a link a person pasted, or what a poll kept, into something a loop
    * can act on. `payload` is whatever this connector put on the signal, and is
    * null for a task that came from a pasted link.
    */
@@ -296,8 +296,8 @@ export type ConnectorRuntime = {
     credential: unknown;
     /**
      * Whatever this connector returned last time, or null on a first look.
-     * Kept per rule rather than per account: a stream hands each message over
-     * once, so two rules sharing one position would divide the messages
+     * Kept per loop rather than per account: a stream hands each message over
+     * once, so two loops sharing one position would divide the messages
      * between them instead of each seeing all of them.
      */
     cursor: JsonValue | null;

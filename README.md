@@ -2,7 +2,7 @@
 
 **Build reliable engineering loops across the services and agents you already use.**
 
-Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the rule says, and writes the result back. Rules run on their own, and every run is recorded so you can see what happened.
+Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Loops run on their own, and every run is recorded so you can see what happened.
 
 Everything runs on your own machine: the app, the database, and the credentials.
 
@@ -14,7 +14,7 @@ pnpm dev            # http://127.0.0.1:4321
 pnpm daemon         # the engine: runs the queued work
 ```
 
-Two processes, on purpose. The app is the windows and the buttons; the daemon does the work, so a rule keeps running when nobody has the app open. They talk only through SQLite: the app queues a task and the daemon picks it up. If the daemon is not running, the app says so rather than letting work pile up in silence.
+Two processes, on purpose. The app is the windows and the buttons; the daemon does the work, so a loop keeps running when nobody has the app open. They talk only through SQLite: the app queues a task and the daemon picks it up. If the daemon is not running, the app says so rather than letting work pile up in silence.
 
 Other commands:
 
@@ -77,37 +77,37 @@ Connecting means scanning, which the browser-redirect flow has no room for, so a
 
 Two details are deliberate. The code's identity travels to the page and back rather than being held on the server, because these logins are short and a reload should not silently kill one in progress; nothing secret is in it, since whatever identifies the code is already on screen inside the code. And the token never reaches the browser at all: a confirmed scan is saved server-side, and the page is told only that it worked.
 
-There are no WeChat workflows yet. Binding an account is worth having on its own, and what a rule should do with a message is better answered by watching real ones arrive than by guessing first.
+There are no WeChat workflows yet. Binding an account is worth having on its own, and what a loop should do with a message is better answered by watching real ones arrive than by guessing first.
 
-## Rules
+## Loops
 
-A connector declares **workflows**: whole jobs, named the way a person would name them. "Review pull requests I am asked to review" is one. A workflow owns what to watch for, what to ask the agent, and where the answer is written; a **rule** is one instance of a workflow with its few knobs set. Rules run by themselves and nobody has to click anything; a per-rule "check this before it goes out" switch is a door left open for later.
+A connector declares **workflows**: whole jobs, named the way a person would name them. "Review pull requests I am asked to review" is one. A workflow owns what to watch for, what to ask the agent, and where the answer is written; a **loop** is one instance of a workflow with its few knobs set. Loops run by themselves and nobody has to click anything; a per-loop "check this before it goes out" switch is a door left open for later.
 
-The prompt belongs to the workflow rather than to the rule. Reviewing a pull request is a well-understood job, and a connector that knows how to do it should get it right once instead of leaving every person to rediscover it in an empty box. A rule may add guidance — what is true of your team rather than of the job — and that guidance is appended to the workflow's prompt, never substituted for it, so a rule cannot quietly turn a review into something else. Timeouts and models are deliberately absent, because those belong to the agent and would only drift if restated here.
+The prompt belongs to the workflow rather than to the loop. Reviewing a pull request is a well-understood job, and a connector that knows how to do it should get it right once instead of leaving every person to rediscover it in an empty box. A loop may add guidance — what is true of your team rather than of the job — and that guidance is appended to the workflow's prompt, never substituted for it, so a loop cannot quietly turn a review into something else. Timeouts and models are deliberately absent, because those belong to the agent and would only drift if restated here.
 
-Knobs are the interesting part. "Repositories" and "drafts" are GitHub's words, so they are not columns: each workflow declares the settings a rule can narrow it by, using the same field type as connection settings, and the rule stores whatever those fields produce as JSON. The rules table therefore knows nothing about GitHub, and the rule form renders knobs it has never seen. A stored setting a connector no longer offers is discarded rather than left narrowing invisibly.
+Knobs are the interesting part. "Repositories" and "drafts" are GitHub's words, so they are not columns: each workflow declares the settings a loop can narrow it by, using the same field type as connection settings, and the loop stores whatever those fields produce as JSON. The loops table therefore knows nothing about GitHub, and the loop form renders knobs it has never seen. A stored setting a connector no longer offers is discarded rather than left narrowing invisibly.
 
-The first rule that matches something is the one that runs, so rules are ordered and the order is editable. Creating a rule is choosing a workflow: every workflow already defaults everything it needs, so the form is for changing one afterwards rather than for filling one in. A workflow that stops being offered leaves its rules readable and deletable but not runnable, said plainly rather than failing later.
+The first loop that matches something is the one that runs, so loops are ordered and the order is editable. Creating a loop is choosing a workflow: every workflow already defaults everything it needs, so the form is for changing one afterwards rather than for filling one in. A workflow that stops being offered leaves its loops readable and deletable but not runnable, said plainly rather than failing later.
 
-Rules can be written before anything is connected or installed. The page says what is still missing instead of refusing to save.
+Loops can be written before anything is connected or installed. The page says what is still missing instead of refusing to save.
 
 ## Tasks and the inbox
 
-A task is one run of one rule against one thing: fetch the context, let the agent work, write the result back. It is kept whether it wrote anything or not, because a rule that runs on its own is only worth having if you can see afterwards what it did. The inbox is every task in the order it happened; a rule's own page shows the same records filtered to that rule, next to the settings that produced them.
+A task is one run of one loop against one thing: fetch the context, let the agent work, write the result back. It is kept whether it wrote anything or not, because a loop that runs on its own is only worth having if you can see afterwards what it did. The inbox is every task in the order it happened; a loop's own page shows the same records filtered to that loop, next to the settings that produced them.
 
-A task usually starts on its own, from a poll. A rule can also be pointed at a link on its own page, which is how one gets shaped without waiting for a real signal to turn up; dry run prepares the result and shows it without writing, so shaping leaves no marks on a real repository.
+A task usually starts on its own, from a poll. A loop can also be pointed at a link on its own page, which is how one gets shaped without waiting for a real signal to turn up; dry run prepares the result and shows it without writing, so shaping leaves no marks on a real repository.
 
 ## Watching
 
-Nothing calls Loopable back. It runs on a laptop, which has no address for GitHub to reach and no business having one, so the daemon asks instead: every two minutes it asks each rule's connector what matches right now. A connector answers with the present state rather than with what changed, because working out what is new needs to know what has already been acted on, and only Loopable knows that.
+Nothing calls Loopable back. It runs on a laptop, which has no address for GitHub to reach and no business having one, so the daemon asks instead: every two minutes it asks each loop's connector what matches right now. A connector answers with the present state rather than with what changed, because working out what is new needs to know what has already been acted on, and only Loopable knows that.
 
-What stops a rule acting twice is the key the connector puts on each signal, which has to change exactly when there is something new to do and not otherwise. A pull request is keyed by its head commit: a new push is worth reviewing again, another comment on it is not. An assigned issue is keyed by the issue alone, since being assigned it twice is not a reason to write a second plan.
+What stops a loop acting twice is the key the connector puts on each signal, which has to change exactly when there is something new to do and not otherwise. A pull request is keyed by its head commit: a new push is worth reviewing again, another comment on it is not. An assigned issue is keyed by the issue alone, since being assigned it twice is not a reason to write a second plan.
 
-**The first look never acts.** Whatever is already waiting when a rule is created is that rule's backlog, and turning on a rule is not a request to run an agent over a review queue that has been piling up for a month. It is recorded rather than discarded, so the rule's page can offer to run it on purpose. A look that fails does not spend that first look, or a token that expired overnight would swallow the backlog silently.
+**The first look never acts.** Whatever is already waiting when a loop is created is that loop's backlog, and turning on a loop is not a request to run an agent over a review queue that has been piling up for a month. It is recorded rather than discarded, so the loop's page can offer to run it on purpose. A look that fails does not spend that first look, or a token that expired overnight would swallow the backlog silently.
 
-When two rules want the same pull request, the one that comes first in the list gets it and the other records that it was taken. Order already decides which rule runs; this is the same rule applied to the only case where it could be ambiguous.
+When two loops want the same pull request, the one that comes first in the list gets it and the other records that it was taken. Order already decides which loop runs; this is the same principle applied to the only case where it could be ambiguous.
 
-A run passes through `preparing` and, if it has something to say, `applying`, ending at `done` with a link to what was written. Two other endings matter as much. `skipped` is the agent answering `NOTHING_TO_DO`, which the prompt asks for explicitly: a rule that runs by itself must be able to stay quiet, or it posts filler. `prepared` is output with nothing written, which today means a dry run and later will mean a rule that asked to be checked first.
+A run passes through `preparing` and, if it has something to say, `applying`, ending at `done` with a link to what was written. Two other endings matter as much. `skipped` is the agent answering `NOTHING_TO_DO`, which the prompt asks for explicitly: a loop that runs by itself must be able to stay quiet, or it posts filler. `prepared` is output with nothing written, which today means a dry run and later will mean a loop that asked to be checked first.
 
 ## The queue
 
@@ -119,7 +119,7 @@ Retries are deliberately lopsided, because the phases cost wildly different amou
 
 The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into `~/.loopable/runs/<task>/` as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess. What the agent replied is kept alongside them, because when a reply cannot be made sense of, the reply is the only thing worth looking at.
 
-Written work is signed, so nobody has to wonder whether a person or a rule wrote it.
+Written work is signed, so nobody has to wonder whether a person or a loop wrote it.
 
 ## Reviews that point at lines
 

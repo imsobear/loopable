@@ -5,9 +5,9 @@ import { runnerSettings, setRunnerPaused } from "../settings.ts";
 
 export const getInbox = createServerFn({ method: "GET" }).handler(() => listTasks());
 
-export const getRuleTasks = createServerFn({ method: "GET" })
-  .inputValidator((data: { ruleId: string }) => data)
-  .handler(({ data }) => listTasks({ ruleId: data.ruleId }));
+export const getLoopTasks = createServerFn({ method: "GET" })
+  .inputValidator((data: { loopId: string }) => data)
+  .handler(({ data }) => listTasks({ loopId: data.loopId }));
 
 export const getTaskById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
@@ -17,8 +17,8 @@ export const getTaskLog = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
   .handler(({ data }) => readTaskLog(data.id));
 
-export const runRuleNow = createServerFn({ method: "POST" })
-  .inputValidator((data: { ruleId: string; url: string; dryRun: boolean }) => data)
+export const runLoopNow = createServerFn({ method: "POST" })
+  .inputValidator((data: { loopId: string; url: string; dryRun: boolean }) => data)
   .handler(({ data }) => enqueueTask(data));
 
 export const stopTask = createServerFn({ method: "POST" })

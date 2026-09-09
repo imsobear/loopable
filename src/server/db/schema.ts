@@ -61,17 +61,17 @@ export const authAttempts = sqliteTable("auth_attempts", {
 });
 
 /**
- * One run of one rule against one thing. Kept whether it wrote anything or
- * not, because a rule that runs on its own is only trustworthy if you can see
+ * One run of one loop against one thing. Kept whether it wrote anything or
+ * not, because a loop that runs on its own is only trustworthy if you can see
  * afterwards what it did.
  */
 export const tasks = sqliteTable(
   "tasks",
   {
     id: text("id").primaryKey(),
-    ruleId: text("rule_id")
+    loopId: text("loop_id")
       .notNull()
-      .references(() => rules.id, { onDelete: "cascade" }),
+      .references(() => loops.id, { onDelete: "cascade" }),
     connectorId: text("connector_id").notNull(),
     state: text("state").$type<TaskState>().notNull().default("queued"),
     /** What the task is about, resolved once so the record survives the source. */
@@ -120,7 +120,7 @@ export const tasks = sqliteTable(
     cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
     /**
      * Set when the task came from a signal rather than from a pasted link.
-     * The signals table already prevents a rule acting twice; this is the
+     * The signals table already prevents a loop acting twice; this is the
      * second lock, held by the database, in case two polls overlap.
      */
     dedupeKey: text("dedupe_key"),
@@ -134,7 +134,7 @@ export const tasks = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (table) => [
-    index("tasks_rule_idx").on(table.ruleId),
+    index("tasks_loop_idx").on(table.loopId),
     index("tasks_created_idx").on(table.createdAt),
     /** The worker's only question: what can I claim right now? */
     index("tasks_claim_idx").on(table.state, table.runAfter),
@@ -144,17 +144,17 @@ export const tasks = sqliteTable(
 
 /**
  * One instance of one of a connector's workflows. The workflow decides what to
- * watch for, what to ask, and where to write; a rule only carries the answers
+ * watch for, what to ask, and where to write; a loop only carries the answers
  * to the few questions the workflow asks. Settings are a JSON blob because
  * only the connector knows what can be narrowed.
  */
-export const rules = sqliteTable(
-  "rules",
+export const loops = sqliteTable(
+  "loops",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-    /** Lowest first. The first matching rule wins, so order is meaningful. */
+    /** Lowest first. The first matching loop wins, so order is meaningful. */
     priority: integer("priority").notNull(),
     connectorId: text("connector_id").notNull(),
     workflowId: text("workflow_id").notNull(),
@@ -162,13 +162,13 @@ export const rules = sqliteTable(
       .$type<ConnectionSettings>()
       .notNull()
       .default({}),
-    /** Added to the workflow's own prompt. Most rules leave it empty. */
+    /** Added to the workflow's own prompt. Most loops leave it empty. */
     guidance: text("guidance"),
     /** Null means whichever agent is currently the default. */
     agentId: text("agent_id"),
     /**
-     * Null until the rule has been looked at once. That first look is what
-     * separates the backlog that predates the rule from everything after it,
+     * Null until the loop has been looked at once. That first look is what
+     * separates the backlog that predates the loop from everything after it,
      * so it is worth being able to tell the two apart.
      */
     polledAt: integer("polled_at", { mode: "timestamp_ms" }),
@@ -183,21 +183,21 @@ export const rules = sqliteTable(
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (table) => [index("rules_priority_idx").on(table.priority)],
+  (table) => [index("loops_priority_idx").on(table.priority)],
 );
 
 /**
- * What a rule has already noticed. A rule acts once per key and never again,
+ * What a loop has already noticed. A loop acts once per key and never again,
  * which is the whole of not reviewing the same commit twice.
  */
 export const SIGNAL_OUTCOME = [
   /** A task was made for it. */
   "queued",
-  /** It was already waiting when the rule was created, so it was left alone. */
+  /** It was already waiting when the loop was created, so it was left alone. */
   "backlog",
   /** Matched, but the connector would not run it by itself. `hold` says why. */
   "held",
-  /** A rule that comes first took it. */
+  /** A loop that comes first took it. */
   "superseded",
 ] as const;
 export type SignalOutcome = (typeof SIGNAL_OUTCOME)[number];
@@ -205,9 +205,9 @@ export type SignalOutcome = (typeof SIGNAL_OUTCOME)[number];
 export const signals = sqliteTable(
   "signals",
   {
-    ruleId: text("rule_id")
+    loopId: text("loop_id")
       .notNull()
-      .references(() => rules.id, { onDelete: "cascade" }),
+      .references(() => loops.id, { onDelete: "cascade" }),
     /** The connector's own idea of identity: changing it means act again. */
     key: text("key").notNull(),
     outcome: text("outcome").$type<SignalOutcome>().notNull(),
@@ -225,9 +225,9 @@ export const signals = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (table) => [
-    primaryKey({ columns: [table.ruleId, table.key] }),
-    /** The backlog question: what is this rule holding and has never run? */
-    index("signals_outcome_idx").on(table.ruleId, table.outcome),
+    primaryKey({ columns: [table.loopId, table.key] }),
+    /** The backlog question: what is this loop holding and has never run? */
+    index("signals_outcome_idx").on(table.loopId, table.outcome),
   ],
 );
 
@@ -255,9 +255,9 @@ export const appSettings = sqliteTable("app_settings", {
 });
 
 export type Task = typeof tasks.$inferSelect;
-export type Rule = typeof rules.$inferSelect;
+export type Loop = typeof loops.$inferSelect;
 export type Signal = typeof signals.$inferSelect;
-export type NewRule = typeof rules.$inferInsert;
+export type NewLoop = typeof loops.$inferInsert;
 export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;
 export type AuthAttempt = typeof authAttempts.$inferSelect;

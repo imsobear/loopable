@@ -14,7 +14,7 @@ import type { ConnectionSettings } from "@/lib/domain.ts";
 
 /**
  * One renderer for anything a connector declares as a field, so connection
- * settings and rule conditions can never drift apart visually.
+ * settings and loop conditions can never drift apart visually.
  */
 export function initialFieldValues(
   fields: SettingField[],

@@ -44,7 +44,7 @@ const sizeLimit: SettingField = {
 };
 
 /**
- * Written once, here, rather than left to whoever creates the rule. A review
+ * Written once, here, rather than left to whoever creates the loop. A review
  * is a well-understood job and the connector should be good at it by default.
  */
 const REVIEW_PROMPT = [
@@ -131,7 +131,7 @@ export const githubManifest = defineManifest({
     },
   ],
   // Nothing to configure per account: what the account can see is what GitHub
-  // decides, and every narrowing choice belongs to a rule.
+  // decides, and every narrowing choice belongs to a loop.
   settings: [],
   // The redirect authorizes whichever account the browser is already signed in
   // as, so a second account is out of reach without signing out of GitHub

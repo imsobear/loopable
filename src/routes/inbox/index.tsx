@@ -22,13 +22,13 @@ function InboxPage() {
 
       <TaskList
         tasks={tasks}
-        empty="Nothing has run yet. Open a rule and try it against a pull request or issue link."
+        empty="Nothing has run yet. Open a loop and try it against a pull request or issue link."
       />
 
       {tasks.length === 0 ? (
         <p className="text-center text-sm text-muted-foreground">
-          <Link to="/rules" className="underline">
-            Go to rules
+          <Link to="/loops" className="underline">
+            Go to loops
           </Link>
         </p>
       ) : null}

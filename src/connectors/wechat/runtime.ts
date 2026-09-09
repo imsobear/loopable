@@ -137,7 +137,7 @@ export const wechatRuntime: ConnectorRuntime = {
         url: "",
         // Held rather than dropped, so a message that was sent and never
         // answered says so. It can still be run deliberately, which is the
-        // point: a rule that silently ignores people looks broken.
+        // point: a loop that silently ignores people looks broken.
         hold:
           onlyMe && fromUserId !== account.userId
             ? "sent by someone other than you"

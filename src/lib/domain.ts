@@ -11,14 +11,14 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 export type ConnectionSettings = Record<string, JsonValue>;
 
 /**
- * How far a run got. A rule runs by itself, so these are all outcomes rather
+ * How far a run got. A loop runs by itself, so these are all outcomes rather
  * than requests for attention.
  */
 export const TASK_STATE = [
   "queued",
   "preparing",
   "applying",
-  /** Output ready, nothing written: a dry run, and later a rule that asks to be checked. */
+  /** Output ready, nothing written: a dry run, and later a loop that asks to be checked. */
   "prepared",
   "done",
   /** The agent judged there was nothing worth writing. */
@@ -39,7 +39,7 @@ export function isTaskActive(state: TaskState): boolean {
 }
 
 /**
- * The sort of thing a rule acts on. Widened by whichever connector needs it:
+ * The sort of thing a loop acts on. Widened by whichever connector needs it:
  * the list is closed so that the few places which phrase a kind for a person
  * have to say something for every one of them.
  */
@@ -47,8 +47,8 @@ export type WorkItemKind = "pull_request" | "issue" | "message";
 
 export type TaskView = {
   id: string;
-  ruleId: string;
-  ruleName: string;
+  loopId: string;
+  loopName: string;
   connectorId: string;
   state: TaskState;
   sourceUrl: string;
@@ -74,8 +74,8 @@ export type TaskView = {
   updatedAt: string;
 };
 
-/** A rule as the browser sees it: a workflow plus the answers it asked for. */
-export type RuleView = {
+/** A loop as the browser sees it: a workflow plus the answers it asked for. */
+export type LoopView = {
   id: string;
   name: string;
   enabled: boolean;
@@ -86,33 +86,33 @@ export type RuleView = {
   settings: ConnectionSettings;
   /** Added to the workflow's own prompt. Usually null. */
   guidance: string | null;
-  /** Null means whichever agent is the default when the rule runs. */
+  /** Null means whichever agent is the default when the loop runs. */
   agentId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-/** Something a rule noticed and did not act on, and the reason it did not. */
+/** Something a loop noticed and did not act on, and the reason it did not. */
 export type BacklogItem = {
   key: string;
   sourceKind: WorkItemKind;
   sourceRef: string;
   sourceTitle: string;
   sourceUrl: string;
-  /** Why it was held back, or null when it was simply there before the rule. */
+  /** Why it was held back, or null when it was simply there before the loop. */
   hold: string | null;
   seenAt: string;
 };
 
-/** Whether a rule is really watching, which is the thing a page cannot infer. */
-export type RulePollState = {
+/** Whether a loop is really watching, which is the thing a page cannot infer. */
+export type LoopPollState = {
   polledAt: string | null;
   pollError: string | null;
   backlog: BacklogItem[];
 };
 
-/** What a rule needs to run, resolved when the page loads rather than stored. */
-export type RuleReadiness = {
+/** What a loop needs to run, resolved when the page loads rather than stored. */
+export type LoopReadiness = {
   connectedConnectorIds: string[];
   defaultAgentId: string | null;
   installedAgentIds: string[];

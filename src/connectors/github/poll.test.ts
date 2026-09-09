@@ -131,7 +131,7 @@ describe("pollGithub, review requested", () => {
     expect((await poll())[0]!.key).toBe("acme/web#7@sha2");
   });
 
-  it("keeps only the repositories a rule names", async () => {
+  it("keeps only the repositories a loop names", async () => {
     givenGithub({
       items: [
         { repo: "acme/web", number: 1 },
@@ -152,7 +152,7 @@ describe("pollGithub, review requested", () => {
     });
     const found = await poll();
     expect(found.map((signal) => signal.ref)).toEqual(["acme/web#3"]);
-    // One search, and one pull request: the two that were ruled out on the
+    // One search, and one pull request: the two that were LOOPDOUTxKEEP on the
     // search result alone were never fetched.
     expect(github.asked.filter((url) => url.includes("/pulls/"))).toHaveLength(1);
   });
@@ -181,7 +181,7 @@ describe("pollGithub, review requested", () => {
     // will not happen on its own, so it can be seen and run on purpose.
     const found = await poll({ maxChangedFiles: "50" });
     expect(found.map((signal) => [signal.ref, signal.hold])).toEqual([
-      ["acme/web#1", "80 files changed, over this rule's 50"],
+      ["acme/web#1", "80 files changed, over this loop's 50"],
       ["acme/web#2", undefined],
     ]);
   });
@@ -202,7 +202,7 @@ describe("pollGithub, review requested", () => {
         { repo: "acme/web", number: 2 },
       ],
     });
-    // A rule saved before ignoreBots existed still has to skip bots.
+    // A loop saved before ignoreBots existed still has to skip bots.
     expect((await poll({ repositories: [] })).map((signal) => signal.ref)).toEqual(["acme/web#2"]);
   });
 

@@ -112,7 +112,7 @@ export type ReviewComment = {
 };
 
 /**
- * Reviews are submitted as COMMENT, never APPROVE: a rule may say what it
+ * Reviews are submitted as COMMENT, never APPROVE: a loop may say what it
  * thinks, but whether a pull request is approved stays a human judgement.
  *
  * A comment on a line outside the diff makes GitHub refuse the whole review,

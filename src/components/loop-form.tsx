@@ -19,27 +19,27 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_MANIFESTS } from "@/agents/manifests.ts";
 import { connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
-import type { ConnectionSettings, RuleView } from "@/lib/domain.ts";
-import { saveRule } from "@/server/functions/rules.ts";
+import type { ConnectionSettings, LoopView } from "@/lib/domain.ts";
+import { saveLoop } from "@/server/functions/loops.ts";
 
 const DEFAULT_AGENT = "__default";
 
 /**
- * A rule is one of a connector's workflows with its knobs set, so this edits
+ * A loop is one of a connector's workflows with its knobs set, so this edits
  * the knobs and nothing else. What to watch for, what to ask and where to
  * write are the workflow's business, and are shown here only to be read.
  */
-export function RuleForm({ rule }: { rule: RuleView }) {
+export function LoopForm({ loop }: { loop: LoopView }) {
   const navigate = useNavigate();
-  const connector = connectorManifest(rule.connectorId);
-  const workflow = connectorWorkflow(rule.connectorId, rule.workflowId);
+  const connector = connectorManifest(loop.connectorId);
+  const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
 
-  const [name, setName] = useState(rule.name);
-  const [guidance, setGuidance] = useState(rule.guidance ?? "");
-  const [agentId, setAgentId] = useState(rule.agentId ?? DEFAULT_AGENT);
-  const [enabled, setEnabled] = useState(rule.enabled);
+  const [name, setName] = useState(loop.name);
+  const [guidance, setGuidance] = useState(loop.guidance ?? "");
+  const [agentId, setAgentId] = useState(loop.agentId ?? DEFAULT_AGENT);
+  const [enabled, setEnabled] = useState(loop.enabled);
   const [settings, setSettings] = useState<ConnectionSettings>(() =>
-    initialFieldValues(workflow?.settings ?? [], rule.settings),
+    initialFieldValues(workflow?.settings ?? [], loop.settings),
   );
   const [saving, setSaving] = useState(false);
 
@@ -48,8 +48,8 @@ export function RuleForm({ rule }: { rule: RuleView }) {
       <Alert variant="destructive">
         <AlertTitle>This workflow is no longer offered</AlertTitle>
         <AlertDescription>
-          {connector?.name ?? rule.connectorId} used to have <code>{rule.workflowId}</code> and no
-          longer does, so this rule cannot run or be edited. Deleting it is the only thing left to
+          {connector?.name ?? loop.connectorId} used to have <code>{loop.workflowId}</code> and no
+          longer does, so this loop cannot run or be edited. Deleting it is the only thing left to
           do with it.
         </AlertDescription>
       </Alert>
@@ -59,12 +59,12 @@ export function RuleForm({ rule }: { rule: RuleView }) {
   const save = async () => {
     setSaving(true);
     try {
-      const saved = await saveRule({
+      const saved = await saveLoop({
         data: {
-          id: rule.id,
+          id: loop.id,
           name,
-          connectorId: rule.connectorId,
-          workflowId: rule.workflowId,
+          connectorId: loop.connectorId,
+          workflowId: loop.workflowId,
           guidance: guidance.trim() || null,
           agentId: agentId === DEFAULT_AGENT ? null : agentId,
           settings,
@@ -72,7 +72,7 @@ export function RuleForm({ rule }: { rule: RuleView }) {
         },
       });
       toast.success(`Saved ${saved.name}`);
-      await navigate({ to: "/rules" });
+      await navigate({ to: "/loops" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -88,7 +88,7 @@ export function RuleForm({ rule }: { rule: RuleView }) {
             <Bell className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div className="flex flex-col gap-1">
               <p>
-                When {workflow.trigger}, {connector?.name ?? rule.connectorId} hands it to an agent.
+                When {workflow.trigger}, {connector?.name ?? loop.connectorId} hands it to an agent.
               </p>
               <p className="flex items-center gap-1.5 text-muted-foreground">
                 <ArrowRight className="size-3.5 shrink-0" />
@@ -98,9 +98,9 @@ export function RuleForm({ rule }: { rule: RuleView }) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="rule-name">Name</Label>
+            <Label htmlFor="loop-name">Name</Label>
             <Input
-              id="rule-name"
+              id="loop-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -117,7 +117,7 @@ export function RuleForm({ rule }: { rule: RuleView }) {
                   {workflow.watches}
                 </code>
                 <p className="text-xs text-muted-foreground">
-                  Word for word what Loopable asks {connector?.name ?? rule.connectorId} every
+                  Word for word what Loopable asks {connector?.name ?? loop.connectorId} every
                   couple of minutes
                   {workflow.settings.length > 0
                     ? ", before anything below narrows it further."
@@ -126,7 +126,7 @@ export function RuleForm({ rule }: { rule: RuleView }) {
               </>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Nothing is asked for. {connector?.name ?? rule.connectorId} sends this over as it
+                Nothing is asked for. {connector?.name ?? loop.connectorId} sends this over as it
                 happens, and Loopable picks it up within a couple of minutes.
               </p>
             )}
@@ -145,13 +145,13 @@ export function RuleForm({ rule }: { rule: RuleView }) {
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="rule-guidance">Anything else the agent should know</Label>
+            <Label htmlFor="loop-guidance">Anything else the agent should know</Label>
             <p className="text-xs text-muted-foreground">
               Optional. Loopable already knows how to do this job; this is added to what it asks
               for, so keep it to what is true of your team rather than of the job.
             </p>
             <Textarea
-              id="rule-guidance"
+              id="loop-guidance"
               rows={4}
               value={guidance}
               placeholder={workflow.guidancePlaceholder}
@@ -160,9 +160,9 @@ export function RuleForm({ rule }: { rule: RuleView }) {
           </div>
 
           <div className="flex flex-col gap-2 sm:max-w-xs">
-            <Label htmlFor="rule-agent">Run it with</Label>
+            <Label htmlFor="loop-agent">Run it with</Label>
             <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
-              <SelectTrigger id="rule-agent" className="w-full">
+              <SelectTrigger id="loop-agent" className="w-full">
                 <SelectValue>
                   {(value: string) =>
                     value === DEFAULT_AGENT
@@ -184,21 +184,21 @@ export function RuleForm({ rule }: { rule: RuleView }) {
 
           <div className="flex items-center justify-between gap-4 border-t pt-5">
             <div>
-              <Label htmlFor="rule-enabled">Enabled</Label>
+              <Label htmlFor="loop-enabled">Enabled</Label>
               <p className="mt-1 text-xs text-muted-foreground">
-                A disabled rule is kept but never matches.
+                A disabled loop is kept but never matches.
               </p>
             </div>
-            <Switch id="rule-enabled" checked={enabled} onCheckedChange={setEnabled} />
+            <Switch id="loop-enabled" checked={enabled} onCheckedChange={setEnabled} />
           </div>
         </CardContent>
       </Card>
 
       <div className="flex items-center gap-2">
         <Button onClick={save} disabled={saving}>
-          {saving ? "Saving..." : "Save rule"}
+          {saving ? "Saving..." : "Save loop"}
         </Button>
-        <Button variant="ghost" onClick={() => navigate({ to: "/rules" })} disabled={saving}>
+        <Button variant="ghost" onClick={() => navigate({ to: "/loops" })} disabled={saving}>
           Cancel
         </Button>
       </div>

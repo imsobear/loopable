@@ -85,6 +85,13 @@
       "when": 1788919929732,
       "tag": "0011_rule_poll_cursor",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788923780775,
+      "tag": "0012_loops",
+      "breakpoints": true
     }
   ]
 }
