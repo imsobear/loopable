@@ -59,6 +59,7 @@ describe("wechat poll", () => {
         ref: "msg#1",
         title: "what broke the build",
         url: "",
+        hold: undefined,
         payload: {
           messageId: 1,
           fromUserId: "owner@im.wechat",
@@ -76,14 +77,18 @@ describe("wechat poll", () => {
     expect(sent[0]!.body.get_updates_buf).toBe("here");
   });
 
-  it("answers only its owner unless told otherwise", async () => {
+  it("holds a stranger's message instead of running it", async () => {
     // The reply is a coding agent running on this machine. A bot can be
     // messaged by anyone, so a stranger getting one is the thing to prevent.
+    // Keeping it visible is the other half: a message that was sent and never
+    // answered should say why rather than vanish.
     givenWechat([message({ message_id: 2, from_user_id: "stranger@im.wechat" })]);
-    expect((await poll()).signals).toEqual([]);
+    const [held] = (await poll()).signals;
+    expect(held).toMatchObject({ ref: "msg#2", hold: "sent by someone other than you" });
 
     givenWechat([message({ message_id: 2, from_user_id: "stranger@im.wechat" })]);
-    expect((await poll({ askers: "anyone" })).signals).toHaveLength(1);
+    const [allowed] = (await poll({ askers: "anyone" })).signals;
+    expect(allowed!.hold).toBeUndefined();
   });
 
   it("ignores what the bot itself said, and anything with no words in it", async () => {

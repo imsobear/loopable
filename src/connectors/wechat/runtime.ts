@@ -122,8 +122,6 @@ export const wechatRuntime: ConnectorRuntime = {
       const text = textOf(message);
       if (!text) continue;
       const fromUserId = message.from_user_id ?? "";
-      if (onlyMe && fromUserId !== account.userId) continue;
-
       const asked: Asked = {
         messageId: message.message_id ?? 0,
         fromUserId,
@@ -137,6 +135,13 @@ export const wechatRuntime: ConnectorRuntime = {
         title: summarise(text),
         // A message in a chat is not somewhere a browser can be sent.
         url: "",
+        // Held rather than dropped, so a message that was sent and never
+        // answered says so. It can still be run deliberately, which is the
+        // point: a rule that silently ignores people looks broken.
+        hold:
+          onlyMe && fromUserId !== account.userId
+            ? "sent by someone other than you"
+            : undefined,
         payload: asked as unknown as JsonValue,
       });
     }
