@@ -362,7 +362,9 @@ export function LoopForm({ loop }: { loop: LoopView }) {
             />
           </div>
 
-          <div className="flex flex-col gap-2 sm:max-w-xs">
+          {/* Only the control is narrow. The help belongs to the section and
+              reads as a column of three words a line inside a box this wide. */}
+          <div className="flex flex-col gap-2">
             <Label htmlFor="loop-every">How often to look</Label>
             <p className="text-xs text-muted-foreground">
               Waiting longer is not only about being polite to the service. Anything that decides
@@ -370,7 +372,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               constantly means finding one thing at a time and running all of them.
             </p>
             <Select value={pollEveryMs} onValueChange={(value) => value && setPollEveryMs(value)}>
-              <SelectTrigger id="loop-every" className="w-full">
+              <SelectTrigger id="loop-every" className="w-full sm:max-w-xs">
                 <SelectValue>
                   {(value: string) =>
                     POLL_CHOICES.find((choice) => choice.value === value)?.label ?? value
