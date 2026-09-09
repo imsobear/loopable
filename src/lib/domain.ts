@@ -86,7 +86,9 @@ export type LoopView = {
   workflowId: string;
   /** Keys are declared by the workflow in the connector manifest. */
   settings: ConnectionSettings;
-  /** Added to the workflow's own prompt. Usually null. */
+  /** What the agent is asked. Starts out the workflow's words and is then the loop's. */
+  prompt: string;
+  /** Added after the prompt, for a note not worth editing it over. Usually null. */
   guidance: string | null;
   /** Null means whichever agent is the default when the loop runs. */
   agentId: string | null;

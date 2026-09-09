@@ -21,8 +21,9 @@ type Write = {
 };
 const writes: Write[] = [];
 
-/** What the agent will say. Set per test. */
+/** What the agent will say, and what it was asked. Set per test. */
 let said = "";
+let asked = "";
 
 // Two connectors, told apart by which one is asked, because the whole point
 // here is that reading and writing need not be the same one.
@@ -51,7 +52,10 @@ vi.mock("./connections.ts", () => ({
 
 vi.mock("#/agents/runtimes.ts", () => ({
   agentRuntime: () => ({
-    run: async () => ({ ok: true, output: said, durationMs: 1, command: "fake-agent" }),
+    run: async (input: { prompt: string }) => {
+      asked = input.prompt;
+      return { ok: true, output: said, durationMs: 1, command: "fake-agent" };
+    },
   }),
 }));
 
@@ -65,6 +69,9 @@ const { loops, tasks } = await import("./db/schema.ts");
 const { enqueueTask, runTask } = await import("./tasks.ts");
 
 const LOOP_ID = "loop-under-test";
+
+/** Nothing like the workflow's own words, so the two cannot be confused. */
+const PROMPT = "Only say whether the lockfile changed.";
 
 /** A loop that watches GitHub, with where it writes left to the caller. */
 function givenLoop(action: {
@@ -80,6 +87,7 @@ function givenLoop(action: {
       priority: 1,
       connectorId: "github",
       workflowId: "github.review_requested",
+      prompt: PROMPT,
       actionTarget: {},
       ...action,
     })
@@ -91,6 +99,26 @@ beforeEach(() => {
   db().delete(loops).run();
   writes.length = 0;
   said = "";
+  asked = "";
+});
+
+describe("what the agent is asked", () => {
+  it("is the loop's own words, not the words its workflow still has", async () => {
+    // The point of copying the prompt onto the loop: once someone has changed
+    // it, the template is history and must not creep back in.
+    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    said = "Looks right.";
+
+    const queued = enqueueTask({
+      loopId: LOOP_ID,
+      url: "https://github.com/acme/web/pull/7",
+      dryRun: false,
+    });
+    await runTask(queued.id);
+
+    expect(asked).toContain(PROMPT);
+    expect(asked).not.toContain("the way an experienced engineer on this team would");
+  });
 });
 
 describe("runTask", () => {

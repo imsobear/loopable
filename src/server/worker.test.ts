@@ -27,6 +27,7 @@ function givenLoop(): void {
       name: "Test loop",
       connectorId: "github",
       workflowId: "github.review_requested",
+      prompt: "Review it.",
       actionConnectorId: "github",
       actionId: "github.submit_review",
       priority: 1,

@@ -173,7 +173,16 @@ export const loops = sqliteTable(
       .$type<ConnectionSettings>()
       .notNull()
       .default({}),
-    /** Added to the workflow's own prompt. Most loops leave it empty. */
+    /**
+     * What the agent is asked to do. Copied from the workflow when the loop is
+     * created, and the loop's own words from then on.
+     *
+     * Copied rather than referenced because this is the part a person has
+     * opinions about, and an opinion that a later release can overwrite is not
+     * worth having. It is only prose, so nothing else has to agree with it.
+     */
+    prompt: text("prompt").notNull(),
+    /** Added after the prompt, for a note that is not worth editing it over. */
     guidance: text("guidance"),
     /** Null means whichever agent is currently the default. */
     agentId: text("agent_id"),

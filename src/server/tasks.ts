@@ -272,13 +272,6 @@ export function isCancellation(error: unknown): boolean {
 }
 
 /**
- * The workflow's prompt is the job; a loop's guidance is house loops layered
- * on top. Guidance is added rather than substituted, so a loop cannot quietly
- * turn a review into something else. How the answer should be shaped is the
- * machinery's business and is added here, so a workflow only has to describe
- * the work.
- */
-/**
  * The directory a loop says its agent should work in. Checked here rather than
  * left to the agent, which would otherwise run somewhere unexpected and answer
  * confidently about the wrong code.
@@ -298,8 +291,17 @@ const KIND_NOUN: Record<WorkItemKind, string> = {
   message: "the message",
 };
 
+/**
+ * What the agent is actually sent.
+ *
+ * The loop supplies the job and, if it has anything to add, its guidance after
+ * it. What shape the answer must take is not either of theirs: it is what the
+ * code downstream is able to read, so it is appended here and neither of them
+ * has to know about it.
+ */
 function promptFor(input: {
   workflow: WorkflowDescriptor;
+  ask: string;
   guidance: string | null;
   item: WorkItem;
   files: string[];
@@ -314,7 +316,7 @@ function promptFor(input: {
     `Read ${input.files.join(" and ")} first.`,
     ``,
     `Your task:`,
-    input.workflow.prompt,
+    input.ask,
     ...(input.guidance ? [``, `From the person who set this up:`, input.guidance] : []),
     ``,
     ...shape,
@@ -410,6 +412,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     const result = await agentRuntime(agentId).run({
       prompt: promptFor({
         workflow,
+        ask: loop.prompt,
         guidance: loop.guidance,
         item,
         files: item.context.map((file) => join(workspace, file.name)),

@@ -79,6 +79,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
   const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
 
   const [name, setName] = useState(loop.name);
+  const [prompt, setPrompt] = useState(loop.prompt);
   const [guidance, setGuidance] = useState(loop.guidance ?? "");
   const [agentId, setAgentId] = useState(loop.agentId ?? DEFAULT_AGENT);
   const [enabled, setEnabled] = useState(loop.enabled);
@@ -126,6 +127,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           name,
           connectorId: loop.connectorId,
           workflowId: loop.workflowId,
+          prompt,
           guidance: guidance.trim() || null,
           agentId: agentId === DEFAULT_AGENT ? null : agentId,
           settings,
@@ -318,10 +320,26 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           </div>
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="loop-prompt">What the agent is asked to do</Label>
+            <p className="text-xs text-muted-foreground">
+              Copied from &ldquo;{workflow.name}&rdquo; when this loop was made, and yours now.
+              Editing it here changes nothing anywhere else, and a later version of that workflow
+              will not change it back.
+            </p>
+            <Textarea
+              id="loop-prompt"
+              rows={12}
+              className="font-mono text-xs"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Label htmlFor="loop-guidance">Anything else the agent should know</Label>
             <p className="text-xs text-muted-foreground">
-              Optional. Loopable already knows how to do this job; this is added to what it asks
-              for, so keep it to what is true of your team rather than of the job.
+              Optional, and added after what you asked above. For a standing note about your team
+              rather than about the job, so the two do not have to be untangled later.
             </p>
             <Textarea
               id="loop-guidance"

@@ -12,6 +12,7 @@ export type LoopDraft = {
   name: string;
   connectorId: string;
   workflowId: string;
+  prompt: string;
   guidance: string | null;
   agentId: string | null;
   settings: ConnectionSettings;
@@ -22,6 +23,7 @@ export type LoopDraft = {
 };
 
 const NAME_LIMIT = 80;
+const PROMPT_LIMIT = 8000;
 const GUIDANCE_LIMIT = 4000;
 
 function toView(row: Loop): LoopView {
@@ -33,6 +35,7 @@ function toView(row: Loop): LoopView {
     connectorId: row.connectorId,
     workflowId: row.workflowId,
     settings: row.settings,
+    prompt: row.prompt,
     guidance: row.guidance,
     agentId: row.agentId,
     actionConnectorId: row.actionConnectorId,
@@ -96,8 +99,17 @@ function validate(draft: LoopDraft): LoopDraft {
   if (!name) throw new Error("Give the loop a name.");
   if (name.length > NAME_LIMIT) throw new Error(`Keep the name under ${NAME_LIMIT} characters.`);
 
-  // The workflow already knows what to ask for, so guidance is genuinely
-  // optional and an empty box is stored as nothing rather than as "".
+  // Refused rather than quietly filled back in from the workflow: emptying
+  // this box is a mistake worth hearing about, since a loop with nothing to
+  // ask would run an agent and post whatever came back.
+  const prompt = draft.prompt.trim();
+  if (!prompt) throw new Error("Say what the agent should do.");
+  if (prompt.length > PROMPT_LIMIT) {
+    throw new Error(`Keep what you ask under ${PROMPT_LIMIT} characters.`);
+  }
+
+  // The prompt already says what to do, so guidance is genuinely optional and
+  // an empty box is stored as nothing rather than as "".
   const guidance = draft.guidance?.trim() || null;
   if (guidance && guidance.length > GUIDANCE_LIMIT) {
     throw new Error(`Keep the guidance under ${GUIDANCE_LIMIT} characters.`);
@@ -106,6 +118,7 @@ function validate(draft: LoopDraft): LoopDraft {
   return {
     ...draft,
     name,
+    prompt,
     guidance,
     settings: cleanConditions(workflow.settings, draft.settings),
     actionTarget: cleanConditions(action.target, draft.actionTarget),
@@ -138,6 +151,7 @@ export function createLoop(draft: LoopDraft): LoopView {
       connectorId: checked.connectorId,
       workflowId: checked.workflowId,
       settings: checked.settings,
+      prompt: checked.prompt,
       guidance: checked.guidance,
       agentId: checked.agentId,
       actionConnectorId: checked.actionConnectorId,
@@ -159,6 +173,7 @@ export function updateLoop(id: string, draft: LoopDraft): LoopView {
       connectorId: checked.connectorId,
       workflowId: checked.workflowId,
       settings: checked.settings,
+      prompt: checked.prompt,
       guidance: checked.guidance,
       agentId: checked.agentId,
       actionConnectorId: checked.actionConnectorId,
@@ -213,11 +228,12 @@ export function createLoopFromWorkflow(connectorId: string, workflowId: string):
     name: workflow.name,
     connectorId,
     workflowId,
+    // Both taken once, here. From now on they are the loop's, and improving
+    // the workflow will not reword an existing loop or move where it writes.
+    prompt: workflow.prompt,
     guidance: null,
     agentId: null,
     settings: {},
-    // Taken once, here. From now on it is the loop's, and improving the
-    // workflow will not move where an existing loop has been writing.
     actionConnectorId: connectorId,
     actionId: workflow.actionId,
     actionTarget: {},
