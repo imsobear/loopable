@@ -48,6 +48,7 @@ function toView(row: Omit<Task, "sourcePayload"> & { loopName?: string | null })
     agentCommand: row.agentCommand,
     output: row.output,
     comments: row.comments ?? [],
+    actionConnectorId: row.actionConnectorId,
     actionId: row.actionId,
     resultUrl: row.resultUrl,
     error: row.error,
@@ -76,7 +77,9 @@ function select() {
       agentCommand: tasks.agentCommand,
       output: tasks.output,
       comments: tasks.comments,
+      actionConnectorId: tasks.actionConnectorId,
       actionId: tasks.actionId,
+      actionTarget: tasks.actionTarget,
       resultUrl: tasks.resultUrl,
       error: tasks.error,
       logPath: tasks.logPath,
@@ -121,7 +124,6 @@ export function updateTask(id: string, values: Partial<Task>): void {
 /** The one place a task is created, whether a person or a poll asked for it. */
 function queue(input: {
   loop: Loop;
-  workflow: WorkflowDescriptor;
   item: WorkItemRef;
   payload?: JsonValue;
   url: string;
@@ -143,7 +145,9 @@ function queue(input: {
       sourcePayload: input.payload,
       sourceTitle: input.title,
       dryRun: input.dryRun,
-      actionId: input.workflow.actionId,
+      actionConnectorId: input.loop.actionConnectorId,
+      actionId: input.loop.actionId,
+      actionTarget: input.loop.actionTarget,
       dedupeKey: input.dedupeKey,
     })
     .run();
@@ -151,21 +155,26 @@ function queue(input: {
 }
 
 /** Everything a loop needs before it can produce a task, or a reason it cannot. */
-function runnable(loopId: string): { loop: Loop; workflow: WorkflowDescriptor } {
+function runnable(loopId: string): Loop {
   const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
   if (!loop) throw new Error("Loop not found");
 
   const manifest = connectorManifest(loop.connectorId);
   if (!manifest) throw new Error(`Unknown connector: ${loop.connectorId}`);
-  const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
-  if (!workflow) {
+  if (!connectorWorkflow(loop.connectorId, loop.workflowId)) {
     throw new Error(`${manifest.name} no longer offers the workflow this loop was built on.`);
   }
-  const runtime = connectorRuntime(loop.connectorId);
-  if (!runtime.resolveWorkItem || !runtime.applyAction) {
+  if (!connectorRuntime(loop.connectorId).resolveWorkItem) {
     throw new Error(`${manifest.name} cannot run tasks yet.`);
   }
-  return { loop, workflow };
+
+  // Checked separately because it can be another connector entirely.
+  const writer = connectorManifest(loop.actionConnectorId);
+  if (!writer) throw new Error(`Unknown connector: ${loop.actionConnectorId}`);
+  if (!connectorRuntime(loop.actionConnectorId).applyAction) {
+    throw new Error(`${writer.name} cannot write anything yet.`);
+  }
+  return loop;
 }
 
 /**
@@ -178,7 +187,7 @@ export function enqueueTask(input: {
   url: string;
   dryRun: boolean;
 }): TaskView {
-  const { loop, workflow } = runnable(input.loopId);
+  const loop = runnable(input.loopId);
   const manifest = connectorManifest(loop.connectorId)!;
   const runtime = connectorRuntime(loop.connectorId);
   if (!runtime.identifyLink) throw new Error(`${manifest.name} cannot read links.`);
@@ -187,7 +196,7 @@ export function enqueueTask(input: {
   if (!item) {
     throw new Error(`That does not look like a ${manifest.name} link Loopable can work on.`);
   }
-  return queue({ loop, workflow, item, url: input.url, dryRun: input.dryRun });
+  return queue({ loop, item, url: input.url, dryRun: input.dryRun });
 }
 
 /**
@@ -196,10 +205,9 @@ export function enqueueTask(input: {
  * anything.
  */
 export function enqueueSignal(input: { loop: Loop; signal: Signal }): TaskView {
-  const { loop, workflow } = runnable(input.loop.id);
+  const loop = runnable(input.loop.id);
   return queue({
     loop,
-    workflow,
     item: input.signal,
     payload: input.signal.payload,
     url: input.signal.url,
@@ -362,11 +370,14 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     throw new Error(`${loop.connectorId} no longer offers ${loop.workflowId}.`);
   }
   const runtime = connectorRuntime(task.connectorId);
-  if (!runtime.resolveWorkItem || !runtime.applyAction) {
-    throw new Error(`${task.connectorId} cannot run tasks.`);
-  }
-  const action = connectorAction(task.connectorId, task.actionId);
-  if (!action) throw new Error(`${task.connectorId} no longer offers ${task.actionId}.`);
+  if (!runtime.resolveWorkItem) throw new Error(`${task.connectorId} cannot run tasks.`);
+
+  // The write can belong to another connector, with its own runtime and its
+  // own account, so reading and writing are resolved apart from here on.
+  const writer = connectorRuntime(task.actionConnectorId);
+  if (!writer.applyAction) throw new Error(`${task.actionConnectorId} cannot write anything.`);
+  const action = connectorAction(task.actionConnectorId, task.actionId);
+  if (!action) throw new Error(`${task.actionConnectorId} no longer offers ${task.actionId}.`);
 
   stop();
   const { credential } = await credentialForConnector(task.connectorId);
@@ -443,20 +454,26 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
 
   stop();
   updateTask(id, { state: "applying" });
-  const outcome = await runtime.applyAction({
+  const sameConnector = task.actionConnectorId === task.connectorId;
+  const outcome = await writer.applyAction({
     actionId: task.actionId,
-    target: {},
+    target: task.actionTarget,
     source: {
       connectorId: task.connectorId,
       kind: item.kind,
       ref: item.ref,
       title: item.title,
       url: item.url,
-      carry: item.carry,
+      // Withheld across connectors on purpose. It is one connector's private
+      // record of a conversation, and another reading it as its own would be
+      // a confusing failure rather than a clear one.
+      carry: sameConnector ? item.carry : undefined,
     },
     body: output + SIGNATURE,
     comments,
-    credential,
+    credential: sameConnector
+      ? credential
+      : (await credentialForConnector(task.actionConnectorId)).credential,
   });
   finish(id, task, { state: "done", resultUrl: outcome.url });
   return getTask(id)!;

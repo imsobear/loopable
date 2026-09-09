@@ -39,6 +39,8 @@ function givenLoop(id: string, priority: number, repositories: string[] = []): v
       name: `Loop ${id}`,
       connectorId: "github",
       workflowId: "github.review_requested",
+      actionConnectorId: "github",
+      actionId: "github.submit_review",
       settings: { repositories },
       priority,
     })

@@ -18,16 +18,60 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_MANIFESTS } from "@/agents/manifests.ts";
-import { connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
+import {
+  CONNECTOR_MANIFESTS,
+  connectorAction,
+  connectorManifest,
+  connectorWorkflow,
+} from "@/connectors/manifests.ts";
 import type { ConnectionSettings, LoopView } from "@/lib/domain.ts";
 import { saveLoop } from "@/server/functions/loops.ts";
 
 const DEFAULT_AGENT = "__default";
 
+/** Connectors that can write at all, for the question of where the answer goes. */
+const WRITERS = CONNECTOR_MANIFESTS.filter((entry) => entry.actions.length > 0);
+
 /**
- * A loop is one of a connector's workflows with its knobs set, so this edits
- * the knobs and nothing else. What to watch for, what to ask and where to
- * write are the workflow's business, and are shown here only to be read.
+ * Shown rather than hidden, and locked rather than editable.
+ *
+ * These are the parts of a workflow that only mean anything alongside the code
+ * that reads them: the query a connector sends, whether the agent gets a
+ * checkout, how its answer is parsed. Copying them onto a loop would freeze
+ * whatever was true the day it was made, and leaving them off the page would
+ * mean nobody could see what their loop actually does.
+ */
+function Locked({
+  label,
+  value,
+  help,
+  mono,
+}: {
+  label: string;
+  value: string;
+  help: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label className="text-muted-foreground">{label}</Label>
+      <Input
+        readOnly
+        disabled
+        value={value}
+        className={mono ? "font-mono text-xs disabled:opacity-100" : "disabled:opacity-100"}
+      />
+      <p className="text-xs text-muted-foreground">{help}</p>
+    </div>
+  );
+}
+
+/**
+ * A loop is one of a connector's workflows with its own answers to the
+ * questions it asks. Which of those a loop owns is the whole shape of this
+ * page: what it looks for and how the answer is read belong to the workflow
+ * and are locked, while what narrows it, where it writes and which agent runs
+ * it belong to the loop.
  */
 export function LoopForm({ loop }: { loop: LoopView }) {
   const navigate = useNavigate();
@@ -41,7 +85,24 @@ export function LoopForm({ loop }: { loop: LoopView }) {
   const [settings, setSettings] = useState<ConnectionSettings>(() =>
     initialFieldValues(workflow?.settings ?? [], loop.settings),
   );
+  const [actionConnectorId, setActionConnectorId] = useState(loop.actionConnectorId);
+  const [actionId, setActionId] = useState(loop.actionId);
+  const [actionTarget, setActionTarget] = useState<ConnectionSettings>(() =>
+    initialFieldValues(
+      connectorAction(loop.actionConnectorId, loop.actionId)?.target ?? [],
+      loop.actionTarget,
+    ),
+  );
   const [saving, setSaving] = useState(false);
+
+  const action = connectorAction(actionConnectorId, actionId);
+
+  /** Changing where the answer goes changes what has to be said about it. */
+  const chooseAction = (connectorId: string, id: string) => {
+    setActionConnectorId(connectorId);
+    setActionId(id);
+    setActionTarget(initialFieldValues(connectorAction(connectorId, id)?.target ?? [], {}));
+  };
 
   if (!workflow) {
     return (
@@ -68,6 +129,9 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           guidance: guidance.trim() || null,
           agentId: agentId === DEFAULT_AGENT ? null : agentId,
           settings,
+          actionConnectorId,
+          actionId,
+          actionTarget,
           enabled,
         },
       });
@@ -92,7 +156,9 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               </p>
               <p className="flex items-center gap-1.5 text-muted-foreground">
                 <ArrowRight className="size-3.5 shrink-0" />
-                It writes {workflow.writes}.
+                {action
+                  ? `Then, on ${connectorManifest(actionConnectorId)?.name ?? actionConnectorId}: ${action.name.toLowerCase()}.`
+                  : "Where the answer goes is no longer offered; choose again below."}
               </p>
             </div>
           </div>
@@ -109,28 +175,44 @@ export function LoopForm({ loop }: { loop: LoopView }) {
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">What it looks for</p>
-            {workflow.watches ? (
-              <>
-                <code className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs">
-                  {workflow.watches}
-                </code>
-                <p className="text-xs text-muted-foreground">
-                  Word for word what Loopable asks {connector?.name ?? loop.connectorId} every
-                  couple of minutes
-                  {workflow.settings.length > 0
-                    ? ", before anything below narrows it further."
-                    : "."}
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Nothing is asked for. {connector?.name ?? loop.connectorId} sends this over as it
-                happens, and Loopable picks it up within a couple of minutes.
-              </p>
-            )}
-          </div>
+          <Locked
+            label="What it looks for"
+            mono
+            value={workflow.watches ?? "Nothing is asked for; it arrives as it happens"}
+            help={
+              workflow.watches
+                ? `Word for word what Loopable asks ${connector?.name ?? loop.connectorId} every couple of minutes${
+                    workflow.settings.length > 0
+                      ? ", before anything below narrows it further."
+                      : "."
+                  }`
+                : `${connector?.name ?? loop.connectorId} sends this over as it happens, and Loopable picks it up within a couple of minutes.`
+            }
+          />
+
+          <Locked
+            label="Where the agent runs"
+            value={
+              workflow.runsIn === "folder"
+                ? "In the folder this loop names"
+                : "In a scratch directory holding only what it was given"
+            }
+            help={
+              workflow.runsIn === "folder"
+                ? "This job has to read the code around what it was asked, so it works in a real checkout."
+                : "Judging a change needs the change and nothing else, so the agent gets no checkout to wander into."
+            }
+          />
+
+          <Locked
+            label="How its answer is read"
+            value={
+              workflow.answer === "review"
+                ? "A summary, plus points attached to lines"
+                : "One block of text"
+            }
+            help="Part of how this job works rather than a preference, so it is fixed here and cannot drift from the code that parses it."
+          />
 
           {workflow.settings.length > 0 ? (
             <div className="flex flex-col gap-5 rounded-lg border p-4">
@@ -143,6 +225,97 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               />
             </div>
           ) : null}
+
+          <div className="flex flex-col gap-5 rounded-lg border p-4">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">Where the answer goes</p>
+              <p className="text-xs text-muted-foreground">
+                Usually back to whatever triggered the loop, which is what this started as. It does
+                not have to be, and it does not have to be the same service.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="loop-action-connector">Service</Label>
+                <Select
+                  value={actionConnectorId}
+                  onValueChange={(value) =>
+                    value && chooseAction(value, connectorManifest(value)!.actions[0]!.id)
+                  }
+                >
+                  <SelectTrigger id="loop-action-connector" className="w-full">
+                    <SelectValue>
+                      {(value: string) => connectorManifest(value)?.name ?? value}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WRITERS.map((entry) => (
+                      <SelectItem key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="loop-action">What it does there</Label>
+                <Select
+                  value={actionId}
+                  onValueChange={(value) => value && chooseAction(actionConnectorId, value)}
+                >
+                  <SelectTrigger id="loop-action" className="w-full">
+                    <SelectValue>
+                      {(value: string) =>
+                        connectorAction(actionConnectorId, value)?.name ?? value
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(connectorManifest(actionConnectorId)?.actions ?? []).map((entry) => (
+                      <SelectItem key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {action ? <p className="text-xs text-muted-foreground">{action.summary}</p> : null}
+
+            {/* Answering the thing that triggered the loop is only possible
+                when the two are on the same service, so a loop that crosses
+                has to be told where instead of being left to fail at the
+                write. */}
+            {action && actionConnectorId !== loop.connectorId ? (
+              <Alert>
+                <AlertTitle>This writes somewhere it did not read</AlertTitle>
+                <AlertDescription>
+                  {connectorManifest(actionConnectorId)?.name ?? actionConnectorId} has no way to
+                  answer something on {connector?.name ?? loop.connectorId}, so choose below where
+                  this should land. Both accounts have to be connected for the loop to run.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {action && workflow.answer === "review" && !action.accepts.includes("review") ? (
+              <p className="text-xs text-muted-foreground">
+                This cannot attach a comment to a line, so the review arrives as prose with the
+                file and line of each point written into it. Nothing is dropped.
+              </p>
+            ) : null}
+
+            {action && action.target.length > 0 ? (
+              <SettingFieldInputs
+                fields={action.target}
+                values={actionTarget}
+                idPrefix="target-"
+                onChange={(key, value) => setActionTarget((prev) => ({ ...prev, [key]: value }))}
+              />
+            ) : null}
+          </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="loop-guidance">Anything else the agent should know</Label>

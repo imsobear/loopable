@@ -27,6 +27,8 @@ function givenLoop(): void {
       name: "Test loop",
       connectorId: "github",
       workflowId: "github.review_requested",
+      actionConnectorId: "github",
+      actionId: "github.submit_review",
       priority: 1,
     })
     .onConflictDoNothing()
@@ -45,6 +47,7 @@ function givenTask(values: Partial<typeof tasks.$inferInsert> = {}): string {
       sourceUrl: "https://github.com/acme/web/pull/1",
       sourceKind: "pull_request",
       sourceRef: "acme/web#1",
+      actionConnectorId: "github",
       actionId: "github.submit_review",
       ...values,
     })

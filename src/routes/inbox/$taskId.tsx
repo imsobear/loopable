@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { connectorManifest } from "@/connectors/manifests.ts";
+import { connectorAction, connectorManifest } from "@/connectors/manifests.ts";
 import { isTaskActive, type TaskView } from "@/lib/domain.ts";
 import type { Finding } from "@/lib/review.ts";
 import { getTaskById, getTaskLog, stopTask } from "@/server/functions/tasks.ts";
@@ -24,8 +24,10 @@ export const Route = createFileRoute("/inbox/$taskId")({
 
 function TaskPage() {
   const { task, log } = Route.useLoaderData();
-  const manifest = connectorManifest(task.connectorId);
-  const action = manifest?.actions.find((entry) => entry.id === task.actionId);
+  // The connector that writes, which is not always the one that was read: a
+  // loop may answer on a service it does not watch.
+  const writer = connectorManifest(task.actionConnectorId);
+  const action = connectorAction(task.actionConnectorId, task.actionId);
   useLiveTasks([task]);
 
   return (
@@ -90,7 +92,7 @@ function TaskPage() {
                 nativeButton={false}
                 render={<a href={task.resultUrl} target="_blank" rel="noreferrer" />}
               >
-                See it on {manifest?.name ?? task.connectorId}
+                See it on {writer?.name ?? task.actionConnectorId}
                 <ExternalLink />
               </Button>
             ) : null}
@@ -127,7 +129,12 @@ function TaskPage() {
               </span>
             )}
           </Row>
-          <Row label="Action">{action?.name ?? task.actionId}</Row>
+          <Row label="Action">
+            {action?.name ?? task.actionId}
+            {task.actionConnectorId === task.connectorId
+              ? null
+              : ` on ${writer?.name ?? task.actionConnectorId}`}
+          </Row>
           <Row label="Agent">{task.agentId ?? "unknown"}</Row>
           <Row label="Queued">{new Date(task.createdAt).toLocaleString()}</Row>
           {task.attempts > 1 ? <Row label="Attempt">{task.attempts}</Row> : null}

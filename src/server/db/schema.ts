@@ -98,7 +98,18 @@ export const tasks = sqliteTable(
      * repeatable without paying for the review a second time.
      */
     comments: text("comments", { mode: "json" }).$type<Finding[]>(),
+    /**
+     * Which action is going to write this and where, taken from the loop when
+     * the task was queued. Kept here rather than read back off the loop so
+     * that changing a loop cannot change what a task already in the queue is
+     * about to do.
+     */
+    actionConnectorId: text("action_connector_id").notNull(),
     actionId: text("action_id").notNull(),
+    actionTarget: text("action_target", { mode: "json" })
+      .$type<ConnectionSettings>()
+      .notNull()
+      .default({}),
     /** Where the write landed, once it has. */
     resultUrl: text("result_url"),
     error: text("error"),
@@ -166,6 +177,24 @@ export const loops = sqliteTable(
     guidance: text("guidance"),
     /** Null means whichever agent is currently the default. */
     agentId: text("agent_id"),
+    /**
+     * Which action carries the answer back. Copied from the workflow when the
+     * loop is created and the loop's own from then on, so a workflow that
+     * changes its mind about where to write does not quietly move somebody's
+     * loop with it.
+     *
+     * The connector is stored apart from the one the loop watches because it
+     * need not be the same one. Being asked for a review on GitHub and
+     * answering in a chat is two connectors, and this column is what makes it
+     * one loop.
+     */
+    actionConnectorId: text("action_connector_id").notNull(),
+    actionId: text("action_id").notNull(),
+    /** Answers to the action's own `target` fields. Empty means: back to the source. */
+    actionTarget: text("action_target", { mode: "json" })
+      .$type<ConnectionSettings>()
+      .notNull()
+      .default({}),
     /**
      * Null until the loop has been looked at once. That first look is what
      * separates the backlog that predates the loop from everything after it,

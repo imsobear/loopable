@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { agentManifest } from "@/agents/manifests.ts";
-import { connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
+import { connectorAction, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
 import type { LoopReadiness, LoopView } from "@/lib/domain.ts";
 import { getLoopsPage, removeLoop, reorderLoop, toggleLoop } from "@/server/functions/loops.ts";
 
@@ -100,6 +100,19 @@ function Gaps({ readiness, hasLoops }: { readiness: LoopReadiness; hasLoops: boo
   );
 }
 
+/**
+ * Where this loop writes, in its own words rather than the workflow's. A loop
+ * may have been pointed somewhere else since it was made, and the card is the
+ * one place someone scanning a list would notice.
+ */
+function writesOf(loop: LoopView): string {
+  const action = connectorAction(loop.actionConnectorId, loop.actionId);
+  if (!action) return `it writes with ${loop.actionId}, which is no longer offered`;
+  const writer = connectorManifest(loop.actionConnectorId);
+  const where = loop.actionConnectorId === loop.connectorId ? "" : ` on ${writer?.name ?? loop.actionConnectorId}`;
+  return `it will ${action.name.toLowerCase()}${where}`;
+}
+
 function LoopCard({
   loop,
   position,
@@ -148,7 +161,7 @@ function LoopCard({
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {workflow
-              ? `When ${workflow.trigger}, it writes ${workflow.writes}${agent ? `, using ${agent.name}` : ""}.`
+              ? `When ${workflow.trigger}, ${writesOf(loop)}${agent ? `, using ${agent.name}` : ""}.`
               : `Built on ${loop.workflowId}, which is no longer offered.`}
           </p>
         </div>

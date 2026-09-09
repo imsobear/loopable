@@ -62,6 +62,8 @@ export type TaskView = {
   output: string | null;
   /** Findings that will be attached to lines, rather than to the review body. */
   comments: Finding[];
+  /** Which connector writes the answer, which need not be the one that read it. */
+  actionConnectorId: string;
   actionId: string;
   resultUrl: string | null;
   error: string | null;
@@ -88,6 +90,11 @@ export type LoopView = {
   guidance: string | null;
   /** Null means whichever agent is the default when the loop runs. */
   agentId: string | null;
+  /** Where the answer goes. Starts out the workflow's own and is then the loop's. */
+  actionConnectorId: string;
+  actionId: string;
+  /** Keys are declared by the action, not by the workflow. Empty is the norm. */
+  actionTarget: ConnectionSettings;
   createdAt: string;
   updatedAt: string;
 };

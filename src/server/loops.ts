@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq, sql } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
-import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
+import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import type { SettingField } from "#/connectors/types.ts";
 import type { ConnectionSettings, LoopReadiness, LoopView } from "#/lib/domain.ts";
 import { listAgents } from "./agents.ts";
@@ -15,6 +15,9 @@ export type LoopDraft = {
   guidance: string | null;
   agentId: string | null;
   settings: ConnectionSettings;
+  actionConnectorId: string;
+  actionId: string;
+  actionTarget: ConnectionSettings;
   enabled: boolean;
 };
 
@@ -32,6 +35,9 @@ function toView(row: Loop): LoopView {
     settings: row.settings,
     guidance: row.guidance,
     agentId: row.agentId,
+    actionConnectorId: row.actionConnectorId,
+    actionId: row.actionId,
+    actionTarget: row.actionTarget,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -75,6 +81,13 @@ function validate(draft: LoopDraft): LoopDraft {
   const workflow = connectorWorkflow(draft.connectorId, draft.workflowId);
   if (!workflow) throw new Error(`${manifest.name} does not offer ${draft.workflowId}.`);
 
+  // Where the answer goes is the loop's to choose, and can be a connector it
+  // does not watch, so this is where a choice that cannot work is caught.
+  const writer = connectorManifest(draft.actionConnectorId);
+  if (!writer) throw new Error(`Unknown connector: ${draft.actionConnectorId}`);
+  const action = connectorAction(draft.actionConnectorId, draft.actionId);
+  if (!action) throw new Error(`${writer.name} cannot ${draft.actionId}.`);
+
   if (draft.agentId && !agentManifest(draft.agentId)) {
     throw new Error(`Unknown agent: ${draft.agentId}`);
   }
@@ -95,6 +108,7 @@ function validate(draft: LoopDraft): LoopDraft {
     name,
     guidance,
     settings: cleanConditions(workflow.settings, draft.settings),
+    actionTarget: cleanConditions(action.target, draft.actionTarget),
   };
 }
 
@@ -126,6 +140,9 @@ export function createLoop(draft: LoopDraft): LoopView {
       settings: checked.settings,
       guidance: checked.guidance,
       agentId: checked.agentId,
+      actionConnectorId: checked.actionConnectorId,
+      actionId: checked.actionId,
+      actionTarget: checked.actionTarget,
     })
     .run();
   return getLoop(id)!;
@@ -144,6 +161,9 @@ export function updateLoop(id: string, draft: LoopDraft): LoopView {
       settings: checked.settings,
       guidance: checked.guidance,
       agentId: checked.agentId,
+      actionConnectorId: checked.actionConnectorId,
+      actionId: checked.actionId,
+      actionTarget: checked.actionTarget,
       updatedAt: new Date(),
     })
     .where(eq(loops.id, id))
@@ -196,6 +216,11 @@ export function createLoopFromWorkflow(connectorId: string, workflowId: string):
     guidance: null,
     agentId: null,
     settings: {},
+    // Taken once, here. From now on it is the loop's, and improving the
+    // workflow will not move where an existing loop has been writing.
+    actionConnectorId: connectorId,
+    actionId: workflow.actionId,
+    actionTarget: {},
     enabled: true,
   });
 }
