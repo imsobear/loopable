@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
@@ -6,7 +9,8 @@ import type { BacklogItem, LoopPollState } from "#/lib/domain.ts";
 import { credentialForConnector } from "./connections.ts";
 import { db } from "./db/client.ts";
 import { loops, signals, type Loop } from "./db/schema.ts";
-import { enqueueSignal } from "./tasks.ts";
+import { defaultAgentFor, enqueueSignal } from "./tasks.ts";
+import { triage, type Triage } from "./triage.ts";
 
 export type PollReport = {
   loopId: string;
@@ -17,8 +21,15 @@ export type PollReport = {
   backlog: number;
   held: number;
   superseded: number;
+  /** How many a single triage run saved from being a run of their own. */
+  triaged: number;
   error: string | null;
 };
+
+/** A setting a loop was saved before existing is missing, which is not false. */
+function boolean(value: unknown): boolean {
+  return value === true;
+}
 
 /**
  * Two loops can want the same pull request. Only the first one gets it, so
@@ -46,6 +57,7 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
     backlog: 0,
     held: 0,
     superseded: 0,
+    triaged: 0,
     error: null,
   };
 
@@ -79,6 +91,24 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
     );
     const first = loop.polledAt === null;
 
+    // What would otherwise become a run each. Asked about together, before any
+    // of them is paid for, and only when there is something to save: a first
+    // look is going to the backlog regardless, and a connector that already
+    // held something has said more about it than this can.
+    let judged: Triage = new Map();
+    if (!first && boolean(loop.settings.needsMeOnly)) {
+      const fresh = found.filter(
+        (signal) =>
+          !known.has(signal.key) && !signal.hold && !claimed.has(claimOf(loop, signal)),
+      );
+      judged = await triage({
+        signals: fresh,
+        agentId: await defaultAgentFor(loop.agentId),
+        guidance: loop.guidance,
+        cwd: mkdtempSync(join(tmpdir(), "loopable-triage-")),
+      });
+    }
+
     for (const signal of found) {
       const claim = claimOf(loop, signal);
       // Something this loop has already dealt with still counts as taken, or
@@ -91,9 +121,10 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
       // Being taken settles it before any other reason, including a hold or a
       // first look: the same thing sitting in two loops' lists would be run
       // twice by whoever works through them.
+      const hold = signal.hold ?? judged.get(signal.key);
       const outcome = claimed.has(claim)
         ? "superseded"
-        : signal.hold
+        : hold
           ? "held"
           : first
             ? "backlog"
@@ -109,7 +140,7 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
           sourceRef: signal.ref,
           sourceTitle: signal.title,
           sourceUrl: signal.url,
-          hold: signal.hold,
+          hold,
           sourcePayload: signal.payload,
           taskId: task?.id,
         })
@@ -118,6 +149,10 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
 
       claimed.add(claim);
       report[outcome] += 1;
+      // Counted where it is decided, not from what triage returned: an item it
+      // set aside can still be settled by something with precedence, and this
+      // number is shown.
+      if (outcome === "held" && !signal.hold) report.triaged += 1;
     }
 
     // The cursor moves only once everything the last answer carried is on

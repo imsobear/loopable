@@ -26,6 +26,24 @@ vi.mock("./connections.ts", () => ({
   credentialForConnector: async () => ({ credential: { accessToken: "token" } }),
 }));
 
+/** What the triage run will decide, when a loop asks for one. */
+let triaged = '{"needsMe": []}';
+let triageRuns = 0;
+
+vi.mock("#/agents/runtimes.ts", () => ({
+  agentRuntime: () => ({
+    run: async () => {
+      triageRuns += 1;
+      return { ok: true, output: triaged, durationMs: 1, command: { bin: "x", args: [] } };
+    },
+  }),
+}));
+
+vi.mock("./agents.ts", () => ({
+  listAgents: async () => [{ agentId: "cursor-agent", isDefault: true, installed: true }],
+  settingsFor: () => ({ permissionMode: "read_only", model: null, timeoutMs: 1_000 }),
+}));
+
 const { db } = await import("./db/client.ts");
 const { loops, signals, tasks } = await import("./db/schema.ts");
 const { pollAllLoops, loopPollState, runBacklog } = await import("./signals.ts");
@@ -76,6 +94,8 @@ beforeEach(() => {
   db().delete(signals).run();
   db().delete(loops).run();
   answer = [];
+  triaged = '{"needsMe": []}';
+  triageRuns = 0;
 });
 
 describe("the first look", () => {
@@ -212,6 +232,101 @@ describe("running the backlog", () => {
     expect(runBacklog("a")).toBe(0);
     await pollAllLoops();
     expect(tasksFor("a")).toHaveLength(2);
+  });
+});
+
+describe("deciding what is worth a run", () => {
+  /** A loop that asks for the cheap look first. */
+  function givenTriagingLoop(id: string): void {
+    db()
+      .insert(loops)
+      .values({
+        id,
+        name: `Loop ${id}`,
+        connectorId: "github",
+        workflowId: "github.review_requested",
+        prompt: "Review it.",
+        actionConnectorId: "github",
+        actionId: "github.submit_review",
+        settings: { needsMeOnly: true },
+        priority: 1,
+      })
+      .run();
+  }
+
+  /** Past the first look, which goes to the backlog whatever triage thinks. */
+  async function settled(id: string): Promise<void> {
+    givenTriagingLoop(id);
+    answer = [];
+    await pollAllLoops();
+    triageRuns = 0;
+  }
+
+  it("runs only what the one look picked out, and holds the rest with a reason", async () => {
+    await settled("a");
+    triaged = '{"needsMe": [2]}';
+
+    answer = [pull(1), pull(2), pull(3)];
+    const [report] = await pollAllLoops();
+
+    // One agent run decided the fate of three, instead of three runs.
+    expect(triageRuns).toBe(1);
+    expect(report).toMatchObject({ found: 3, queued: 1, held: 2, triaged: 2 });
+    expect(tasksFor("a")).toHaveLength(1);
+
+    const held = signalsFor("a").filter((row) => row.outcome === "held");
+    expect(held.map((row) => row.sourceRef)).toEqual(["acme/web#1", "acme/web#3"]);
+    expect(held[0]!.hold).toBe("nothing in it was being asked of you");
+  });
+
+  it("still lets a held one be run on purpose, when the look got it wrong", async () => {
+    await settled("a");
+    triaged = '{"needsMe": []}';
+
+    answer = [pull(1), pull(2), pull(3)];
+    await pollAllLoops();
+    expect(tasksFor("a")).toHaveLength(0);
+
+    // The whole reason for holding rather than dropping.
+    expect(runBacklog("a")).toBe(3);
+    expect(tasksFor("a")).toHaveLength(3);
+  });
+
+  it("leaves a loop that did not ask for it alone", async () => {
+    givenLoop("a", 1);
+    answer = [];
+    await pollAllLoops();
+
+    answer = [pull(1), pull(2), pull(3)];
+    const [report] = await pollAllLoops();
+
+    expect(triageRuns).toBe(0);
+    expect(report).toMatchObject({ queued: 3, held: 0, triaged: 0 });
+  });
+
+  it("does not weigh up a backlog nobody was going to run", async () => {
+    // The first look is the case: everything is going to the backlog, so
+    // asking which of it matters would be paying for an answer nothing uses.
+    givenTriagingLoop("a");
+    answer = [pull(1), pull(2), pull(3)];
+    const [report] = await pollAllLoops();
+
+    expect(triageRuns).toBe(0);
+    expect(report).toMatchObject({ backlog: 3, held: 0 });
+  });
+
+  it("does not weigh up what the connector already refused", async () => {
+    await settled("a");
+    triaged = '{"needsMe": []}';
+
+    // A hold the connector gave says more than triage can, and asking about
+    // one item would cost a run to save one.
+    answer = [{ ...pull(1), hold: "80 files changed" }];
+    const [report] = await pollAllLoops();
+
+    expect(triageRuns).toBe(0);
+    expect(report).toMatchObject({ held: 1, triaged: 0 });
+    expect(signalsFor("a")[0]!.hold).toBe("80 files changed");
   });
 });
 

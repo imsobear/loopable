@@ -48,7 +48,12 @@ export function createPoller(options: PollerOptions = {}) {
           const parts = [
             report.queued ? `${report.queued} queued` : null,
             report.backlog ? `${report.backlog} kept as backlog` : null,
-            report.held ? `${report.held} held back` : null,
+            // Named apart from the connector's own holds, because this is the
+            // number that says whether one look is earning its keep.
+            report.triaged ? `${report.triaged} not worth a run` : null,
+            report.held - report.triaged > 0
+              ? `${report.held - report.triaged} held back`
+              : null,
             report.superseded ? `${report.superseded} taken by an earlier loop` : null,
           ].filter(Boolean);
           log(`poll ${report.loopName}: ${report.found} matching, ${parts.join(", ")}`);

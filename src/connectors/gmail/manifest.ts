@@ -39,6 +39,19 @@ const perPoll: SettingField = {
   default: "10",
 };
 
+/**
+ * The setting that decides whether a quiet mailbox is quiet. Without it every
+ * receipt arrives as a notification saying a receipt arrived, which costs a
+ * run each and trains you to stop looking.
+ */
+const needsMeOnly: SettingField = {
+  key: "needsMeOnly",
+  kind: "boolean",
+  label: "Only tell me when it needs me",
+  help: "One cheap look at everything that arrived decides which mails are actually asking something of you, from the sender, subject and first line. The rest wait in the backlog with a reason, so you can still run one if this got it wrong.",
+  default: true,
+};
+
 const skipOwn: SettingField = {
   key: "skipOwn",
   kind: "boolean",
@@ -89,7 +102,7 @@ export const gmailManifest = defineManifest({
       // Nothing to check out: the mail is the whole of the work, and it is
       // handed over as a file.
       runsIn: "temp",
-      settings: [extraQuery, perPoll, skipOwn],
+      settings: [extraQuery, needsMeOnly, perPoll, skipOwn],
       prompt: TELL_ME_PROMPT,
       guidancePlaceholder:
         "What you care about in your mail. For example: I only need to know about anything involving money or a deadline.",

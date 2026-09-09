@@ -492,7 +492,7 @@ function finish(id: string, task: Task, values: Partial<Task>): void {
   updateTask(id, { error: null, ...values, durationMs: Date.now() - started, leaseUntil: null });
 }
 
-async function defaultAgentFor(pinned: string | null): Promise<string> {
+export async function defaultAgentFor(pinned: string | null): Promise<string> {
   const agents = await listAgents();
   const chosen = pinned ?? agents.find((agent) => agent.isDefault)?.agentId ?? null;
   if (!chosen) throw new Error("No agent is available. Choose a default on the Agents page.");

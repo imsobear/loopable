@@ -77,6 +77,10 @@ export async function pollGmail(input: {
       ref: mailRef(id),
       title: summarise(message),
       url: permalink(id),
+      // Gmail's own preview line, which the metadata fetch returns whether or
+      // not it is asked for. Enough to tell a bank statement from a person
+      // waiting on an answer, without fetching the body.
+      preview: (message.snippet ?? "").trim() || undefined,
       // Only the id. Unlike a chat message, mail stays where it is and can be
       // read again when the work actually runs, so keeping a copy of every
       // body in SQLite would be paying to store the mailbox twice.

@@ -311,6 +311,13 @@ export type Signal = WorkItemRef & {
    */
   hold?: string;
   /**
+   * A few words of what is inside, when the connector already has them. Not
+   * for display: the title is what gets shown. This is for deciding whether
+   * the work is worth doing before paying an agent to find out, so it is only
+   * worth filling when it comes free with what the poll already fetched.
+   */
+  preview?: string;
+  /**
    * What the connector saw, for sources that cannot be read twice. A pull
    * request can be fetched again from its URL an hour later; a message is
    * handed over once and is gone from the stream, so what it said has to be
