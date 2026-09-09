@@ -93,6 +93,8 @@ export const githubManifest = defineManifest({
       // Team requests matter more than they sound: in most repositories with a
       // CODEOWNERS file, review arrives addressed to a team rather than a person.
       trigger: "your review is requested, either directly or through a team you belong to",
+      // review-requested covers teams; user-review-requested would not.
+      watches: "is:open is:pr review-requested:@me",
       writes: "a review on the pull request, as a comment rather than an approval",
       settings: [repositories, ignoreDrafts, ignoreBots, sizeLimit],
       prompt: REVIEW_PROMPT,
@@ -106,6 +108,8 @@ export const githubManifest = defineManifest({
       name: "Plan issues assigned to me",
       summary: "Posts a short implementation plan when an issue lands on you.",
       trigger: "an issue is assigned to you",
+      // is:issue matters: without it this would pick up your own pull requests.
+      watches: "is:open is:issue assignee:@me",
       writes: "a comment on the issue",
       settings: [repositories],
       prompt: PLAN_PROMPT,

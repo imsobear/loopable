@@ -1,5 +1,6 @@
 import type { Signal } from "../types.ts";
 import { getPull, searchIssues, type SearchItem } from "./api.ts";
+import { githubManifest } from "./manifest.ts";
 
 /**
  * Search tells you which repository a result came from only through its API
@@ -57,6 +58,18 @@ function candidates(items: SearchItem[], repositories: string[]): Candidate[] {
   });
 }
 
+/**
+ * What the workflow says it watches for, which is what gets asked. Taking the
+ * query from the manifest is the point: it is shown on the rule page, and a
+ * search that quietly differed from the one on screen would be the worst kind
+ * of wrong.
+ */
+function query(workflowId: string): string {
+  const workflow = githubManifest.workflows.find((entry) => entry.id === workflowId);
+  if (!workflow) throw new Error(`GitHub cannot watch for ${workflowId}.`);
+  return workflow.watches;
+}
+
 export async function pollGithub(input: {
   workflowId: string;
   settings: Record<string, unknown>;
@@ -65,9 +78,9 @@ export async function pollGithub(input: {
   const repositories = stringList(input.settings.repositories);
 
   if (input.workflowId === "github.review_requested") {
-    // Covers requests addressed to a team as well as to the person, and
-    // empties itself: once a review is submitted, GitHub drops the request.
-    const items = await searchIssues(input.accessToken, "is:open is:pr review-requested:@me");
+    // The search empties itself: once a review is submitted, GitHub drops the
+    // request and the pull request stops matching.
+    const items = await searchIssues(input.accessToken, query(input.workflowId));
     const ignoreDrafts = boolean(input.settings.ignoreDrafts, true);
     const ignoreBots = boolean(input.settings.ignoreBots, true);
     const maxFiles = count(input.settings.maxChangedFiles, 50);
@@ -107,7 +120,7 @@ export async function pollGithub(input: {
   }
 
   if (input.workflowId === "github.issue_assigned") {
-    const items = await searchIssues(input.accessToken, "is:open is:issue assignee:@me");
+    const items = await searchIssues(input.accessToken, query(input.workflowId));
     // One plan per issue: being assigned again, or the issue being edited, is
     // not a reason to write a second one.
     return candidates(items, repositories).map(({ repo, item }) => ({

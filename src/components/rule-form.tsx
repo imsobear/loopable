@@ -109,6 +109,20 @@ export function RuleForm({ rule }: { rule: RuleView }) {
             </p>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">What it looks for</p>
+            <code className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs">
+              {workflow.watches}
+            </code>
+            <p className="text-xs text-muted-foreground">
+              Word for word what Loopable asks {connector?.name ?? rule.connectorId} every couple
+              of minutes
+              {workflow.settings.length > 0
+                ? ", before anything below narrows it further."
+                : "."}
+            </p>
+          </div>
+
           {workflow.settings.length > 0 ? (
             <div className="flex flex-col gap-5 rounded-lg border p-4">
               <p className="text-sm font-medium">Only when</p>

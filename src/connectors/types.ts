@@ -79,6 +79,13 @@ export type WorkflowDescriptor = {
   summary: string;
   /** What arrives, as a sentence a rule card can read back. */
   trigger: string;
+  /**
+   * The same thing exactly, in whatever the service itself understands. Shown
+   * so that "when your review is requested" can be checked rather than taken
+   * on trust, and read by the connector when it polls, so what a rule says it
+   * watches for cannot drift from what it asks.
+   */
+  watches: string;
   /** What gets written, as a sentence. */
   writes: string;
   /** The knobs a rule may set, in the connector's own words. */
