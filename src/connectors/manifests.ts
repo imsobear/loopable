@@ -1,4 +1,5 @@
 import { githubManifest } from "./github/manifest.ts";
+import { gmailManifest } from "./gmail/manifest.ts";
 import { wechatManifest } from "./wechat/manifest.ts";
 import type {
   ActionDescriptor,
@@ -11,7 +12,11 @@ import type {
  * Client-safe registry. Imports are explicit rather than a glob so the bundler
  * can see exactly what ships and so a typo fails the build.
  */
-export const CONNECTOR_MANIFESTS: ConnectorManifest[] = [githubManifest, wechatManifest];
+export const CONNECTOR_MANIFESTS: ConnectorManifest[] = [
+  githubManifest,
+  gmailManifest,
+  wechatManifest,
+];
 
 export function connectorManifest(id: ConnectorId): ConnectorManifest | undefined {
   return CONNECTOR_MANIFESTS.find((manifest) => manifest.id === id);

@@ -56,6 +56,7 @@ export const KIND_LABEL: Record<WorkItemKind, string> = {
   pull_request: "Pull request",
   issue: "Issue",
   message: "Message",
+  email: "Email",
 };
 
 function when(iso: string): string {

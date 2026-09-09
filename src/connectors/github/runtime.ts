@@ -1,7 +1,7 @@
 import { defineRuntime } from "../define.ts";
 import type { ActionSource, ConnectorAccount } from "../types.ts";
+import { oauthAppRegistration } from "../oauth-app.ts";
 import { getViewer, postIssueComment, submitReview } from "./api.ts";
-import { githubAppRegistration } from "./app-registration.ts";
 import { pollGithub } from "./poll.ts";
 import { githubRef, parseGithubRef, parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
@@ -13,7 +13,7 @@ import {
 } from "./oauth.ts";
 
 function requireRegistration() {
-  const registration = githubAppRegistration();
+  const registration = oauthAppRegistration("github");
   if (!registration) {
     throw new Error("GitHub is not configured in this build: the OAuth app registration is missing.");
   }
@@ -72,7 +72,7 @@ export async function usableToken(
 
 export const githubRuntime = defineRuntime({
   async readiness() {
-    if (githubAppRegistration()) return { ready: true };
+    if (oauthAppRegistration("github")) return { ready: true };
     return {
       ready: false,
       reason: "This build has no GitHub app registration.",

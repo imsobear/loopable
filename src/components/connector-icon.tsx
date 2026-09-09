@@ -1,4 +1,4 @@
-import { Plug, type LucideIcon } from "lucide-react";
+import { Mail, MessageCircle, Plug, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function GithubMark({ className }: { className?: string }) {
@@ -16,6 +16,8 @@ function GithubMark({ className }: { className?: string }) {
  */
 const ICONS: Record<string, LucideIcon | typeof GithubMark> = {
   Github: GithubMark,
+  Mail,
+  MessageCircle,
   Plug,
 };
 

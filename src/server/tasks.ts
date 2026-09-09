@@ -289,6 +289,7 @@ const KIND_NOUN: Record<WorkItemKind, string> = {
   pull_request: "pull request",
   issue: "issue",
   message: "the message",
+  email: "the email",
 };
 
 /**

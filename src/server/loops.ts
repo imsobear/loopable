@@ -228,15 +228,17 @@ export function createLoopFromWorkflow(connectorId: string, workflowId: string):
     name: workflow.name,
     connectorId,
     workflowId,
-    // Both taken once, here. From now on they are the loop's, and improving
+    // All taken once, here. From now on they are the loop's, and improving
     // the workflow will not reword an existing loop or move where it writes.
     prompt: workflow.prompt,
     guidance: null,
     agentId: null,
     settings: {},
-    actionConnectorId: connectorId,
+    // Where it reads, unless the workflow says otherwise. A connector that
+    // only reads has no action of its own to fall back to.
+    actionConnectorId: workflow.actionConnectorId ?? connectorId,
     actionId: workflow.actionId,
-    actionTarget: {},
+    actionTarget: workflow.actionTarget ?? {},
     enabled: true,
   });
 }

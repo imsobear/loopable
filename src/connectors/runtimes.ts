@@ -1,4 +1,5 @@
 import { githubRuntime } from "./github/runtime.ts";
+import { gmailRuntime } from "./gmail/runtime.ts";
 import { wechatRuntime } from "./wechat/runtime.ts";
 import type { Connector, ConnectorId } from "./types.ts";
 import { CONNECTOR_MANIFESTS } from "./manifests.ts";
@@ -6,6 +7,7 @@ import { CONNECTOR_MANIFESTS } from "./manifests.ts";
 /** Server-only registry. Never import this from a component. */
 const RUNTIMES: Record<ConnectorId, Connector["runtime"]> = {
   github: githubRuntime,
+  gmail: gmailRuntime,
   wechat: wechatRuntime,
 };
 

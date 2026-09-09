@@ -11,7 +11,7 @@
  * Adding a connector must not require touching any page.
  */
 
-import type { JsonValue, WorkItemKind } from "#/lib/domain.ts";
+import type { ConnectionSettings, JsonValue, WorkItemKind } from "#/lib/domain.ts";
 import type { Commentable, Finding } from "#/lib/review.ts";
 
 export type ConnectorId = string;
@@ -137,6 +137,23 @@ export type WorkflowDescriptor = {
   answer: AnswerShape;
   /** Which action a loop starts out carrying the answer with. */
   actionId: string;
+  /**
+   * Which connector that action belongs to, when it is not this one.
+   *
+   * Most workflows answer where they read, and leave this alone. Some cannot:
+   * a connector that only reads has nowhere to put an answer, and a workflow
+   * whose entire point is to tell you about something somewhere you are
+   * actually looking has to name that somewhere to be any use on the day it
+   * is turned on. It is still only a starting point, and a loop may point
+   * anywhere once it exists.
+   */
+  actionConnectorId?: ConnectorId;
+  /**
+   * What that action should be told about where to write. Against the
+   * action's own `target` fields, and needed when the action's default cannot
+   * apply: "whoever asked" means nothing to a loop that no person started.
+   */
+  actionTarget?: ConnectionSettings;
 };
 
 export type ConnectorManifest = {
