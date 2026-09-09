@@ -97,6 +97,8 @@ export type LoopView = {
   actionId: string;
   /** Keys are declared by the action, not by the workflow. Empty is the norm. */
   actionTarget: ConnectionSettings;
+  /** How long to leave between looks. Null is every time the engine looks. */
+  pollEveryMs: number | null;
   createdAt: string;
   updatedAt: string;
 };

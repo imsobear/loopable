@@ -116,6 +116,14 @@ export const gmailManifest = defineManifest({
       actionConnectorId: "wechat",
       actionId: "wechat.reply",
       actionTarget: { to: "me" },
+      // Half an hour, because mail turns up one piece at a time and the whole
+      // of deciding what is worth a run is having several to compare. Looking
+      // every two minutes meant almost always finding exactly one, which is
+      // not a batch, so every newsletter got an agent to itself.
+      //
+      // The cost of waiting is being told half an hour late about something
+      // that sat unread for hours before it was sent.
+      pollEveryMs: 30 * 60_000,
     },
   ],
   // Read-only, so there is nothing to offer. A loop built on Gmail writes

@@ -210,6 +210,17 @@ export const loops = sqliteTable(
      * so it is worth being able to tell the two apart.
      */
     polledAt: integer("polled_at", { mode: "timestamp_ms" }),
+    /**
+     * How long to leave between looks, or null to look every time the engine
+     * does.
+     *
+     * Worth having because looking often and acting cheaply pull in opposite
+     * directions. A loop that decides what is worth doing by weighing a batch
+     * has nothing to weigh when it is handed one item at a time, so for mail,
+     * where nothing turns on the next two minutes, waiting is what makes the
+     * weighing possible at all.
+     */
+    pollEveryMs: integer("poll_every_ms"),
     /** Why the last look failed, if it did. Cleared by a look that works. */
     pollError: text("poll_error"),
     /** Where a stream got to. The connector's own business. See `poll`. */

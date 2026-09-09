@@ -85,8 +85,13 @@ describe("triage", () => {
     asked = "";
     answer = { ok: true, output: '{"needsMe": []}', aborted: false };
 
-    expect(await run(FOUR.slice(0, 2))).toEqual(new Map());
+    // One is the only size that cannot pay for itself: a run to decide whether
+    // to do a run.
+    expect(await run(FOUR.slice(0, 1))).toEqual(new Map());
     expect(asked).toBe("");
+
+    expect([...(await run(FOUR.slice(0, 2))).keys()]).toEqual(["mail#1", "mail#2"]);
+    expect(asked).not.toBe("");
   });
 
   /**

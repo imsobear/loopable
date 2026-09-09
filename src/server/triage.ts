@@ -114,9 +114,16 @@ export async function triage(input: {
   signal?: AbortSignal;
 }): Promise<Triage> {
   const held: Triage = new Map();
-  // One or two would spend an agent run to save at most two, and the saving is
-  // the point.
-  if (input.signals.length < 3) return held;
+  // A single item cannot pay for this: one run to decide whether to do one run
+  // is the same money at best. Two can, and usually does, because most of what
+  // arrives is not asking anything.
+  //
+  // This was three, which sounds safer and quietly turned the whole thing off:
+  // things arrive one at a time, so a look often enough to feel prompt almost
+  // never has three to compare, and everything went through unweighed. Whether
+  // there is a batch to judge is decided by how long the loop waits between
+  // looks, not here.
+  if (input.signals.length < 2) return held;
 
   const result = await agentRuntime(input.agentId).run({
     prompt: promptFor(input.signals, input.guidance),

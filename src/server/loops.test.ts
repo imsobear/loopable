@@ -28,6 +28,7 @@ function edited(id: string, changes: Record<string, unknown>) {
     actionConnectorId: loop.actionConnectorId,
     actionId: loop.actionId,
     actionTarget: loop.actionTarget,
+    pollEveryMs: loop.pollEveryMs,
     enabled: loop.enabled,
     ...changes,
   });

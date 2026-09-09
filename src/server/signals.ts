@@ -178,10 +178,27 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
 }
 
 /**
- * Every enabled loop, in the order a person put them in, because that order is
- * what decides who gets a thing two loops both want.
+ * Whether enough time has passed for this loop to be looked at again.
+ *
+ * A loop that has never been looked at is always due, so asking to be left an
+ * hour does not mean waiting an hour before finding out the loop works.
+ */
+export function isDue(loop: Loop, now: number): boolean {
+  if (!loop.pollEveryMs || !loop.polledAt) return true;
+  return now - loop.polledAt.getTime() >= loop.pollEveryMs;
+}
+
+/**
+ * Every enabled loop that is due, in the order a person put them in, because
+ * that order is what decides who gets a thing two loops both want.
+ *
+ * Order only settles a tie between loops looked at together. Give two loops
+ * that want the same thing different intervals and the slower one will find
+ * things already taken, whatever its priority says, because the other one got
+ * there while it was waiting.
  */
 export async function pollAllLoops(): Promise<PollReport[]> {
+  const now = Date.now();
   const enabled = db()
     .select()
     .from(loops)
@@ -192,6 +209,7 @@ export async function pollAllLoops(): Promise<PollReport[]> {
   const claimed = new Set<string>();
   const reports: PollReport[] = [];
   for (const loop of enabled) {
+    if (!isDue(loop, now)) continue;
     reports.push(await pollLoop(loop, claimed));
   }
   return reports;

@@ -29,6 +29,15 @@ import { saveLoop } from "@/server/functions/loops.ts";
 
 const DEFAULT_AGENT = "__default";
 
+/** Zero is stored as null: "as often as the engine does" is not a duration. */
+const POLL_CHOICES = [
+  { value: "0", label: "Every time the engine looks" },
+  { value: String(10 * 60_000), label: "Every 10 minutes" },
+  { value: String(30 * 60_000), label: "Every 30 minutes" },
+  { value: String(60 * 60_000), label: "Every hour" },
+  { value: String(4 * 60 * 60_000), label: "Every 4 hours" },
+];
+
 /** Connectors that can write at all, for the question of where the answer goes. */
 const WRITERS = CONNECTOR_MANIFESTS.filter((entry) => entry.actions.length > 0);
 
@@ -86,6 +95,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
   const [settings, setSettings] = useState<ConnectionSettings>(() =>
     initialFieldValues(workflow?.settings ?? [], loop.settings),
   );
+  const [pollEveryMs, setPollEveryMs] = useState(String(loop.pollEveryMs ?? 0));
   const [actionConnectorId, setActionConnectorId] = useState(loop.actionConnectorId);
   const [actionId, setActionId] = useState(loop.actionId);
   const [actionTarget, setActionTarget] = useState<ConnectionSettings>(() =>
@@ -135,6 +145,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           actionConnectorId,
           actionId,
           actionTarget,
+          pollEveryMs: Number(pollEveryMs) || null,
           enabled,
         },
       });
@@ -349,6 +360,31 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               placeholder={workflow.guidancePlaceholder}
               onChange={(event) => setGuidance(event.target.value)}
             />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:max-w-xs">
+            <Label htmlFor="loop-every">How often to look</Label>
+            <p className="text-xs text-muted-foreground">
+              Waiting longer is not only about being polite to the service. Anything that decides
+              what deserves an agent by weighing a batch needs a batch to weigh, and looking
+              constantly means finding one thing at a time and running all of them.
+            </p>
+            <Select value={pollEveryMs} onValueChange={(value) => value && setPollEveryMs(value)}>
+              <SelectTrigger id="loop-every" className="w-full">
+                <SelectValue>
+                  {(value: string) =>
+                    POLL_CHOICES.find((choice) => choice.value === value)?.label ?? value
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {POLL_CHOICES.map((choice) => (
+                  <SelectItem key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col gap-2 sm:max-w-xs">

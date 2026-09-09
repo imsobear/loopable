@@ -235,6 +235,75 @@ describe("running the backlog", () => {
   });
 });
 
+describe("how often to look", () => {
+  function every(id: string, ms: number | null): void {
+    db().update(loops).set({ pollEveryMs: ms }).where(eq(loops.id, id)).run();
+  }
+
+  /** As if the last look happened this long ago. */
+  function lastLooked(id: string, msAgo: number): void {
+    db()
+      .update(loops)
+      .set({ polledAt: new Date(Date.now() - msAgo) })
+      .where(eq(loops.id, id))
+      .run();
+  }
+
+  it("looks straight away the first time, whatever the interval says", async () => {
+    givenLoop("a", 1);
+    every("a", 30 * 60_000);
+
+    answer = [pull(1)];
+    expect(await pollAllLoops()).toHaveLength(1);
+  });
+
+  it("then leaves it alone until the interval is up", async () => {
+    givenLoop("a", 1);
+    every("a", 30 * 60_000);
+    answer = [];
+    await pollAllLoops();
+
+    answer = [pull(1)];
+    expect(await pollAllLoops()).toEqual([]);
+    expect(tasksFor("a")).toHaveLength(0);
+
+    lastLooked("a", 29 * 60_000);
+    expect(await pollAllLoops()).toEqual([]);
+
+    lastLooked("a", 31 * 60_000);
+    expect(await pollAllLoops()).toHaveLength(1);
+    expect(tasksFor("a")).toHaveLength(1);
+  });
+
+  it("looks every time when no interval is set", async () => {
+    givenLoop("a", 1);
+    every("a", null);
+    answer = [];
+    await pollAllLoops();
+
+    answer = [pull(1)];
+    expect(await pollAllLoops()).toHaveLength(1);
+    expect(tasksFor("a")).toHaveLength(1);
+  });
+
+  it("lets a loop that is due take what a waiting one would have claimed", async () => {
+    // Priority settles a tie between loops looked at together, and two loops
+    // on different clocks are not looked at together. Worth a test because it
+    // reads as priority being ignored.
+    givenLoop("first", 1);
+    givenLoop("second", 2);
+    every("first", 30 * 60_000);
+    answer = [];
+    await pollAllLoops();
+
+    answer = [pull(1)];
+    const reports = await pollAllLoops();
+    expect(reports.map((report) => report.loopId)).toEqual(["second"]);
+    expect(tasksFor("second")).toHaveLength(1);
+    expect(tasksFor("first")).toHaveLength(0);
+  });
+});
+
 describe("deciding what is worth a run", () => {
   /** A loop that asks for the cheap look first. */
   function givenTriagingLoop(id: string): void {
@@ -313,6 +382,24 @@ describe("deciding what is worth a run", () => {
 
     expect(triageRuns).toBe(0);
     expect(report).toMatchObject({ backlog: 3, held: 0 });
+  });
+
+  it("weighs up two, and does not bother for one", async () => {
+    await settled("a");
+    triaged = '{"needsMe": [1]}';
+
+    // One run to decide whether to do one run is the same money at best.
+    answer = [pull(1)];
+    const [alone] = await pollAllLoops();
+    expect(triageRuns).toBe(0);
+    expect(alone).toMatchObject({ queued: 1, triaged: 0 });
+
+    // Two can pay for it, and this is the size that actually turns up when a
+    // loop looks often: three was rare enough that nothing was ever weighed.
+    answer = [pull(1), pull(2), pull(3)];
+    const [pair] = await pollAllLoops();
+    expect(triageRuns).toBe(1);
+    expect(pair).toMatchObject({ queued: 1, held: 1, triaged: 1 });
   });
 
   it("does not weigh up what the connector already refused", async () => {

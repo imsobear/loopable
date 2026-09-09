@@ -154,6 +154,16 @@ export type WorkflowDescriptor = {
    * apply: "whoever asked" means nothing to a loop that no person started.
    */
   actionTarget?: ConnectionSettings;
+  /**
+   * How long a new loop should leave between looks, when looking as often as
+   * the engine does is the wrong pace for this workflow. A starting point like
+   * the rest of these, and the loop's own once it exists.
+   *
+   * Worth setting where arriving one at a time is the problem rather than the
+   * point: a workflow that weighs a batch to decide what deserves an agent has
+   * no batch to weigh if it is handed each item the moment it lands.
+   */
+  pollEveryMs?: number;
 };
 
 export type ConnectorManifest = {

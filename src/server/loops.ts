@@ -19,6 +19,7 @@ export type LoopDraft = {
   actionConnectorId: string;
   actionId: string;
   actionTarget: ConnectionSettings;
+  pollEveryMs: number | null;
   enabled: boolean;
 };
 
@@ -41,6 +42,7 @@ function toView(row: Loop): LoopView {
     actionConnectorId: row.actionConnectorId,
     actionId: row.actionId,
     actionTarget: row.actionTarget,
+    pollEveryMs: row.pollEveryMs,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -157,6 +159,7 @@ export function createLoop(draft: LoopDraft): LoopView {
       actionConnectorId: checked.actionConnectorId,
       actionId: checked.actionId,
       actionTarget: checked.actionTarget,
+      pollEveryMs: checked.pollEveryMs,
     })
     .run();
   return getLoop(id)!;
@@ -179,6 +182,7 @@ export function updateLoop(id: string, draft: LoopDraft): LoopView {
       actionConnectorId: checked.actionConnectorId,
       actionId: checked.actionId,
       actionTarget: checked.actionTarget,
+      pollEveryMs: checked.pollEveryMs,
       updatedAt: new Date(),
     })
     .where(eq(loops.id, id))
@@ -239,6 +243,7 @@ export function createLoopFromWorkflow(connectorId: string, workflowId: string):
     actionConnectorId: workflow.actionConnectorId ?? connectorId,
     actionId: workflow.actionId,
     actionTarget: workflow.actionTarget ?? {},
+    pollEveryMs: workflow.pollEveryMs ?? null,
     enabled: true,
   });
 }
