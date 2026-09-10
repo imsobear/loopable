@@ -217,7 +217,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
               workflow.runsIn === "checkout"
                 ? "This job writes code, so it gets a checkout of its own. Your folder is only the source it is cut from: nothing is edited there, and anything you have uncommitted stays yours."
                 : workflow.runsIn === "folder"
-                  ? "This job has to read the code around what it was asked, so it works in a real checkout."
+                  ? "This job reads real code to do its work, so it runs in a real checkout. It does not write there: anything it changed would be sitting in your working copy."
                   : "Judging a change needs the change and nothing else, so the agent gets no checkout to wander into."
             }
           />
