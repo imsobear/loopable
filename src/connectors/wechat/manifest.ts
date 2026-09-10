@@ -114,4 +114,7 @@ export const wechatManifest: ConnectorManifest = {
   settings: [],
   // One bot per account is the shape of the login; more than one is untested.
   allowsMultipleAccounts: false,
+  // A message is handed over once and is gone from the stream, so there is
+  // no address to paste and no way to ask for one again.
+  byHand: { kind: "none" },
 };

@@ -1,5 +1,6 @@
 import { githubManifest } from "./github/manifest.ts";
 import { gmailManifest } from "./gmail/manifest.ts";
+import { scheduleManifest } from "./schedule/manifest.ts";
 import { wechatManifest } from "./wechat/manifest.ts";
 import type {
   ActionDescriptor,
@@ -16,10 +17,22 @@ export const CONNECTOR_MANIFESTS: ConnectorManifest[] = [
   githubManifest,
   gmailManifest,
   wechatManifest,
+  scheduleManifest,
 ];
 
 export function connectorManifest(id: ConnectorId): ConnectorManifest | undefined {
   return CONNECTOR_MANIFESTS.find((manifest) => manifest.id === id);
+}
+
+/**
+ * Whether this connector is somewhere you have an account.
+ *
+ * Asked in three places that would otherwise each assume every connector is:
+ * the page listing accounts, the check for what stands between a loop and
+ * running, and the fetch of a credential for a run.
+ */
+export function needsAccount(id: ConnectorId): boolean {
+  return connectorManifest(id)?.auth.kind !== "none";
 }
 
 export function connectorWorkflow(

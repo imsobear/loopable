@@ -176,6 +176,7 @@ function RunBox({ loop }: { loop: { id: string; connectorId: string } }) {
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
   const manifest = connectorManifest(loop.connectorId);
+  const byHand = manifest?.byHand ?? { kind: "none" as const };
 
   const run = async () => {
     setRunning(true);
@@ -191,23 +192,54 @@ function RunBox({ loop }: { loop: { id: string; connectorId: string } }) {
     }
   };
 
+  // Nothing here can start a run, so the card would be a box that only makes
+  // errors. Saying why is more use than offering one.
+  if (byHand.kind === "none") {
+    return (
+      <Card>
+        <CardContent className="pt-6 text-sm text-muted-foreground">
+          This loop can only run on something arriving, so there is nothing to start by hand. What
+          it does with what arrives is worth trying on the first one, with dry run left on.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 pt-6">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="run-url">Try this loop on a {manifest?.name ?? ""} link</Label>
-          <div className="flex gap-2">
-            <Input
-              id="run-url"
-              value={url}
-              placeholder="https://github.com/acme/web/pull/123"
-              onChange={(event) => setUrl(event.target.value)}
-            />
-            <Button onClick={run} disabled={running || url.trim() === ""}>
-              <Play />
-              Run
-            </Button>
-          </div>
+          {byHand.kind === "now" ? (
+            <>
+              <Label>Run it now, without waiting for the time</Label>
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-xs text-muted-foreground">
+                  Runs exactly as it would when the clock came round, and does not count as that
+                  run: the next scheduled one still happens.
+                </p>
+                <Button onClick={run} disabled={running}>
+                  <Play />
+                  Run
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Label htmlFor="run-url">Try this loop on a {manifest?.name ?? ""} link</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="run-url"
+                  value={url}
+                  placeholder={byHand.placeholder}
+                  onChange={(event) => setUrl(event.target.value)}
+                />
+                <Button onClick={run} disabled={running || url.trim() === ""}>
+                  <Play />
+                  Run
+                </Button>
+              </div>
+            </>
+          )}
         </div>
         <div className="flex items-center justify-between gap-4">
           <div>

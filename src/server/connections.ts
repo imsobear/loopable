@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, lt } from "drizzle-orm";
 import type { AuthResult, ConnectorAccount, ConnectorId } from "#/connectors/types.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
+import { needsAccount } from "#/connectors/manifests.ts";
 import { db } from "./db/client.ts";
 import { authAttempts, connections, type Connection } from "./db/schema.ts";
 import { deleteCredential, readCredential, writeCredential } from "./secrets.ts";
@@ -154,7 +155,10 @@ export function updateConnectionSettings(
  */
 export async function credentialForConnector(
   connectorId: ConnectorId,
-): Promise<{ connectionId: string; credential: unknown }> {
+): Promise<{ credential: unknown }> {
+  // A clock has nothing to sign in to, so there is nothing to fetch or check.
+  if (!needsAccount(connectorId)) return { credential: null };
+
   const row = db()
     .select()
     .from(connections)
@@ -169,7 +173,7 @@ export async function credentialForConnector(
   }
   const credential = await readCredential<unknown>(row.id);
   if (!credential) throw new Error(`No credential is stored for ${connectorId}.`);
-  return { connectionId: row.id, credential };
+  return { credential };
 }
 
 /** Proves the stored credential still works and refreshes the shown account. */

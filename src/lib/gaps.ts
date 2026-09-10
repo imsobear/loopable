@@ -1,4 +1,4 @@
-import { connectorManifest } from "@/connectors/manifests.ts";
+import { connectorManifest, needsAccount } from "@/connectors/manifests.ts";
 import type { LoopReadiness, LoopView } from "@/lib/domain.ts";
 
 /**
@@ -26,10 +26,12 @@ export function gapsFor(readiness: LoopReadiness, loops: LoopView[]): string[] {
   if (connected.size > 0) {
     const name = (id: string) => connectorManifest(id)?.name ?? id;
     for (const loop of loops) {
-      if (!connected.has(loop.connectorId)) {
+      // A loop on a schedule watches a clock, which is not somewhere you have
+      // an account, so there is nothing here for a person to go and fix.
+      if (needsAccount(loop.connectorId) && !connected.has(loop.connectorId)) {
         missing.push(`${loop.name} watches ${name(loop.connectorId)}, which has no account.`);
       }
-      if (!connected.has(loop.actionConnectorId)) {
+      if (needsAccount(loop.actionConnectorId) && !connected.has(loop.actionConnectorId)) {
         missing.push(
           `${loop.name} answers on ${name(loop.actionConnectorId)}, which has no account.`,
         );

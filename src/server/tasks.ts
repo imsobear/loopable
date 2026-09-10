@@ -209,6 +209,13 @@ export function enqueueTask(input: {
   const loop = runnable(input.loopId);
   const manifest = connectorManifest(loop.connectorId)!;
   const runtime = connectorRuntime(loop.connectorId);
+
+  // Nothing to paste, and no reason to wait for the clock: what a run started
+  // by hand is about is this moment, and only the connector can say what that
+  // looks like as a work item.
+  if (manifest.byHand.kind === "now" && runtime.itemForNow) {
+    return queue({ loop, item: runtime.itemForNow(), url: "", dryRun: input.dryRun });
+  }
   if (!runtime.identifyLink) throw new Error(`${manifest.name} cannot read links.`);
 
   const item = runtime.identifyLink(input.url);
@@ -309,6 +316,7 @@ const KIND_NOUN: Record<WorkItemKind, string> = {
   issue: "issue",
   message: "the message",
   email: "the email",
+  occurrence: "the run due at",
 };
 
 /**
@@ -335,7 +343,9 @@ function promptFor(input: {
 
   return [
     `You are working on ${KIND_NOUN[input.item.kind]} ${input.item.ref}.`,
-    `Read ${input.files.join(" and ")} first.`,
+    // A run that happens because a time came round has no material: there is
+    // nothing to read, and telling it to read nothing reads as a mistake.
+    ...(input.files.length > 0 ? [`Read ${input.files.join(" and ")} first.`] : []),
     ``,
     `Your task:`,
     input.ask,

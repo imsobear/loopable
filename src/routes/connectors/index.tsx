@@ -7,7 +7,7 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { CONNECTOR_MANIFESTS } from "@/connectors/manifests.ts";
+import { CONNECTOR_MANIFESTS, needsAccount } from "@/connectors/manifests.ts";
 import { getConnectorOverview } from "@/server/functions/connectors.ts";
 
 export const Route = createFileRoute("/connectors/")({
@@ -45,7 +45,9 @@ function ConnectorsPage() {
       </header>
 
       <div className="flex flex-col gap-4">
-        {CONNECTOR_MANIFESTS.map((manifest) => {
+        {/* A clock offers workflows but no account, and a card whose only
+            button is "Set up" would lead nowhere. */}
+        {CONNECTOR_MANIFESTS.filter((manifest) => needsAccount(manifest.id)).map((manifest) => {
           const state = overview.find((entry) => entry.connectorId === manifest.id);
           const connections = state?.connections ?? [];
           const readiness = state?.readiness;

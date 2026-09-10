@@ -43,7 +43,7 @@ export function isTaskActive(state: TaskState): boolean {
  * the list is closed so that the few places which phrase a kind for a person
  * have to say something for every one of them.
  */
-export type WorkItemKind = "pull_request" | "issue" | "message" | "email";
+export type WorkItemKind = "pull_request" | "issue" | "message" | "email" | "occurrence";
 
 export type TaskView = {
   id: string;

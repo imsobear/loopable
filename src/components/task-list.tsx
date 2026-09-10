@@ -64,6 +64,7 @@ export const KIND_LABEL: Record<WorkItemKind, string> = {
   issue: "Issue",
   message: "Message",
   email: "Email",
+  occurrence: "Scheduled run",
 };
 
 function when(iso: string): string {

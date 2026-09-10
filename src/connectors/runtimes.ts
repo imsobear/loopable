@@ -1,5 +1,6 @@
 import { githubRuntime } from "./github/runtime.ts";
 import { gmailRuntime } from "./gmail/runtime.ts";
+import { scheduleRuntime } from "./schedule/runtime.ts";
 import { wechatRuntime } from "./wechat/runtime.ts";
 import type { Connector, ConnectorId } from "./types.ts";
 import { CONNECTOR_MANIFESTS } from "./manifests.ts";
@@ -9,6 +10,7 @@ const RUNTIMES: Record<ConnectorId, Connector["runtime"]> = {
   github: githubRuntime,
   gmail: gmailRuntime,
   wechat: wechatRuntime,
+  schedule: scheduleRuntime,
 };
 
 export function connectorRuntime(id: ConnectorId): Connector["runtime"] {

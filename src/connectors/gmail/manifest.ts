@@ -133,4 +133,7 @@ export const gmailManifest = defineManifest({
   // The redirect authorizes whichever account the browser is signed in as, so
   // reaching a second one means signing out of Google first.
   allowsMultipleAccounts: false,
+  // Mail arrives or it does not. There is nothing to paste and nothing to
+  // start, so the page says so rather than offering a box that only errors.
+  byHand: { kind: "none" },
 });

@@ -35,7 +35,13 @@ export type AuthDescriptor =
       kind: "qr_scan";
       /** What the person is about to bind, since a scan says less than a consent screen. */
       note: string;
-    };
+    }
+  /**
+   * Nothing to sign in to. For the parts of Loopable that are a source of work
+   * without being somewhere else: a clock has no account, but it still has
+   * workflows, and a loop still watches it.
+   */
+  | { kind: "none" };
 
 export type TokenField = {
   key: string;
@@ -189,6 +195,17 @@ export type ConnectorManifest = {
   settings: SettingField[];
   /** Connecting more than one account of this connector is meaningful. */
   allowsMultipleAccounts: boolean;
+  /**
+   * How a person can set a loop going without waiting for one to arrive,
+   * which is how a loop gets shaped.
+   *
+   * "link" is a thing with an address that can be pasted. "now" is for a
+   * trigger with nothing to paste and no reason to wait, which is what a clock
+   * is: running it by hand means running it for this moment. "none" is honest
+   * about the rest, where work arrives or it does not, and a box offering to
+   * start one is a box that can only produce an error.
+   */
+  byHand: { kind: "link"; placeholder: string } | { kind: "now" } | { kind: "none" };
 };
 
 /** The account a credential belongs to, as shown in the UI. */
@@ -370,6 +387,11 @@ export type ConnectorRuntime = {
    * than becoming a queued task that fails a second later.
    */
   identifyLink?(url: string): WorkItemRef | null;
+  /**
+   * What a run started by hand is about, where there is no link to say.
+   * Implemented by the connectors whose `byHand` is "now" and no others.
+   */
+  itemForNow?(): WorkItemRef;
   /**
    * Turn a link a person pasted, or what a poll kept, into something a loop
    * can act on. `payload` is whatever this connector put on the signal, and is

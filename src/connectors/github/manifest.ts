@@ -220,4 +220,5 @@ export const githubManifest = defineManifest({
   // as, so a second account is out of reach without signing out of GitHub
   // first. Connections are still rows, so this is a product decision only.
   allowsMultipleAccounts: false,
+  byHand: { kind: "link", placeholder: "https://github.com/acme/web/pull/123" },
 });

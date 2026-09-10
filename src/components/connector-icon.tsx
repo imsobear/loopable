@@ -1,4 +1,4 @@
-import { Plug, type LucideIcon } from "lucide-react";
+import { Clock, Plug, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,6 +47,9 @@ const ICONS: Record<string, LucideIcon | Mark> = {
   Github: GithubMark,
   Gmail: GmailMark,
   Wechat: WechatMark,
+  // Not a service's mark: a clock is the thing itself rather than a stand-in
+  // for somewhere you have an account.
+  Clock,
   Plug,
 };
 
