@@ -16,7 +16,9 @@ import type {
 import type { JsonValue, TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
 import { listAgents, settingsFor } from "./agents.ts";
+import { closeCheckout, measure, openCheckout } from "./checkout.ts";
 import { credentialForConnector } from "./connections.ts";
+import { commitAll, hasChanges } from "./git.ts";
 import { db } from "./db/client.ts";
 import { dataDir, runDir } from "./paths.ts";
 import { loops, tasks, type Loop, type Task } from "./db/schema.ts";
@@ -26,6 +28,23 @@ import { loops, tasks, type Loop, type Task } from "./db/schema.ts";
  * that runs by itself would post filler, which is worse than silence.
  */
 const NOTHING = "NOTHING_TO_DO";
+
+/**
+ * The answer is the checkout, not the reply, so the reply is asked for as the
+ * account somebody reads before deciding whether to look at the diff.
+ *
+ * The branch is made and committed by Loopable afterwards. An agent told to
+ * commit would also be an agent that might push, and what it pushed to would
+ * be whatever it inferred.
+ */
+const CODE_FORMAT = [
+  "Make the change in the working directory. It is a scratch checkout made for",
+  "you, so edit files freely; do not commit, branch, push, or run git at all.",
+  "",
+  "Then reply with the description of a pull request: a first line under about",
+  "seventy characters saying what it does, a blank line, and a short account of",
+  "what you changed and anything you were unsure about. No preamble.",
+].join("\n");
 
 /** Written work should say where it came from. */
 const SIGNATURE = "\n\n---\n*Written by Loopable, running locally.*";
@@ -310,7 +329,9 @@ function promptFor(input: {
   const shape =
     input.workflow.answer === "review"
       ? [REVIEW_FORMAT]
-      : [`Reply with only the text to post. No preamble, no explanation of what you are about to do.`];
+      : input.workflow.answer === "code"
+        ? [CODE_FORMAT]
+        : [`Reply with only the text to post. No preamble, no explanation of what you are about to do.`];
 
   return [
     `You are working on ${KIND_NOUN[input.item.kind]} ${input.item.ref}.`,
@@ -391,6 +412,14 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
   });
   updateTask(id, { sourceTitle: item.title });
 
+  // Opened before the agent and kept until the work has landed somewhere. A
+  // retry skips the agent, and the branch it already built is the thing that
+  // still has to be pushed.
+  const checkout =
+    workflow.runsIn === "checkout"
+      ? await openCheckout({ repo: folderFor(loop), runDir: runDir(id), ref: item.ref, taskId: id })
+      : null;
+
   // Null means the agent has not run; empty means it ran and had little to
   // say. Telling those apart is what stops a retry paying for the agent twice.
   let output = task.output;
@@ -418,7 +447,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
         item,
         files: item.context.map((file) => join(workspace, file.name)),
       }),
-      cwd: workflow.runsIn === "folder" ? folderFor(loop) : workspace,
+      cwd: checkout ? checkout.dir : workflow.runsIn === "folder" ? folderFor(loop) : workspace,
       settings: settingsFor(agentId),
       outputFile: join(workspace, "answer.txt"),
       signal,
@@ -440,6 +469,7 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     // Checked before parsing, because the way out of a review is a plain word
     // rather than a document saying there is nothing to say.
     if (said.replace(/[`*_.\s]/g, "").toUpperCase() === NOTHING) {
+      if (checkout) await closeCheckout(checkout);
       finish(id, task, { state: "skipped", output: said });
       return getTask(id)!;
     }
@@ -447,6 +477,21 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     ({ output, comments } = answerFor(workflow, action, item, said));
     if (!output && comments.length === 0) {
       throw new Error("The agent produced nothing worth posting.");
+    }
+
+    if (checkout) {
+      // An agent that described a change it did not make is the ordinary way
+      // this goes wrong, and an empty pull request is a worse way to report it
+      // than saying there was nothing to send.
+      if (!(await hasChanges(checkout.dir))) {
+        await closeCheckout(checkout);
+        finish(id, task, {
+          state: "skipped",
+          output: `Nothing was changed, though the agent said:\n\n${output}`,
+        });
+        return getTask(id)!;
+      }
+      await commitAll({ dir: checkout.dir, message: output });
     }
     updateTask(id, { output, comments });
   }
@@ -475,10 +520,14 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
     },
     body: output + SIGNATURE,
     comments,
+    changes: checkout ? { ...checkout, stat: await measure(checkout) } : undefined,
     credential: sameConnector
       ? credential
       : (await credentialForConnector(task.actionConnectorId)).credential,
   });
+  // Only now. Up to here the worktree is the work, and a failure that leaves it
+  // behind is a retry that costs a push instead of an agent.
+  if (checkout) await closeCheckout(checkout);
   finish(id, task, { state: "done", resultUrl: outcome.url });
   return getTask(id)!;
 }

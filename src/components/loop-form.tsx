@@ -207,14 +207,18 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           <Locked
             label="Where the agent runs"
             value={
-              workflow.runsIn === "folder"
-                ? "In the folder this loop names"
-                : "In a scratch directory holding only what it was given"
+              workflow.runsIn === "checkout"
+                ? "In a scratch worktree cut from the folder this loop names"
+                : workflow.runsIn === "folder"
+                  ? "In the folder this loop names"
+                  : "In a scratch directory holding only what it was given"
             }
             help={
-              workflow.runsIn === "folder"
-                ? "This job has to read the code around what it was asked, so it works in a real checkout."
-                : "Judging a change needs the change and nothing else, so the agent gets no checkout to wander into."
+              workflow.runsIn === "checkout"
+                ? "This job writes code, so it gets a checkout of its own. Your folder is only the source it is cut from: nothing is edited there, and anything you have uncommitted stays yours."
+                : workflow.runsIn === "folder"
+                  ? "This job has to read the code around what it was asked, so it works in a real checkout."
+                  : "Judging a change needs the change and nothing else, so the agent gets no checkout to wander into."
             }
           />
 
@@ -223,7 +227,9 @@ export function LoopForm({ loop }: { loop: LoopView }) {
             value={
               workflow.answer === "review"
                 ? "A summary, plus points attached to lines"
-                : "One block of text"
+                : workflow.answer === "code"
+                  ? "A change to the code, described in a sentence or two"
+                  : "One block of text"
             }
             help="Part of how this job works rather than a preference, so it is fixed here and cannot drift from the code that parses it."
           />

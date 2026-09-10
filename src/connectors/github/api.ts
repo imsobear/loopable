@@ -147,6 +147,44 @@ export function postIssueComment(
   });
 }
 
+/**
+ * Opens a pull request for a branch that has already been pushed.
+ *
+ * Draft, always. This runs unattended, and the difference between a colleague
+ * finding something to look at and a colleague being asked to review something
+ * nobody has read is the one flag.
+ */
+export function createPullRequest(
+  accessToken: string,
+  repo: string,
+  input: { title: string; body: string; head: string; base: string },
+): Promise<{ html_url: string; number: number }> {
+  return request<{ html_url: string; number: number }>(accessToken, `/repos/${repo}/pulls`, {
+    method: "POST",
+    body: JSON.stringify({ ...input, draft: true }),
+  });
+}
+
+/**
+ * The pull request already open for a branch, if there is one.
+ *
+ * A retry pushes the same branch again, and asking GitHub to open a second
+ * pull request for it fails. Finding the first one instead turns a retry into
+ * what a person would expect: the change updated, not an error.
+ */
+export async function pullForBranch(
+  accessToken: string,
+  repo: string,
+  owner: string,
+  branch: string,
+): Promise<{ html_url: string; number: number } | null> {
+  const open = await request<Array<{ html_url: string; number: number }>>(
+    accessToken,
+    `/repos/${repo}/pulls?head=${encodeURIComponent(`${owner}:${branch}`)}&state=open`,
+  );
+  return open[0] ?? null;
+}
+
 export type GithubUser = {
   login: string;
   id: number;

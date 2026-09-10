@@ -44,6 +44,19 @@ const sizeLimit: SettingField = {
 };
 
 /**
+ * Where the code is. Needed by anything that writes code rather than words:
+ * the change is made in a worktree cut from here, and this clone's `origin` is
+ * also how the loop knows which repository to open a pull request on.
+ */
+const folder: SettingField = {
+  key: "folder",
+  kind: "text",
+  label: "Your clone of the repository",
+  help: "An absolute path. Work happens in a scratch worktree cut from it, so your own checkout and anything uncommitted in it are left alone.",
+  placeholder: "/Users/you/code/web",
+};
+
+/**
  * Left empty by every loop that answers what it read, which is most of them.
  * Filled in when the trigger is somewhere else entirely and there is no issue
  * in it to comment on.
@@ -84,6 +97,23 @@ const PLAN_PROMPT = [
   "plan, say what is missing rather than inventing the requirements.",
   "",
   "Do not write the implementation.",
+].join("\n");
+
+const IMPLEMENT_PROMPT = [
+  "Implement this issue in the checkout you are in.",
+  "",
+  "Read enough of the surrounding code first that what you write looks like it",
+  "belongs: the same patterns, the same names, the same way of handling errors.",
+  "Where the project has tests for work like this, add one.",
+  "",
+  "Stay inside what the issue asks for. A change that also tidies three other",
+  "things is a change nobody can review. If the issue is too vague to implement,",
+  "or doing it properly needs a decision that is not yours to make, reply with",
+  "exactly NOTHING_TO_DO rather than guessing: an unwanted pull request costs",
+  "more attention than a missing one.",
+  "",
+  "Run the project's tests if you can work out how, and say in your description",
+  "whether you did and what happened.",
 ].join("\n");
 
 export const githubManifest = defineManifest({
@@ -130,6 +160,26 @@ export const githubManifest = defineManifest({
       answer: "text",
       actionId: "github.post_issue_comment",
     },
+    {
+      id: "github.issue_implement",
+      name: "Implement issues assigned to me",
+      summary: "Writes the change in a scratch checkout and opens a draft pull request.",
+      trigger: "an issue is assigned to you",
+      watches: "is:open is:issue assignee:@me",
+      writes: "a draft pull request",
+      // The only workflow that writes code, and so the only one whose agent
+      // gets somewhere to write. Kept apart from "Plan issues assigned to me"
+      // rather than replacing it: asking for a plan and asking for the change
+      // are different jobs, and which one an issue deserves is a judgement
+      // about the issue.
+      runsIn: "checkout",
+      settings: [repositories, folder],
+      prompt: IMPLEMENT_PROMPT,
+      guidancePlaceholder:
+        "How work is done here. For example: every new endpoint needs a test, and we do not add dependencies without asking.",
+      answer: "code",
+      actionId: "github.open_pull_request",
+    },
   ],
   actions: [
     {
@@ -151,6 +201,16 @@ export const githubManifest = defineManifest({
       // A comment is one body of markdown with nowhere to attach anything, so
       // a review arrives here with its findings written into the prose.
       accepts: ["text"],
+    },
+    {
+      id: "github.open_pull_request",
+      name: "Open a draft pull request",
+      summary: "Push the branch the agent worked on and open a draft pull request for it.",
+      // Nothing to ask. The loop already named the clone to work in, and where
+      // that clone pushes is where this belongs; a second answer here could
+      // only disagree with the first.
+      target: [],
+      accepts: ["code"],
     },
   ],
   // Nothing to configure per account: what the account can see is what GitHub

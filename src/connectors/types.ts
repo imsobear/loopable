@@ -45,8 +45,13 @@ export type TokenField = {
   optional?: boolean;
 };
 
-/** What form an answer takes, and so what can be done with it. */
-export type AnswerShape = "text" | "review";
+/**
+ * What form an answer takes, and so what can be done with it.
+ *
+ * "code" is the odd one: the answer is not the words the agent produced but
+ * the state it left a checkout in, and the words are only the account of it.
+ */
+export type AnswerShape = "text" | "review" | "code";
 
 /** Something the connector can do to the outside world, on a loop's behalf. */
 export type ActionDescriptor = {
@@ -122,9 +127,11 @@ export type WorkflowDescriptor = {
    * Where the agent runs. "temp" is a scratch directory holding the context
    * files and nothing else, which is right for judging a diff. "folder" is a
    * directory the loop names, for work that has to read the code around it;
-   * the loop supplies it under the `folder` setting.
+   * the loop supplies it under the `folder` setting. "checkout" is a worktree
+   * cut from that same folder, which is the only one of the three an agent may
+   * write in: the folder itself is where somebody works.
    */
-  runsIn?: "temp" | "folder";
+  runsIn?: "temp" | "folder" | "checkout";
   /** The knobs a loop may set, in the connector's own words. */
   settings: SettingField[];
   /** Owned here. A loop's guidance is appended, never substituted. */
@@ -270,6 +277,25 @@ export type ActionOutcome = {
 };
 
 /**
+ * Work an agent has done in a worktree, committed and ready to go somewhere.
+ *
+ * `repo` is the checkout it was cut from, and its `origin` is where this
+ * belongs. Which means an action never has to be told what to push to: the
+ * loop already said, when it named the folder to work in.
+ */
+export type Changes = {
+  /** The worktree. Its HEAD is the commit to send. */
+  dir: string;
+  branch: string;
+  /** What it was cut from, and what a pull request would merge into. */
+  base: string;
+  /** The repository on disk that owns the worktree. */
+  repo: string;
+  /** `git diff --stat`, for saying how big this is without reading it. */
+  stat: string;
+};
+
+/**
  * What the answer is about, handed to whichever action writes it.
  *
  * Less than the work item, on purpose. An action can always say what the work
@@ -385,6 +411,12 @@ export type ConnectorRuntime = {
     body: string;
     /** Anchored comments, already checked against the diff by the caller. */
     comments?: Finding[];
+    /**
+     * A committed worktree waiting to be sent somewhere, for the actions whose
+     * answer is code. Absent for every other shape, and the action says so by
+     * not accepting "code".
+     */
+    changes?: Changes;
     credential: unknown;
   }): Promise<ActionOutcome>;
   auth: {

@@ -1,7 +1,14 @@
+import { originUrl, pushBranch } from "#/server/git.ts";
 import { defineRuntime } from "../define.ts";
 import type { ActionSource, ConnectorAccount } from "../types.ts";
 import { oauthAppRegistration } from "../oauth-app.ts";
-import { getViewer, postIssueComment, submitReview } from "./api.ts";
+import {
+  createPullRequest,
+  getViewer,
+  postIssueComment,
+  pullForBranch,
+  submitReview,
+} from "./api.ts";
 import { pollGithub } from "./poll.ts";
 import { githubRef, parseGithubRef, parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
@@ -47,6 +54,41 @@ function namedRef(url: string): { repo: string; number: number } {
   const parsed = parseGithubUrl(url);
   if (!parsed) throw new Error(`That is not a GitHub issue or pull request: ${url}`);
   return { repo: parsed.repo, number: parsed.number };
+}
+
+/**
+ * Which repository a clone on disk belongs to.
+ *
+ * Read from the clone rather than asked of the loop, because the loop already
+ * answered it by naming the folder. Anything else would let a change made
+ * against one repository be opened on another.
+ */
+async function repoFromOrigin(repo: string): Promise<string> {
+  const url = await originUrl(repo);
+  const match = /github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/.exec(url);
+  if (!match) throw new Error(`${repo} does not push to GitHub: its origin is ${url}`);
+  return match[1]!;
+}
+
+/** The agent was asked for a subject line first, so this is that line. */
+function titleOf(body: string): string {
+  const first = body.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
+  const clean = first.replace(/^#+\s*/, "");
+  return clean.length > 120 ? `${clean.slice(0, 117)}…` : clean || "Changes from Loopable";
+}
+
+/**
+ * The description, with the two things the agent cannot say for itself: what
+ * this came from, and how big it is. Both are what a person checks first when
+ * a pull request appears that they did not open.
+ */
+function pullBody(input: { body: string; source: ActionSource; stat: string }): string {
+  const closes =
+    input.source.connectorId === "github" && input.source.kind === "issue"
+      ? `Closes #${parseGithubRef(input.source.ref).number}`
+      : `From [${input.source.title}](${input.source.url})`;
+  const size = input.stat ? `\n\n<details><summary>Files changed</summary>\n\n\`\`\`\n${input.stat}\n\`\`\`\n\n</details>` : "";
+  return `${closes}\n\n${input.body}${size}`;
 }
 
 /**
@@ -98,7 +140,7 @@ export const githubRuntime = defineRuntime({
     return { signals: await pollGithub({ workflowId, settings, accessToken }) };
   },
 
-  async applyAction({ actionId, target, source, body, comments, credential }) {
+  async applyAction({ actionId, target, source, body, comments, changes, credential }) {
     const { accessToken } = await usableToken(credential as GithubCredential);
     if (actionId === "github.submit_review") {
       const { repo, number } = sourceRef(source, "A review");
@@ -127,6 +169,32 @@ export const githubRuntime = defineRuntime({
       const { repo, number } = named ? namedRef(named) : sourceRef(source, "A comment");
       const comment = await postIssueComment(accessToken, repo, number, body);
       return { url: comment.html_url };
+    }
+    if (actionId === "github.open_pull_request") {
+      if (!changes) throw new Error("There is no branch to open a pull request for.");
+      const repo = await repoFromOrigin(changes.repo);
+
+      await pushBranch({
+        dir: changes.dir,
+        url: `https://github.com/${repo}.git`,
+        branch: changes.branch,
+        token: accessToken,
+      });
+
+      // The same branch pushed twice is a retry, not a second change. GitHub
+      // refuses a duplicate pull request, and the one already open is now
+      // updated, which is the answer a person wanted anyway.
+      const owner = repo.split("/")[0]!;
+      const existing = await pullForBranch(accessToken, repo, owner, changes.branch);
+      if (existing) return { url: existing.html_url };
+
+      const opened = await createPullRequest(accessToken, repo, {
+        title: titleOf(body),
+        body: pullBody({ body, source, stat: changes.stat }),
+        head: changes.branch,
+        base: changes.base,
+      });
+      return { url: opened.html_url };
     }
     throw new Error(`GitHub cannot ${actionId}.`);
   },
