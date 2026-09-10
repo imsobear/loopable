@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   createLoop,
-  createLoopFromWorkflow,
   deleteLoop,
   getLoop,
   listLoops,
@@ -9,11 +8,16 @@ import {
   loopReadiness,
   setLoopEnabled,
   updateLoop,
-  type LoopDraft,
 } from "../loops.ts";
+import type { LoopEdit } from "#/lib/domain.ts";
 import { loopPollState, runBacklog } from "../signals.ts";
 
-const draft = (data: LoopDraft & { id?: string }) => data;
+/**
+ * Saving is both making and changing, told apart by whether there is an id.
+ * A loop chosen and not yet saved has none, and nothing on the server knew
+ * about it until now.
+ */
+const edit = (data: LoopEdit) => data;
 
 export const getLoopsPage = createServerFn({ method: "GET" }).handler(async () => ({
   loops: listLoops(),
@@ -25,7 +29,7 @@ export const getLoopById = createServerFn({ method: "GET" })
   .handler(({ data }) => getLoop(data.id));
 
 export const saveLoop = createServerFn({ method: "POST" })
-  .inputValidator(draft)
+  .inputValidator(edit)
   .handler(({ data }) => {
     const { id, ...values } = data;
     return id ? updateLoop(id, values) : createLoop(values);
@@ -45,10 +49,6 @@ export const removeLoop = createServerFn({ method: "POST" })
 export const reorderLoop = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; direction: "up" | "down" }) => data)
   .handler(({ data }) => moveLoop(data.id, data.direction));
-
-export const addLoopForWorkflow = createServerFn({ method: "POST" })
-  .inputValidator((data: { connectorId: string; workflowId: string }) => data)
-  .handler(({ data }) => createLoopFromWorkflow(data.connectorId, data.workflowId));
 
 export const getLoopPollState = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)

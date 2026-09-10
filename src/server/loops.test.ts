@@ -9,10 +9,16 @@ process.env.LOOPABLE_DB = join(home, "test.sqlite");
 
 const { db } = await import("./db/client.ts");
 const { loops } = await import("./db/schema.ts");
-const { createLoopFromWorkflow, getLoop, updateLoop } = await import("./loops.ts");
+const { createLoop, getLoop, updateLoop } = await import("./loops.ts");
+const { draftForWorkflow } = await import("#/lib/loop-draft.ts");
 const { githubManifest } = await import("#/connectors/github/manifest.ts");
 
 const REVIEW = githubManifest.workflows.find((entry) => entry.id === "github.review_requested")!;
+
+/** Both steps at once: what the form does when somebody presses the button. */
+function added(connectorId: string, workflowId: string, changes: Record<string, unknown> = {}) {
+  return createLoop({ ...draftForWorkflow(connectorId, workflowId), ...changes });
+}
 
 /** A saved loop, with only the field under test changed. */
 function edited(id: string, changes: Record<string, unknown>) {
@@ -38,9 +44,35 @@ beforeEach(() => {
   db().delete(loops).run();
 });
 
+describe("choosing a workflow", () => {
+  /**
+   * The reason a draft exists at all. Choosing used to create the loop, so
+   * opening the page and looking at what was on offer left a live loop
+   * behind: enabled, watching, and with none of its questions answered.
+   */
+  it("writes nothing down until it is saved", () => {
+    const draft = draftForWorkflow("github", "github.review_requested");
+
+    expect(draft.id).toBeNull();
+    expect(db().select().from(loops).all()).toHaveLength(0);
+
+    createLoop({ ...draft, settings: { repositories: [] } });
+    expect(db().select().from(loops).all()).toHaveLength(1);
+  });
+
+  it("hands the form something to fill in rather than defaults to discover", () => {
+    const draft = draftForWorkflow("github", "github.review_requested");
+
+    expect(draft.name).toBe(REVIEW.name);
+    expect(draft.prompt).toBe(REVIEW.prompt);
+    // On when saved, because pressing the button is the whole of meaning to.
+    expect(draft.enabled).toBe(true);
+  });
+});
+
 describe("turning a workflow into a loop", () => {
   it("takes a copy of what the workflow asks and where it writes", async () => {
-    const loop = createLoopFromWorkflow("github", "github.review_requested");
+    const loop = added("github", "github.review_requested");
 
     expect(loop.prompt).toBe(REVIEW.prompt);
     expect(loop.actionConnectorId).toBe("github");
@@ -49,16 +81,16 @@ describe("turning a workflow into a loop", () => {
   });
 
   it("keeps an edited prompt, and does not read it back off the workflow", () => {
-    const { id } = createLoopFromWorkflow("github", "github.review_requested");
+    const { id } = added("github", "github.review_requested");
     edited(id, { prompt: "Only check the tests." });
 
     expect(getLoop(id)!.prompt).toBe("Only check the tests.");
     // The workflow is untouched, so a second loop still starts from it.
-    expect(createLoopFromWorkflow("github", "github.review_requested").prompt).toBe(REVIEW.prompt);
+    expect(added("github", "github.review_requested").prompt).toBe(REVIEW.prompt);
   });
 
   it("refuses to be left with nothing to ask", () => {
-    const { id } = createLoopFromWorkflow("github", "github.review_requested");
+    const { id } = added("github", "github.review_requested");
     // Quietly restoring the template would be worse: the loop would run and
     // write, and not with what the box on screen said.
     expect(() => edited(id, { prompt: "   " })).toThrow(/what the agent should do/);
@@ -70,7 +102,7 @@ describe("turning a workflow into a loop", () => {
    * on. It still only starts there; the loop can be pointed anywhere after.
    */
   it("starts on another connector when the workflow says so", () => {
-    const loop = createLoopFromWorkflow("gmail", "gmail.new_mail");
+    const loop = added("gmail", "gmail.new_mail");
 
     expect(loop.connectorId).toBe("gmail");
     expect(loop.actionConnectorId).toBe("wechat");
@@ -81,9 +113,38 @@ describe("turning a workflow into a loop", () => {
   });
 });
 
+/**
+ * Saving is the last moment anybody is looking, so it is the moment to refuse
+ * a loop that cannot work. A job that needs a checkout and has not been given
+ * one would sit enabled, come round on time, and fail at the last step every
+ * time, which is a slow way to be told to fill in a box.
+ */
+describe("a loop that has to work somewhere", () => {
+  it("will not be saved without the folder it works in", () => {
+    expect(() => added("schedule", "schedule.recurring")).toThrow(/which folder/);
+    expect(() => added("schedule", "schedule.recurring", { settings: { folder: "  " } })).toThrow(
+      /which folder/,
+    );
+  });
+
+  it("is saved once it has one", () => {
+    const loop = added("schedule", "schedule.recurring", {
+      settings: { every: "day", at: "09:00", weekday: "1", folder: "/Users/you/code/web" },
+    });
+
+    expect(loop.settings.folder).toBe("/Users/you/code/web");
+  });
+
+  it("does not ask for one where the agent is given no checkout", () => {
+    // Judging a diff needs the diff and nothing else, so there is nothing to
+    // name and nothing to refuse.
+    expect(() => added("github", "github.review_requested")).not.toThrow();
+  });
+});
+
 describe("choosing where a loop writes", () => {
   it("accepts an action on a connector it does not watch", () => {
-    const { id } = createLoopFromWorkflow("github", "github.review_requested");
+    const { id } = added("github", "github.review_requested");
     const saved = edited(id, {
       actionConnectorId: "wechat",
       actionId: "wechat.reply",
@@ -97,14 +158,14 @@ describe("choosing where a loop writes", () => {
   it("drops a target the chosen action never asked for", () => {
     // Left alone, a stale answer would sit in the column looking meaningful
     // and be read by nothing.
-    const { id } = createLoopFromWorkflow("github", "github.review_requested");
+    const { id } = added("github", "github.review_requested");
     const saved = edited(id, { actionTarget: { issue: "https://github.com/acme/web/issues/1" } });
 
     expect(saved.actionTarget).toEqual({});
   });
 
   it("refuses an action the connector does not have", () => {
-    const { id } = createLoopFromWorkflow("github", "github.review_requested");
+    const { id } = added("github", "github.review_requested");
     expect(() => edited(id, { actionId: "github.merge_it" })).toThrow(/cannot github.merge_it/);
   });
 });

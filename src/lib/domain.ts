@@ -103,6 +103,35 @@ export type LoopView = {
   updatedAt: string;
 };
 
+/**
+ * Everything about a loop that a person chose, and nothing the database
+ * decided. What a form collects and what saving one takes.
+ */
+export type LoopDraft = {
+  name: string;
+  connectorId: string;
+  workflowId: string;
+  prompt: string;
+  guidance: string | null;
+  agentId: string | null;
+  settings: ConnectionSettings;
+  actionConnectorId: string;
+  actionId: string;
+  actionTarget: ConnectionSettings;
+  pollEveryMs: number | null;
+  enabled: boolean;
+};
+
+/**
+ * A loop being edited, which may not exist yet.
+ *
+ * The null id is the whole difference between shaping a new loop and changing
+ * a saved one, and it is deliberately the only difference: a loop that has
+ * been chosen but not saved is not a row that needs cleaning up later, and
+ * nothing polls it or runs it in the meantime.
+ */
+export type LoopEdit = LoopDraft & { id: string | null };
+
 /** Something a loop noticed and did not act on, and the reason it did not. */
 export type BacklogItem = {
   key: string;

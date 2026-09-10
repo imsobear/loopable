@@ -1,40 +1,85 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { toast } from "sonner";
 import { ConnectorIcon } from "@/components/connector-icon";
+import { LoopForm } from "@/components/loop-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { allWorkflows } from "@/connectors/manifests.ts";
-import { addLoopForWorkflow, getLoopsPage } from "@/server/functions/loops.ts";
+import { allWorkflows, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
+import { draftForWorkflow } from "@/lib/loop-draft.ts";
+import { getLoopsPage } from "@/server/functions/loops.ts";
 
 export const Route = createFileRoute("/loops/new")({
+  // Which workflow is being shaped lives in the URL rather than in state, so
+  // the back button steps out of the form and a half-filled one is never
+  // something on the server has to remember.
+  validateSearch: (search: Record<string, unknown>) => {
+    const result: { connector?: string; workflow?: string } = {};
+    if (typeof search.connector === "string") result.connector = search.connector;
+    if (typeof search.workflow === "string") result.workflow = search.workflow;
+    return result;
+  },
   loader: async () => ({ loops: (await getLoopsPage()).loops }),
   component: NewLoopPage,
 });
 
+function NewLoopPage() {
+  const { connector, workflow } = Route.useSearch();
+  const chosen =
+    connector && workflow && connectorWorkflow(connector, workflow)
+      ? { connector, workflow }
+      : null;
+
+  return chosen ? (
+    <ShapeLoop connectorId={chosen.connector} workflowId={chosen.workflow} />
+  ) : (
+    <ChooseWorkflow />
+  );
+}
+
+/**
+ * The second step, and the one that makes a loop.
+ *
+ * Nothing has been written down yet: the draft is worked out here from the
+ * workflow the URL names, and the loop begins when the form is saved. Picking
+ * a workflow used to create it, which meant a look around this page left a
+ * live loop behind, enabled and with none of its questions answered.
+ */
+function ShapeLoop({ connectorId, workflowId }: { connectorId: string; workflowId: string }) {
+  const workflow = connectorWorkflow(connectorId, workflowId)!;
+  const connector = connectorManifest(connectorId);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Link
+        to="/loops/new"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        New loop
+      </Link>
+      <header className="flex items-start gap-4">
+        {connector ? <ConnectorIcon icon={connector.icon} accent={connector.accent} /> : null}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{workflow.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nothing is watched for until you add this. {workflow.summary}
+          </p>
+        </div>
+      </header>
+      <LoopForm loop={draftForWorkflow(connectorId, workflowId)} />
+    </div>
+  );
+}
+
 /**
  * There is no blank loop to write any more. Every loop is one of the
  * workflows a connector offers, already knowing its own job, so choosing is
- * the whole of creating one and the settings come after.
+ * the first half of making one and the settings are the second.
  */
-function NewLoopPage() {
+function ChooseWorkflow() {
   const { loops } = Route.useLoaderData();
   const navigate = useNavigate();
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const add = async (connectorId: string, workflowId: string) => {
-    setBusy(workflowId);
-    try {
-      const loop = await addLoopForWorkflow({ data: { connectorId, workflowId } });
-      toast.success(`Added "${loop.name}"`);
-      await navigate({ to: "/loops/$loopId", params: { loopId: loop.id } });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-      setBusy(null);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,10 +124,14 @@ function NewLoopPage() {
                 </div>
                 <Button
                   variant="outline"
-                  disabled={busy !== null}
-                  onClick={() => add(connector.id, workflow.id)}
+                  onClick={() =>
+                    void navigate({
+                      to: "/loops/new",
+                      search: { connector: connector.id, workflow: workflow.id },
+                    })
+                  }
                 >
-                  {busy === workflow.id ? "Adding..." : "Add"}
+                  Set up
                 </Button>
               </CardContent>
             </Card>

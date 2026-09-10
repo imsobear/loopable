@@ -24,7 +24,7 @@ import {
   connectorManifest,
   connectorWorkflow,
 } from "@/connectors/manifests.ts";
-import type { ConnectionSettings, LoopView } from "@/lib/domain.ts";
+import type { ConnectionSettings, LoopEdit } from "@/lib/domain.ts";
 import { saveLoop } from "@/server/functions/loops.ts";
 
 const DEFAULT_AGENT = "__default";
@@ -81,9 +81,14 @@ function Locked({
  * page: what it looks for and how the answer is read belong to the workflow
  * and are locked, while what narrows it, where it writes and which agent runs
  * it belong to the loop.
+ *
+ * Serves a loop that exists and one that does not. A loop with no id has been
+ * chosen and not saved, so leaving this page is the end of it: nothing was
+ * written down, and nothing is watching for anything.
  */
-export function LoopForm({ loop }: { loop: LoopView }) {
+export function LoopForm({ loop }: { loop: LoopEdit }) {
   const navigate = useNavigate();
+  const fresh = loop.id === null;
   const connector = connectorManifest(loop.connectorId);
   const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
 
@@ -149,7 +154,7 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           enabled,
         },
       });
-      toast.success(`Saved ${saved.name}`);
+      toast.success(fresh ? `Added "${saved.name}"` : `Saved ${saved.name}`);
       await navigate({ to: "/loops" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -340,9 +345,9 @@ export function LoopForm({ loop }: { loop: LoopView }) {
           <div className="flex flex-col gap-2">
             <Label htmlFor="loop-prompt">What the agent is asked to do</Label>
             <p className="text-xs text-muted-foreground">
-              Copied from &ldquo;{workflow.name}&rdquo; when this loop was made, and yours now.
-              Editing it here changes nothing anywhere else, and a later version of that workflow
-              will not change it back.
+              {fresh
+                ? `Copied from “${workflow.name}”, and yours once you save. Editing it here changes nothing anywhere else, and a later version of that workflow will not change it back.`
+                : `Copied from “${workflow.name}” when this loop was made, and yours now. Editing it here changes nothing anywhere else, and a later version of that workflow will not change it back.`}
             </p>
             <Textarea
               id="loop-prompt"
@@ -432,9 +437,13 @@ export function LoopForm({ loop }: { loop: LoopView }) {
 
       <div className="flex items-center gap-2">
         <Button onClick={save} disabled={saving}>
-          {saving ? "Saving..." : "Save loop"}
+          {saving ? (fresh ? "Adding..." : "Saving...") : fresh ? "Add loop" : "Save loop"}
         </Button>
-        <Button variant="ghost" onClick={() => navigate({ to: "/loops" })} disabled={saving}>
+        <Button
+          variant="ghost"
+          onClick={() => navigate({ to: fresh ? "/loops/new" : "/loops" })}
+          disabled={saving}
+        >
           Cancel
         </Button>
       </div>

@@ -3,25 +3,10 @@ import { asc, eq, sql } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import type { SettingField } from "#/connectors/types.ts";
-import type { ConnectionSettings, LoopReadiness, LoopView } from "#/lib/domain.ts";
+import type { ConnectionSettings, LoopDraft, LoopReadiness, LoopView } from "#/lib/domain.ts";
 import { listAgents } from "./agents.ts";
 import { db } from "./db/client.ts";
 import { connections, loops, type Loop } from "./db/schema.ts";
-
-export type LoopDraft = {
-  name: string;
-  connectorId: string;
-  workflowId: string;
-  prompt: string;
-  guidance: string | null;
-  agentId: string | null;
-  settings: ConnectionSettings;
-  actionConnectorId: string;
-  actionId: string;
-  actionTarget: ConnectionSettings;
-  pollEveryMs: number | null;
-  enabled: boolean;
-};
 
 const NAME_LIMIT = 80;
 const PROMPT_LIMIT = 8000;
@@ -115,6 +100,16 @@ function validate(draft: LoopDraft): LoopDraft {
   const guidance = draft.guidance?.trim() || null;
   if (guidance && guidance.length > GUIDANCE_LIMIT) {
     throw new Error(`Keep the guidance under ${GUIDANCE_LIMIT} characters.`);
+  }
+
+  // A job that works in a checkout cannot be told which one later: it would
+  // sit enabled, come round on time and fail at the last step every time.
+  // Caught while the person is still looking at the box.
+  if (workflow.runsIn === "folder" || workflow.runsIn === "checkout") {
+    const folder = draft.settings.folder;
+    if (typeof folder !== "string" || folder.trim() === "") {
+      throw new Error("Say which folder this should work in.");
+    }
   }
 
   return {
@@ -218,34 +213,6 @@ export function moveLoop(id: string, direction: "up" | "down"): LoopView[] {
     tx.update(loops).set({ priority: moving.priority }).where(eq(loops.id, neighbour.id)).run();
   });
   return listLoops();
-}
-
-/**
- * Turn on one of a connector's workflows. Everything a workflow needs it
- * already declares a default for, so this is the whole of "adding a loop" in
- * the common case, and the form is only for changing one afterwards.
- */
-export function createLoopFromWorkflow(connectorId: string, workflowId: string): LoopView {
-  const workflow = connectorWorkflow(connectorId, workflowId);
-  if (!workflow) throw new Error(`Unknown workflow: ${workflowId}`);
-  return createLoop({
-    name: workflow.name,
-    connectorId,
-    workflowId,
-    // All taken once, here. From now on they are the loop's, and improving
-    // the workflow will not reword an existing loop or move where it writes.
-    prompt: workflow.prompt,
-    guidance: null,
-    agentId: null,
-    settings: {},
-    // Where it reads, unless the workflow says otherwise. A connector that
-    // only reads has no action of its own to fall back to.
-    actionConnectorId: workflow.actionConnectorId ?? connectorId,
-    actionId: workflow.actionId,
-    actionTarget: workflow.actionTarget ?? {},
-    pollEveryMs: workflow.pollEveryMs ?? null,
-    enabled: true,
-  });
 }
 
 /**
