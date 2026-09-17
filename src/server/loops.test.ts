@@ -140,6 +140,10 @@ describe("a loop that has to work somewhere", () => {
     // name and nothing to refuse.
     expect(() => added("github", "github.review_requested")).not.toThrow();
   });
+
+  it("does not ask for a local clone when the agent will clone the repository", () => {
+    expect(() => added("github", "github.issue_implement")).not.toThrow();
+  });
 });
 
 describe("choosing where a loop writes", () => {

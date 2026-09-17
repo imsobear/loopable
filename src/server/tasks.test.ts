@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { hostname as osHostname } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,7 @@ import type { ConnectionSettings } from "#/lib/domain.ts";
 const home = mkdtempSync(join(tmpdir(), "loopable-tasks-"));
 process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
+process.env.LOOPABLE_KEYCHAIN = "0";
 
 /** Every write any connector was asked to make, in order. */
 type Write = {
@@ -19,7 +21,7 @@ type Write = {
   source: ActionSource;
   body: string;
   comments: unknown[];
-  changes?: { dir: string; branch: string; base: string; repo: string; stat: string };
+  changes?: { branch: string; base: string; repo: string; stat: string };
   credential: unknown;
 };
 const writes: Write[] = [];
@@ -32,6 +34,8 @@ let ranIn = "";
 let agentDoes: ((cwd: string) => void) | null = null;
 /** Makes the write fail, for the tests about what survives one. */
 let failWrite: string | null = null;
+/** Extra fields the connector should add to the work item. */
+let workItem: Record<string, unknown> = {};
 
 // Two connectors, told apart by which one is asked, because the whole point
 // here is that reading and writing need not be the same one.
@@ -45,7 +49,15 @@ vi.mock("#/connectors/runtimes.ts", () => ({
       url: "https://github.com/acme/web/pull/7",
       carry: { secret: `${id} only` },
       commentable: { "src/a.ts": [4] },
-      context: [{ name: "CHANGES.md", body: "the diff" }],
+      checkout: {
+        url: "https://github.com/acme/web.git",
+        ref: "pull/7/head",
+        sha: "abc123",
+        base: "main",
+        repo: "acme/web",
+      },
+      context: [{ name: "PULL_REQUEST.md", body: "the pull request" }],
+      ...workItem,
     }),
     applyAction: async (input: Omit<Write, "connectorId">) => {
       writes.push({ connectorId: id, ...input, comments: input.comments ?? [] });
@@ -76,10 +88,19 @@ vi.mock("./agents.ts", () => ({
 }));
 
 const { db } = await import("./db/client.ts");
-const { loops, tasks } = await import("./db/schema.ts");
-const { enqueueTask, runTask } = await import("./tasks.ts");
+const { loops, runners, tasks } = await import("./db/schema.ts");
+const { enqueueTask, getTask, jobForTask, runAssignedAgent, runTask, taskRow } = await import("./tasks.ts");
+const { getJoinToken, joinRunner } = await import("./runners.ts");
+const { branchFor } = await import("./checkout.ts");
 
 const LOOP_ID = "loop-under-test";
+
+async function driveTask(id: string) {
+  await runTask(id);
+  await runAssignedAgent(id);
+  if (taskRow(id)?.state === "applying") await runTask(id);
+  return getTask(id)!;
+}
 
 /** Nothing like the workflow's own words, so the two cannot be confused. */
 const PROMPT = "Only say whether the lockfile changed.";
@@ -105,15 +126,24 @@ function givenLoop(action: {
     .run();
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   db().delete(tasks).run();
   db().delete(loops).run();
+  db().delete(runners).run();
   writes.length = 0;
   said = "";
   asked = "";
   ranIn = "";
   agentDoes = null;
   failWrite = null;
+  workItem = {};
+  await joinRunner({
+    joinToken: await getJoinToken(),
+    hostname: osHostname(),
+    inventory: [
+      { agentId: "cursor-agent", installed: true, version: "1", signedIn: true, detail: "ok" },
+    ],
+  });
 });
 
 describe("what the agent is asked", () => {
@@ -128,10 +158,63 @@ describe("what the agent is asked", () => {
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
     });
-    await runTask(queued.id);
+    await driveTask(queued.id);
 
     expect(asked).toContain(PROMPT);
     expect(asked).not.toContain("the way an experienced engineer on this team would");
+  });
+
+  it("puts clone instructions in the prompt, not on the job", async () => {
+    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    said = "Looks right.";
+
+    const queued = enqueueTask({
+      loopId: LOOP_ID,
+      url: "https://github.com/acme/web/pull/7",
+      dryRun: false,
+    });
+    await runTask(queued.id);
+    const job = await jobForTask(queued.id);
+
+    expect("clone" in job).toBe(false);
+    expect("runsIn" in job).toBe(false);
+    expect(job.cwd).toBeUndefined();
+    expect(job.prompt).toContain("Read PULL_REQUEST.md first.");
+    expect(job.prompt).toContain("Clone https://github.com/acme/web.git");
+    expect(job.prompt).toContain("pull/7/head");
+    expect(job.prompt).toContain("Do not commit or push");
+    expect(job.settings.permissionMode).toBe("workspace_write");
+  });
+
+  it("names a host folder as cwd and leaves the rest to the prompt", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "loopable-folder-"));
+    db()
+      .insert(loops)
+      .values({
+        id: LOOP_ID,
+        name: "Ask the bot",
+        priority: 1,
+        connectorId: "wechat",
+        workflowId: "wechat.ask",
+        prompt: "Answer them.",
+        settings: { folder },
+        actionConnectorId: "wechat",
+        actionId: "wechat.reply",
+        actionTarget: {},
+      })
+      .run();
+
+    const queued = enqueueTask({
+      loopId: LOOP_ID,
+      url: "https://github.com/acme/web/pull/7",
+      dryRun: true,
+    });
+    await runTask(queued.id);
+    const job = await jobForTask(queued.id);
+
+    expect("runsIn" in job).toBe(false);
+    expect(job.cwd).toBe(folder);
+    expect(job.prompt).toContain(`Read ${join(home, "runs", queued.id, "PULL_REQUEST.md")} first.`);
   });
 });
 
@@ -148,7 +231,7 @@ describe("runTask", () => {
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
     });
-    const done = await runTask(queued.id);
+    const done = await driveTask(queued.id);
 
     expect(writes).toHaveLength(1);
     const write = writes[0]!;
@@ -181,7 +264,7 @@ describe("runTask", () => {
       .where(eq(tasks.id, queued.id))
       .run();
 
-    const done = await runTask(queued.id);
+    const done = await driveTask(queued.id);
 
     expect(done.state).toBe("done");
     expect(done.error).toBeNull();
@@ -205,7 +288,7 @@ describe("runTask", () => {
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
     });
-    const done = await runTask(queued.id);
+    const done = await driveTask(queued.id);
 
     const write = writes[0]!;
     expect(write.connectorId).toBe("wechat");
@@ -237,7 +320,7 @@ describe("runTask", () => {
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
     });
-    await runTask(queued.id);
+    await driveTask(queued.id);
 
     expect(writes[0]!.source.carry).toBeUndefined();
   });
@@ -255,7 +338,7 @@ describe("runTask", () => {
       .update(loops)
       .set({ actionConnectorId: "wechat", actionId: "wechat.reply" })
       .run();
-    await runTask(queued.id);
+    await driveTask(queued.id);
 
     expect(writes[0]!.connectorId).toBe("github");
   });
@@ -263,7 +346,7 @@ describe("runTask", () => {
 
 describe("a loop that writes code", () => {
   let root: string;
-  let clone: string;
+  let origin: string;
 
   function git(cwd: string, ...args: string[]): string {
     return execFileSync("git", args, {
@@ -273,7 +356,6 @@ describe("a loop that writes code", () => {
     }).trim();
   }
 
-  /** The loop names a clone; the work happens in a worktree cut from it. */
   function givenCodeLoop(): void {
     db()
       .insert(loops)
@@ -284,7 +366,7 @@ describe("a loop that writes code", () => {
         connectorId: "github",
         workflowId: "github.issue_implement",
         prompt: PROMPT,
-        settings: { folder: clone },
+        settings: {},
         actionConnectorId: "github",
         actionId: "github.open_pull_request",
         actionTarget: {},
@@ -302,17 +384,25 @@ describe("a loop that writes code", () => {
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), "loopable-code-"));
-    const origin = join(root, "origin.git");
-    clone = join(root, "clone");
+    origin = join(root, "origin.git");
     mkdirSync(origin, { recursive: true });
     git(origin, "init", "--bare", "--initial-branch=main", ".");
-    git(root, "clone", "--quiet", origin, "clone");
-    git(clone, "config", "user.email", "t@localhost");
-    git(clone, "config", "user.name", "T");
-    writeFileSync(join(clone, "README.md"), "hello\n");
-    git(clone, "add", "-A");
-    git(clone, "commit", "--quiet", "-m", "first");
-    git(clone, "push", "--quiet", "origin", "main");
+    const seed = join(root, "seed");
+    git(root, "clone", "--quiet", origin, "seed");
+    git(seed, "config", "user.email", "t@localhost");
+    git(seed, "config", "user.name", "T");
+    writeFileSync(join(seed, "README.md"), "hello\n");
+    git(seed, "add", "-A");
+    git(seed, "commit", "--quiet", "-m", "first");
+    git(seed, "push", "--quiet", "origin", "main");
+    workItem = {
+      kind: "issue",
+      ref: "acme/web#7",
+      title: "Add a feature",
+      url: "https://github.com/acme/web/issues/7",
+      context: [{ name: "ISSUE.md", body: "the issue" }],
+      checkout: { url: origin, ref: "main", base: "main", repo: "acme/web" },
+    };
     givenCodeLoop();
   });
 
@@ -320,74 +410,79 @@ describe("a loop that writes code", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it("hands the action a branch with the work committed on it", async () => {
-    agentDoes = (cwd) => writeFileSync(join(cwd, "feature.ts"), "export const x = 1;\n");
+  function pushAsAgent(branch: string, file: string, body: string) {
+    return (cwd: string) => {
+      git(cwd, "clone", "--quiet", origin, "repo");
+      const repo = join(cwd, "repo");
+      git(repo, "config", "user.email", "a@localhost");
+      git(repo, "config", "user.name", "Agent");
+      git(repo, "checkout", "-B", branch);
+      writeFileSync(join(repo, file), body);
+      git(repo, "add", "-A");
+      git(repo, "commit", "--quiet", "-m", "Add the feature");
+      git(repo, "push", "--quiet", "origin", `HEAD:refs/heads/${branch}`);
+    };
+  }
+
+  it("tells the agent which branch to push, then opens a pull request for it", async () => {
+    const queued = queue();
+    const branch = branchFor({ ref: "acme/web#7", taskId: queued.id });
+    agentDoes = pushAsAgent(branch, "feature.ts", "export const x = 1;\n");
     said = "Add the feature\n\nIt does the thing.";
 
-    const done = await runTask(queue().id);
+    const done = await driveTask(queued.id);
 
+    expect(asked).toContain(`Clone ${origin}`);
+    expect(asked).toContain(branch);
     expect(done.state).toBe("done");
-    const changes = writes[0]!.changes!;
-    expect(changes.branch).toMatch(/^loopable\//);
-    expect(changes.base).toBe("main");
-    expect(changes.stat).toContain("feature.ts");
-
-    // Read from the clone rather than the worktree, which is taken away once
-    // the work has landed. Removing a worktree leaves its branch behind, and
-    // the branch is what was handed over.
-    expect(git(clone, "log", "-1", "--format=%s", changes.branch)).toBe("Add the feature");
-    expect(git(clone, "show", "--name-only", "--format=", changes.branch)).toBe("feature.ts");
-    // Built on the remote's tip, so it merges back cleanly.
-    expect(git(clone, "log", "-1", "--format=%s", `${changes.branch}~1`)).toBe("first");
+    expect(writes[0]!.changes).toMatchObject({
+      branch,
+      base: "main",
+      repo: "acme/web",
+    });
+    expect(git(origin, "log", "-1", "--format=%s", branch)).toBe("Add the feature");
+    expect(git(origin, "log", "-1", "--format=%s", "main")).toBe("first");
   });
 
-  it("runs the agent in the worktree and not in the person's own checkout", async () => {
-    agentDoes = (cwd) => writeFileSync(join(cwd, "feature.ts"), "x\n");
+  it("leaves git to the agent", async () => {
+    const queued = queue();
+    agentDoes = pushAsAgent(
+      branchFor({ ref: "acme/web#7", taskId: queued.id }),
+      "feature.ts",
+      "x\n",
+    );
     said = "Add the feature";
 
-    await runTask(queue().id);
+    await runTask(queued.id);
+    expect("clone" in (await jobForTask(queued.id))).toBe(false);
+    await driveTask(queued.id);
 
-    expect(ranIn).not.toBe(clone);
-    // The thing this whole arrangement exists to protect.
-    expect(git(clone, "status", "--porcelain")).toBe("");
-    expect(existsSync(join(clone, "feature.ts"))).toBe(false);
-    expect(git(clone, "log", "-1", "--format=%s")).toBe("first");
+    expect(ranIn).not.toBe(origin);
+    expect(git(origin, "log", "-1", "--format=%s", "main")).toBe("first");
   });
 
-  it("says nothing changed rather than sending an empty pull request", async () => {
-    // The ordinary way this goes wrong: an agent describes work it did not do.
+  it("skips when the agent says there is nothing to do", async () => {
     agentDoes = null;
-    said = "Add the feature\n\nI have made the change.";
+    said = "NOTHING_TO_DO";
 
-    const done = await runTask(queue().id);
+    const done = await driveTask(queue().id);
 
     expect(done.state).toBe("skipped");
-    expect(done.output).toContain("Nothing was changed");
     expect(writes).toHaveLength(0);
   });
 
-  it("takes the worktree away once the work has landed", async () => {
-    agentDoes = (cwd) => writeFileSync(join(cwd, "feature.ts"), "x\n");
-    said = "Add the feature";
-
-    await runTask(queue().id);
-
-    expect(existsSync(writes[0]!.changes!.dir)).toBe(false);
-    expect(git(clone, "worktree", "list").split("\n")).toHaveLength(1);
-  });
-
-  it("keeps the worktree when the write failed, so a retry need not run the agent again", async () => {
-    agentDoes = (cwd) => writeFileSync(join(cwd, "feature.ts"), "x\n");
+  it("keeps the pushed branch when the write failed, so a retry need not run the agent again", async () => {
+    const queued = queue();
+    const branch = branchFor({ ref: "acme/web#7", taskId: queued.id });
+    agentDoes = pushAsAgent(branch, "feature.ts", "x\n");
     said = "Add the feature";
     failWrite = "GitHub said no";
 
-    const queued = queue();
+    await runTask(queued.id);
+    await runAssignedAgent(queued.id);
     await expect(runTask(queued.id)).rejects.toThrow("GitHub said no");
 
-    // The expensive half is done and saved, and the branch is still there.
-    const checkout = join(home, "runs", queued.id, "checkout");
-    expect(existsSync(checkout)).toBe(true);
-    expect(git(checkout, "log", "-1", "--format=%s")).toBe("Add the feature");
+    expect(git(origin, "log", "-1", "--format=%s", branch)).toBe("Add the feature");
 
     failWrite = null;
     agentDoes = () => {
@@ -395,6 +490,5 @@ describe("a loop that writes code", () => {
     };
     const done = await runTask(queued.id);
     expect(done.state).toBe("done");
-    expect(existsSync(checkout)).toBe(false);
   });
 });

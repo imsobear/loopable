@@ -2,13 +2,14 @@ import { CircleAlert, CirclePause, CirclePlay } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getRunnerState, pauseRunner } from "@/server/functions/tasks.ts";
+import { getEngineState, pauseEngine } from "@/server/functions/tasks.ts";
 import { cn } from "@/lib/utils";
 
 export type EngineState = {
-  daemonPid: number | null;
+  enginePid: number | null;
   paused: boolean;
   maxConcurrentRuns: number;
+  onlineRunners: number;
 };
 
 /**
@@ -20,7 +21,7 @@ function useEngineState(everyMs = 10_000) {
 
   const refresh = useCallback(async () => {
     try {
-      setEngine(await getRunnerState());
+      setEngine(await getEngineState());
     } catch {
       // A failed poll says nothing about the engine, only about this request.
     }
@@ -36,7 +37,7 @@ function useEngineState(everyMs = 10_000) {
 }
 
 /**
- * Runs happen in the daemon, so a queued task that never moves usually means
+ * Runs happen in the engine, so a queued task that never moves usually means
  * the engine is not there. Saying so is the difference between a queue and a
  * thing that quietly swallows work.
  *
@@ -52,12 +53,12 @@ export function EngineStatus() {
   // worse than no dot at all.
   if (!engine) return null;
 
-  const down = engine.daemonPid === null;
+  const down = engine.enginePid === null;
 
   const toggle = async () => {
     setBusy(true);
     try {
-      await pauseRunner({ data: { paused: !engine.paused } });
+      await pauseEngine({ data: { paused: !engine.paused } });
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -109,12 +110,16 @@ export function EngineStatus() {
         {down ? (
           <>
             Queued tasks will wait. Start it with{" "}
-            <code className="rounded bg-muted px-1 py-0.5">pnpm daemon</code>.
+            <code className="rounded bg-muted px-1 py-0.5">pnpm engine</code>.
           </>
         ) : engine.paused ? (
           "Nothing will run until you start it again."
         ) : (
-          `${engine.maxConcurrentRuns} run${engine.maxConcurrentRuns === 1 ? "" : "s"} at a time.`
+          `${engine.maxConcurrentRuns} run${engine.maxConcurrentRuns === 1 ? "" : "s"} at a time${
+            engine.onlineRunners > 0
+              ? ` · ${engine.onlineRunners} runner${engine.onlineRunners === 1 ? "" : "s"} online`
+              : ""
+          }.`
         )}
       </p>
     </div>

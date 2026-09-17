@@ -1,4 +1,3 @@
-import { originUrl, pushBranch } from "#/server/git.ts";
 import { defineRuntime } from "../define.ts";
 import type { ActionSource, ConnectorAccount } from "../types.ts";
 import { oauthAppRegistration } from "../oauth-app.ts";
@@ -54,20 +53,6 @@ function namedRef(url: string): { repo: string; number: number } {
   const parsed = parseGithubUrl(url);
   if (!parsed) throw new Error(`That is not a GitHub issue or pull request: ${url}`);
   return { repo: parsed.repo, number: parsed.number };
-}
-
-/**
- * Which repository a clone on disk belongs to.
- *
- * Read from the clone rather than asked of the loop, because the loop already
- * answered it by naming the folder. Anything else would let a change made
- * against one repository be opened on another.
- */
-async function repoFromOrigin(repo: string): Promise<string> {
-  const url = await originUrl(repo);
-  const match = /github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/.exec(url);
-  if (!match) throw new Error(`${repo} does not push to GitHub: its origin is ${url}`);
-  return match[1]!;
 }
 
 /** The agent was asked for a subject line first, so this is that line. */
@@ -172,18 +157,14 @@ export const githubRuntime = defineRuntime({
     }
     if (actionId === "github.open_pull_request") {
       if (!changes) throw new Error("There is no branch to open a pull request for.");
-      const repo = await repoFromOrigin(changes.repo);
+      const repo = changes.repo;
+      if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) {
+        throw new Error(`Not a GitHub repository: ${repo}`);
+      }
 
-      await pushBranch({
-        dir: changes.dir,
-        url: `https://github.com/${repo}.git`,
-        branch: changes.branch,
-        token: accessToken,
-      });
+      // The agent already pushed with the machine's git. This is only the
+      // Connection writing a pull request through the API.
 
-      // The same branch pushed twice is a retry, not a second change. GitHub
-      // refuses a duplicate pull request, and the one already open is now
-      // updated, which is the answer a person wanted anyway.
       const owner = repo.split("/")[0]!;
       const existing = await pullForBranch(accessToken, repo, owner, changes.branch);
       if (existing) return { url: existing.html_url };

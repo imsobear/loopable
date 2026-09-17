@@ -5,6 +5,7 @@ import type {
   ConnectionSettings,
   ConnectionStatus,
   JsonValue,
+  RunnerInventoryEntry,
   WorkItemKind,
   TaskState,
 } from "#/lib/domain.ts";
@@ -83,12 +84,13 @@ export const tasks = sqliteTable(
     sourcePayload: text("source_payload", { mode: "json" }).$type<JsonValue>(),
     /**
      * Identifying a link needs no network, but the title does, so it arrives
-     * when the worker fetches rather than when the task is queued.
+     * when the engine fetches rather than when the task is queued.
      */
     sourceTitle: text("source_title"),
     /** Set when a run was asked to stop before writing anything. */
     dryRun: integer("dry_run", { mode: "boolean" }).notNull().default(false),
     agentId: text("agent_id"),
+    runnerId: text("runner_id"),
     agentCommand: text("agent_command"),
     /** What the agent produced, which is also what gets written back. */
     output: text("output"),
@@ -117,7 +119,7 @@ export const tasks = sqliteTable(
     logPath: text("log_path"),
 
     // Queue bookkeeping. The work happens in another process, so a task has to
-    // carry enough state for the worker to be interrupted at any moment.
+    // carry enough state for the engine to be interrupted at any moment.
     attempts: integer("attempts").notNull().default(0),
     /** Not claimable before this: how a retry backs off. */
     runAfter: integer("run_after", { mode: "timestamp_ms" })
@@ -125,7 +127,7 @@ export const tasks = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
     /**
      * A claim that expires. Whoever holds it renews it while working, so a
-     * task whose worker died can be told apart from one still being worked on.
+     * task whose engine died can be told apart from one still being worked on.
      */
     leaseUntil: integer("lease_until", { mode: "timestamp_ms" }),
     cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
@@ -147,7 +149,7 @@ export const tasks = sqliteTable(
   (table) => [
     index("tasks_loop_idx").on(table.loopId),
     index("tasks_created_idx").on(table.createdAt),
-    /** The worker's only question: what can I claim right now? */
+    /** The engine's only question: what can I claim right now? */
     index("tasks_claim_idx").on(table.state, table.runAfter),
     uniqueIndex("tasks_dedupe_idx").on(table.dedupeKey),
   ],
@@ -281,8 +283,8 @@ export const signals = sqliteTable(
 );
 
 /**
- * Agents are discovered on the machine every time, so nothing about their
- * presence is stored. Only the choices a person makes live here.
+ * Agents are discovered on each runner, so nothing about their presence is
+ * stored here. Only the choices a person makes live in this table.
  */
 export const agentSettings = sqliteTable("agent_settings", {
   agentId: text("agent_id").primaryKey(),
@@ -303,6 +305,21 @@ export const appSettings = sqliteTable("app_settings", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * A joined runner that can run agents.
+ */
+export const runners = sqliteTable("runners", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  hostname: text("hostname").notNull(),
+  status: text("status").$type<"online" | "offline">().notNull().default("offline"),
+  inventory: text("inventory", { mode: "json" }).$type<RunnerInventoryEntry[]>().notNull().default([]),
+  lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export type Task = typeof tasks.$inferSelect;
 export type Loop = typeof loops.$inferSelect;
 export type Signal = typeof signals.$inferSelect;
@@ -310,3 +327,4 @@ export type NewLoop = typeof loops.$inferInsert;
 export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;
 export type AuthAttempt = typeof authAttempts.$inferSelect;
+export type Runner = typeof runners.$inferSelect;

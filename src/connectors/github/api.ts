@@ -39,6 +39,7 @@ export type PullRequest = {
   html_url: string;
   user: { login: string };
   head: { sha: string };
+  base: { ref: string };
   changed_files: number;
 };
 
@@ -65,6 +66,16 @@ export function getPull(accessToken: string, repo: string, number: number): Prom
 
 export function getIssue(accessToken: string, repo: string, number: number): Promise<Issue> {
   return request<Issue>(accessToken, `/repos/${repo}/issues/${number}`);
+}
+
+export type GithubRepo = {
+  full_name: string;
+  default_branch: string;
+  clone_url: string;
+};
+
+export function getRepo(accessToken: string, repo: string): Promise<GithubRepo> {
+  return request<GithubRepo>(accessToken, `/repos/${repo}`);
 }
 
 export function listPullFiles(

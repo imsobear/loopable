@@ -213,17 +213,17 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
             label="Where the agent runs"
             value={
               workflow.runsIn === "checkout"
-                ? "In a scratch worktree cut from the folder this loop names"
+                ? "In a scratch directory; the prompt tells the agent to clone"
                 : workflow.runsIn === "folder"
                   ? "In the folder this loop names"
                   : "In a scratch directory holding only what it was given"
             }
             help={
               workflow.runsIn === "checkout"
-                ? "This job writes code, so it gets a checkout of its own. Your folder is only the source it is cut from: nothing is edited there, and anything you have uncommitted stays yours."
+                ? "The agent clones the repository with that machine's git. Loopable's GitHub account is not used to clone, and is only used afterwards to write the review or open the pull request."
                 : workflow.runsIn === "folder"
                   ? "This job reads real code to do its work, so it runs in a real checkout. It does not write there: anything it changed would be sitting in your working copy."
-                  : "Judging a change needs the change and nothing else, so the agent gets no checkout to wander into."
+                  : "The agent gets the files it was given and nothing else."
             }
           />
 
@@ -421,6 +421,9 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              The engine picks an online runner that has this agent signed in.
+            </p>
           </div>
 
           <div className="flex items-center justify-between gap-4 border-t pt-5">

@@ -7,7 +7,7 @@ import { cursorAgentManifest } from "./manifest.ts";
 
 async function binary(): Promise<string> {
   const found = await resolveBinary(cursorAgentManifest.binaries);
-  if (!found) throw new Error("The cursor-agent binary was not found on this machine.");
+  if (!found) throw new Error("The cursor-agent binary was not found on this host.");
   return found;
 }
 

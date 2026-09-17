@@ -169,11 +169,9 @@ describe("pushing", () => {
     writeFileSync(join(work, "new.txt"), "x\n");
     await commitAll({ dir: work, message: "a change" });
 
-    // A path is a valid remote, so the whole push runs for real.
-    await pushBranch({ dir: work, url: origin, branch: "loopable/x", token: "unused" });
+    await pushBranch({ dir: work, branch: "loopable/x" });
 
     expect(git(origin, "log", "-1", "--format=%s", "loopable/x")).toBe("a change");
-    // The line everyone else is working on is where it was.
     expect(git(origin, "log", "-1", "--format=%s", "main")).toBe("first");
   });
 
@@ -182,9 +180,8 @@ describe("pushing", () => {
     await addWorktree({ repo: clone, path: work, branch: "loopable/x", base: "main" });
     writeFileSync(join(work, "new.txt"), "x\n");
     await commitAll({ dir: work, message: "mine" });
-    await pushBranch({ dir: work, url: origin, branch: "loopable/x", token: "unused" });
+    await pushBranch({ dir: work, branch: "loopable/x" });
 
-    // Somebody else moves the branch on, and this run is now behind it.
     const theirs = join(root, "theirs");
     git(root, "clone", "--quiet", "-b", "loopable/x", origin, "theirs");
     git(theirs, "config", "user.email", "them@localhost");
@@ -196,32 +193,8 @@ describe("pushing", () => {
 
     writeFileSync(join(work, "more.txt"), "z\n");
     await commitAll({ dir: work, message: "mine again" });
-    await expect(
-      pushBranch({ dir: work, url: origin, branch: "loopable/x", token: "unused" }),
-    ).rejects.toThrow(/Could not push/);
+    await expect(pushBranch({ dir: work, branch: "loopable/x" })).rejects.toThrow(/Could not push/);
 
     expect(git(origin, "log", "-1", "--format=%s", "loopable/x")).toBe("theirs");
-  });
-
-  it("keeps the token out of anything it throws", async () => {
-    const work = join(root, "work");
-    await addWorktree({ repo: clone, path: work, branch: "loopable/x", base: "main" });
-    writeFileSync(join(work, "new.txt"), "x\n");
-    await commitAll({ dir: work, message: "a change" });
-
-    const token = "ghs_topsecretvalue";
-    const failed = await pushBranch({
-      dir: work,
-      url: `https://x-access-token:${token}@127.0.0.1:1/nope.git`,
-      branch: "loopable/x",
-      token,
-    }).catch((error: Error) => error.message);
-
-    // git redacts a URL in its own messages, so in practice this passes before
-    // the replacement in pushBranch does anything. Asserted anyway, because
-    // what matters is the property and not which layer happens to hold it: a
-    // failed push is written to the task log a person can open.
-    expect(failed).not.toContain(token);
-    expect(failed).toContain("Could not push");
   });
 });

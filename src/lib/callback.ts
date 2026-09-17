@@ -1,21 +1,25 @@
-/**
- * Providers that allow loopback redirects require the literal 127.0.0.1 rather
- * than "localhost", and a dev server usually advertises localhost, so callback
- * URLs are always rebuilt on the loopback literal with the port in use.
- */
 export function callbackUrl(requestUrl: string, connectorId: string): string {
   return `${appOrigin(requestUrl)}/api/connectors/${connectorId}/callback`;
 }
 
-/**
- * The URL to register with the provider. Loopback matching ignores the port, so
- * one portless registration covers every port Loopable might run on.
- */
 export function registrableCallbackUrl(connectorId: string): string {
+  const base = process.env.LOOPABLE_BASE_URL?.replace(/\/$/, "");
+  if (base) return `${base}/api/connectors/${connectorId}/callback`;
   return `http://127.0.0.1/api/connectors/${connectorId}/callback`;
 }
 
 export function appOrigin(requestUrl: string): string {
+  const base = process.env.LOOPABLE_BASE_URL?.replace(/\/$/, "");
+  if (base) return base;
   const url = new URL(requestUrl);
   return `http://127.0.0.1${url.port ? `:${url.port}` : ""}`;
+}
+
+export function isLoopbackHost(hostname: string): boolean {
+  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+}
+
+/** Where runners and people should address this Loopable. */
+export function loopableOrigin(): string {
+  return process.env.LOOPABLE_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:4321";
 }

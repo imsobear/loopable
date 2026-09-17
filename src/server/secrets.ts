@@ -113,3 +113,11 @@ export async function writeCredential(connectionId: string, credential: unknown)
 export async function deleteCredential(connectionId: string): Promise<void> {
   await secretStore().delete(connectionSecretKey(connectionId));
 }
+
+export function joinTokenKey(): string {
+  return "runners.join";
+}
+
+export function runnerTokenKey(runnerId: string): string {
+  return `runners.token.${runnerId}`;
+}

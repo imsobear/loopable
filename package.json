@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "vite dev --port 4321 --host 127.0.0.1",
-    "daemon": "node --experimental-strip-types src/daemon/main.ts",
+    "engine": "node --experimental-strip-types src/engine/main.ts",
+    "runner": "node --experimental-strip-types src/runner/main.ts",
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",

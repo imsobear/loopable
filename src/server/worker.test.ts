@@ -77,8 +77,8 @@ beforeEach(() => {
   db().delete(tasks).run();
   db().delete(loops).run();
   givenLoop();
-  writeSetting("runner.paused", false);
-  writeSetting("runner.maxConcurrentRuns", 1);
+  writeSetting("engine.paused", false);
+  writeSetting("engine.maxConcurrentRuns", 1);
 });
 
 describe("worker", () => {
@@ -116,7 +116,7 @@ describe("worker", () => {
     givenTask();
     givenTask();
     givenTask();
-    writeSetting("runner.maxConcurrentRuns", 2);
+    writeSetting("engine.maxConcurrentRuns", 2);
 
     let release = () => {};
     const holding = new Promise<void>((resolve) => {
@@ -137,7 +137,7 @@ describe("worker", () => {
 
   it("starts nothing while paused", async () => {
     givenTask();
-    writeSetting("runner.paused", true);
+    writeSetting("engine.paused", true);
     const agent = fakeRun(() => {});
 
     expect(await createWorker({ runTask: agent.run }).tick()).toBe(0);
@@ -230,6 +230,32 @@ describe("worker", () => {
     expect(taskById(id).state).toBe("preparing");
   });
 
+  it("does not take back an applying task that is waiting to be claimed", () => {
+    const id = givenTask({
+      state: "applying",
+      output: "Looks fine.",
+      attempts: 1,
+      leaseUntil: null,
+    });
+
+    expect(createWorker({}).reap()).toBe(0);
+    expect(taskById(id).state).toBe("applying");
+  });
+
+  it("applies a task a runner has already finished", async () => {
+    const id = givenTask({
+      state: "applying",
+      output: "Looks fine.",
+      leaseUntil: null,
+    });
+    const agent = fakeRun(() => {});
+    const worker = createWorker({ runTask: agent.run });
+
+    expect(await worker.tick()).toBe(1);
+    await worker.drain();
+    expect(agent.seen).toEqual([id]);
+  });
+
   /**
    * A person clicks Stop in the app, which is a different process, so the
    * request arrives as a column. The worker has to notice it while the run is
@@ -256,10 +282,10 @@ describe("worker", () => {
 
   /**
    * Shutting down also aborts whatever is running, but nobody asked for those
-   * to end, so they have to be waiting when the daemon comes back rather than
+   * to end, so they have to be waiting when the engine comes back rather than
    * recorded as though a person stopped them.
    */
-  it("queues again a run that only stopped because the daemon did", async () => {
+  it("queues again a run that only stopped because the engine did", async () => {
     const id = givenTask();
     const worker = createWorker({
       runTask: async (_id, signal) => {

@@ -1,5 +1,5 @@
 import { pollAllLoops, type PollReport } from "./signals.ts";
-import { runnerSettings } from "./settings.ts";
+import { engineSettings } from "./settings.ts";
 
 export type PollerOptions = {
   /** Swapped out in tests, where asking GitHub anything is not the point. */
@@ -36,7 +36,7 @@ export function createPoller(options: PollerOptions = {}) {
     // Pausing is about not spending money on agent runs, and looking costs
     // none, but a paused engine that keeps queueing work would hand back a
     // pile of it the moment it resumed.
-    if (runnerSettings().paused) return [];
+    if (engineSettings().paused) return [];
 
     busy = true;
     try {

@@ -24,6 +24,8 @@ export const getLoopsPage = createServerFn({ method: "GET" }).handler(async () =
   readiness: await loopReadiness(),
 }));
 
+export const getLoopReadiness = createServerFn({ method: "GET" }).handler(() => loopReadiness());
+
 export const getLoopById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
   .handler(({ data }) => getLoop(data.id));

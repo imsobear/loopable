@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { gapsFor } from "./gaps.ts";
+import { gapsFor, issuesFor } from "./gaps.ts";
 import type { LoopReadiness, LoopView } from "./domain.ts";
 
 const ready: LoopReadiness = {
   connectedConnectorIds: ["github", "wechat"],
   defaultAgentId: "cursor-agent",
-  installedAgentIds: ["cursor-agent"],
+  availableAgentIds: ["cursor-agent"],
+  hostAgentIds: ["cursor-agent"],
 };
 
 function loop(over: Partial<LoopView> = {}): LoopView {
@@ -52,19 +53,67 @@ describe("gapsFor", () => {
     ]);
   });
 
-  // Otherwise the first run of the app lists every loop twice under a heading
-  // that has already said the only thing worth saying.
   it("does not repeat itself per loop when nothing is connected at all", () => {
     const gaps = gapsFor({ ...ready, connectedConnectorIds: [] }, [loop(), loop({ id: "loop-2" })]);
     expect(gaps).toEqual(["No account is connected yet, so no signal can arrive."]);
   });
 
   it("separates having no agent from having one but not choosing it", () => {
-    expect(gapsFor({ ...ready, installedAgentIds: [], defaultAgentId: null }, [])).toEqual([
-      "No coding agent was found on this machine, so nothing can be prepared.",
-    ]);
+    expect(gapsFor({ ...ready, availableAgentIds: [], hostAgentIds: [], defaultAgentId: null }, [])).toEqual(
+      ["No coding agent is signed in on any runner, so nothing can be prepared."],
+    );
     expect(gapsFor({ ...ready, defaultAgentId: null }, [])).toEqual([
       "No default agent is chosen, so loops that do not name one cannot run.",
     ]);
+  });
+
+  it("names a loop whose agent is not signed in on any online runner", () => {
+    expect(gapsFor(ready, [loop({ agentId: "codex" })])).toEqual([
+      "Review my code uses Codex, which no online runner has signed in.",
+    ]);
+  });
+});
+
+describe("issuesFor", () => {
+  it("is silent for a loop that can run", () => {
+    expect(issuesFor(ready, loop())).toEqual([]);
+  });
+
+  it("is silent when the loop is off", () => {
+    expect(issuesFor(ready, loop({ enabled: false, agentId: "codex" }))).toEqual([]);
+  });
+
+  it("says so when the named agent has no online runner", () => {
+    expect(issuesFor(ready, loop({ agentId: "codex" }))).toEqual([
+      "Review my code uses Codex, which no online runner has signed in.",
+    ]);
+  });
+
+  it("lets a GitHub checkout loop run on a runner that is not this host", () => {
+    expect(
+      issuesFor(
+        { ...ready, hostAgentIds: [] },
+        loop({
+          name: "Implement things",
+          workflowId: "github.issue_implement",
+          actionId: "github.open_pull_request",
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("still pins a folder loop to a runner on this host", () => {
+    expect(
+      issuesFor(
+        { ...ready, hostAgentIds: [] },
+        loop({
+          name: "Daily look",
+          connectorId: "schedule",
+          workflowId: "schedule.recurring",
+          actionConnectorId: "wechat",
+          actionId: "wechat.reply",
+        }),
+      ),
+    ).toEqual(["Daily look needs a runner on this host with Cursor Agent signed in."]);
   });
 });

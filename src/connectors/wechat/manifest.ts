@@ -9,13 +9,13 @@ const folder: SettingField = {
   key: "folder",
   kind: "text",
   label: "Folder to work in",
-  help: "An absolute path to a checkout on this machine. The agent runs here, so it can read the code you are asking about.",
+  help: "An absolute path to a checkout on this host. The agent runs here, so it can read the code you are asking about.",
   placeholder: "/Users/you/code/your-project",
 };
 
 /**
  * A bot bound to your account can be messaged by other people, and this
- * workflow runs a coding agent on your machine. Answering only yourself is the
+ * workflow runs a coding agent on a runner. Answering only yourself is the
  * default because the alternative hands strangers your terminal.
  */
 const askers: SettingField = {
@@ -86,7 +86,7 @@ export const wechatManifest: ConnectorManifest = {
     {
       id: "wechat.ask",
       name: "Do what I ask the bot",
-      summary: "Runs your agent on your machine when you message the bot, and answers in the chat.",
+      summary: "Runs your agent on a runner when you message the bot, and answers in the chat.",
       trigger: "you send the bot a message",
       // No query to show: messages arrive on a stream rather than being found
       // by asking, so there is nothing here that could be checked.

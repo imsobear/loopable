@@ -1,4 +1,5 @@
 import { mkdtempSync } from "node:fs";
+import { hostname as osHostname } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +8,7 @@ import type { Signal } from "#/connectors/types.ts";
 const home = mkdtempSync(join(tmpdir(), "loopable-signals-"));
 process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
+process.env.LOOPABLE_KEYCHAIN = "0";
 
 /** What the fake connector will answer with on the next look. */
 let answer: Signal[] | Error = [];
@@ -45,8 +47,9 @@ vi.mock("./agents.ts", () => ({
 }));
 
 const { db } = await import("./db/client.ts");
-const { loops, signals, tasks } = await import("./db/schema.ts");
+const { loops, runners, signals, tasks } = await import("./db/schema.ts");
 const { pollAllLoops, loopPollState, runBacklog } = await import("./signals.ts");
+const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { asc, eq } = await import("drizzle-orm");
 
 function givenLoop(id: string, priority: number, repositories: string[] = []): void {
@@ -89,13 +92,21 @@ function signalsFor(loopId: string) {
     .all();
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   db().delete(tasks).run();
   db().delete(signals).run();
   db().delete(loops).run();
+  db().delete(runners).run();
   answer = [];
   triaged = '{"needsMe": []}';
   triageRuns = 0;
+  await joinRunner({
+    joinToken: await getJoinToken(),
+    hostname: osHostname(),
+    inventory: [
+      { agentId: "cursor-agent", installed: true, version: "1", signedIn: true, detail: "ok" },
+    ],
+  });
 });
 
 describe("the first look", () => {

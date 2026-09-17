@@ -29,7 +29,7 @@ const at: SettingField = {
   key: "at",
   kind: "text",
   label: "At",
-  help: "On a 24-hour clock, in this machine's own time zone. Only the minutes are used by an hourly loop.",
+  help: "On a 24-hour clock, in this host's own time zone. Only the minutes are used by an hourly loop.",
   placeholder: "09:00",
 };
 

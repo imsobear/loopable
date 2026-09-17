@@ -131,11 +131,10 @@ export type WorkflowDescriptor = {
   writes: string;
   /**
    * Where the agent runs. "temp" is a scratch directory holding the context
-   * files and nothing else, which is right for judging a diff. "folder" is a
-   * directory the loop names, for work that has to read the code around it;
-   * the loop supplies it under the `folder` setting. "checkout" is a worktree
-   * cut from that same folder, which is the only one of the three an agent may
-   * write in: the folder itself is where somebody works.
+   * files and nothing else. "folder" is a directory the loop names, for work
+   * that has to read a path that only exists on one machine. "checkout" means
+   * the prompt tells the agent to clone the repository and work there.
+   * The Connection is never used to clone.
    */
   runsIn?: "temp" | "folder" | "checkout";
   /** The knobs a loop may set, in the connector's own words. */
@@ -281,6 +280,18 @@ export type WorkItem = WorkItemRef & {
    */
   commentable?: Commentable;
   /**
+   * Where the agent should clone, with no credentials in it. Used to write the
+   * prompt and to open a pull request afterwards. Absent when the agent does
+   * not need the repository.
+   */
+  checkout?: {
+    url: string;
+    ref: string;
+    sha?: string;
+    base: string;
+    repo: string;
+  };
+  /**
    * Whatever the write will need and cannot look up again: the token that says
    * which conversation a reply belongs to, and the like. Set when the item is
    * resolved and handed back untouched at `applyAction`.
@@ -294,19 +305,15 @@ export type ActionOutcome = {
 };
 
 /**
- * Work an agent has done in a worktree, committed and ready to go somewhere.
- *
- * `repo` is the checkout it was cut from, and its `origin` is where this
- * belongs. Which means an action never has to be told what to push to: the
- * loop already said, when it named the folder to work in.
+ * Work an agent has done in a clone, committed and pushed, ready for an action
+ * that opens a pull request. `repo` is `owner/name` on the service, not a path
+ * on disk. The agent already pushed; the Engine only writes through the API.
  */
 export type Changes = {
-  /** The worktree. Its HEAD is the commit to send. */
-  dir: string;
   branch: string;
   /** What it was cut from, and what a pull request would merge into. */
   base: string;
-  /** The repository on disk that owns the worktree. */
+  /** `owner/name` on GitHub. */
   repo: string;
   /** `git diff --stat`, for saying how big this is without reading it. */
   stat: string;
@@ -434,9 +441,9 @@ export type ConnectorRuntime = {
     /** Anchored comments, already checked against the diff by the caller. */
     comments?: Finding[];
     /**
-     * A committed worktree waiting to be sent somewhere, for the actions whose
-     * answer is code. Absent for every other shape, and the action says so by
-     * not accepting "code".
+     * A branch the agent already pushed, for the actions whose answer is
+     * code. Absent for every other shape, and the action says so by not
+     * accepting "code".
      */
     changes?: Changes;
     credential: unknown;

@@ -1,7 +1,7 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleAlert, Plus, Trash2 } from "lucide-react";
 import { ConnectorIcon } from "@/components/connector-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { agentManifest } from "@/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
 import type { LoopReadiness, LoopView } from "@/lib/domain.ts";
-import { gapsFor } from "@/lib/gaps.ts";
+import { gapsFor, issuesFor } from "@/lib/gaps.ts";
+import { useLiveRefresh } from "@/components/use-live-tasks.ts";
 import { getLoopsPage, removeLoop, reorderLoop, toggleLoop } from "@/server/functions/loops.ts";
 
 export const Route = createFileRoute("/loops/")({
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/loops/")({
 
 function LoopsPage() {
   const { loops, readiness } = Route.useLoaderData();
+  useLiveRefresh();
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,6 +59,7 @@ function LoopsPage() {
         <LoopCard
           key={loop.id}
           loop={loop}
+          readiness={readiness}
           position={index + 1}
           first={index === 0}
           last={index === loops.length - 1}
@@ -85,6 +88,9 @@ function Gaps({ readiness, loops }: { readiness: LoopReadiness; loops: LoopView[
           <Link to="/agents" className="underline">
             Agents
           </Link>
+          <Link to="/runners" className="underline">
+            Runners
+          </Link>
         </span>
       </AlertDescription>
     </Alert>
@@ -111,11 +117,13 @@ function writesOf(loop: LoopView): string {
 
 function LoopCard({
   loop,
+  readiness,
   position,
   first,
   last,
 }: {
   loop: LoopView;
+  readiness: LoopReadiness;
   position: number;
   first: boolean;
   last: boolean;
@@ -123,9 +131,8 @@ function LoopCard({
   const router = useRouter();
   const manifest = connectorManifest(loop.connectorId);
   const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
-  // Named only when the loop pins one; otherwise the default is the story and
-  // it is told on the agents page rather than here.
   const agent = loop.agentId ? agentManifest(loop.agentId) : undefined;
+  const issues = issuesFor(readiness, loop);
   const [busy, setBusy] = useState(false);
 
   const run = async (work: () => Promise<unknown>, message?: string) => {
@@ -154,12 +161,19 @@ function LoopCard({
               {loop.name}
             </Link>
             {loop.enabled ? null : <Badge variant="secondary">Off</Badge>}
+            {issues.length > 0 ? <Badge variant="outline">Cannot run</Badge> : null}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {workflow
               ? `When ${workflow.trigger}, ${writesOf(loop)}${agent ? `, using ${agent.name}` : ""}.`
               : `Built on ${loop.workflowId}, which is no longer offered.`}
           </p>
+          {issues.length > 0 ? (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-500">
+              <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
+              {issues[0]}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-1">
           <Button

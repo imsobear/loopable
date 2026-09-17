@@ -99,6 +99,7 @@ function givenGithub(options: {
           html_url: `https://github.com/${pull[1]}/pull/${pull[2]}`,
           user: { login: "someone" },
           head: { sha: fake.sha ?? "abc123" },
+          base: { ref: "main" },
           changed_files: fake.changed_files ?? 3,
         }),
         { status: 200 },

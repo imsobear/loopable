@@ -13,7 +13,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { connectorManifest } from "@/connectors/manifests.ts";
 import type { LoopPollState } from "@/lib/domain.ts";
-import { getLoopById, getLoopPollState, runLoopBacklog } from "@/server/functions/loops.ts";
+import { issuesFor } from "@/lib/gaps.ts";
+import { useLiveRefresh } from "@/components/use-live-tasks.ts";
+import { getLoopById, getLoopPollState, getLoopReadiness, runLoopBacklog } from "@/server/functions/loops.ts";
 import { getLoopTasks, runLoopNow } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/loops/$loopId")({
@@ -24,13 +26,16 @@ export const Route = createFileRoute("/loops/$loopId")({
       loop,
       tasks: await getLoopTasks({ data: { loopId: params.loopId } }),
       poll: await getLoopPollState({ data: { id: params.loopId } }),
+      readiness: await getLoopReadiness(),
     };
   },
   component: LoopPage,
 });
 
 function LoopPage() {
-  const { loop, tasks, poll } = Route.useLoaderData();
+  const { loop, tasks, poll, readiness } = Route.useLoaderData();
+  useLiveRefresh();
+  const issues = issuesFor(readiness, loop);
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,6 +47,18 @@ function LoopPage() {
         Loops
       </Link>
       <h1 className="text-2xl font-semibold tracking-tight">{loop.name}</h1>
+
+      {issues.length > 0 ? (
+        <Alert>
+          <CircleAlert />
+          <AlertTitle>This loop cannot run yet</AlertTitle>
+          <AlertDescription className="flex flex-col gap-1">
+            {issues.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Watching loop={loop} poll={poll} />
 

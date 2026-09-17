@@ -17,29 +17,29 @@ export function writeSetting(key: string, value: JsonValue): void {
 }
 
 /**
- * How hard the worker is allowed to pull. One run at a time by default,
+ * How hard the engine is allowed to pull. One run at a time by default,
  * because an agent run is minutes of CPU and real money, and two of them
  * racing is rarely what anyone wanted.
  */
-export type RunnerSettings = {
+export type EngineSettings = {
   paused: boolean;
   maxConcurrentRuns: number;
 };
 
-export const RUNNER_DEFAULTS: RunnerSettings = { paused: false, maxConcurrentRuns: 1 };
+export const ENGINE_DEFAULTS: EngineSettings = { paused: false, maxConcurrentRuns: 1 };
 
-const PAUSED_KEY = "runner.paused";
-const CONCURRENCY_KEY = "runner.maxConcurrentRuns";
+const PAUSED_KEY = "engine.paused";
+const CONCURRENCY_KEY = "engine.maxConcurrentRuns";
 
-export function runnerSettings(): RunnerSettings {
-  const concurrency = readSetting<number>(CONCURRENCY_KEY, RUNNER_DEFAULTS.maxConcurrentRuns);
+export function engineSettings(): EngineSettings {
+  const concurrency = readSetting<number>(CONCURRENCY_KEY, ENGINE_DEFAULTS.maxConcurrentRuns);
   return {
-    paused: readSetting<boolean>(PAUSED_KEY, RUNNER_DEFAULTS.paused) === true,
+    paused: readSetting<boolean>(PAUSED_KEY, ENGINE_DEFAULTS.paused) === true,
     maxConcurrentRuns: Number.isFinite(concurrency) && concurrency > 0 ? Math.floor(concurrency) : 1,
   };
 }
 
-export function setRunnerPaused(paused: boolean): RunnerSettings {
+export function setEnginePaused(paused: boolean): EngineSettings {
   writeSetting(PAUSED_KEY, paused);
-  return runnerSettings();
+  return engineSettings();
 }

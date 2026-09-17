@@ -222,7 +222,7 @@ function AgentLog({ log, live }: { log: string; live: boolean }) {
 }
 
 /**
- * The run is in the other process, so this only leaves a note. The daemon
+ * The run is in the other process, so this only leaves a note. The engine
  * sees it when it next renews its claim, which is why the button says it has
  * been asked for rather than pretending it is already done.
  */

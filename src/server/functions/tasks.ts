@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { runningDaemonPid } from "../../daemon/instance.ts";
+import { runningEnginePid } from "../../engine/instance.ts";
 import { enqueueTask, getTask, listTasks, readTaskLog, requestCancel } from "../tasks.ts";
-import { runnerSettings, setRunnerPaused } from "../settings.ts";
+import { engineSettings, setEnginePaused } from "../settings.ts";
+import { onlineRunnerCount } from "../runners.ts";
 
 export const getInbox = createServerFn({ method: "GET" }).handler(() => listTasks());
 
@@ -26,11 +27,12 @@ export const stopTask = createServerFn({ method: "POST" })
   .handler(({ data }) => requestCancel(data.id));
 
 /** Whether the engine is up, and how hard it is allowed to pull. */
-export const getRunnerState = createServerFn({ method: "GET" }).handler(() => ({
-  daemonPid: runningDaemonPid(),
-  ...runnerSettings(),
+export const getEngineState = createServerFn({ method: "GET" }).handler(() => ({
+  enginePid: runningEnginePid(),
+  onlineRunners: onlineRunnerCount(),
+  ...engineSettings(),
 }));
 
-export const pauseRunner = createServerFn({ method: "POST" })
+export const pauseEngine = createServerFn({ method: "POST" })
   .inputValidator((data: { paused: boolean }) => data)
-  .handler(({ data }) => setRunnerPaused(data.paused));
+  .handler(({ data }) => setEnginePaused(data.paused));

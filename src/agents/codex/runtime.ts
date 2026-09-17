@@ -7,7 +7,7 @@ import { codexManifest } from "./manifest.ts";
 
 async function binary(): Promise<string> {
   const found = await resolveBinary(codexManifest.binaries);
-  if (!found) throw new Error("The codex binary was not found on this machine.");
+  if (!found) throw new Error("The codex binary was not found on this host.");
   return found;
 }
 

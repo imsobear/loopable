@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bot, Inbox, Plug, Settings, Workflow } from "lucide-react";
+import { Bot, Inbox, Plug, Server, Settings, Workflow } from "lucide-react";
 import { LoopableMark } from "@/components/brand";
 import { EngineStatus } from "@/components/engine-status";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ const WORK: NavItem[] = [
 const SETUP: NavItem[] = [
   { label: "Connectors", to: "/connectors", icon: Plug },
   { label: "Agents", to: "/agents", icon: Bot },
+  { label: "Runners", to: "/runners", icon: Server },
   { label: "Settings", icon: Settings, soon: true },
 ];
 

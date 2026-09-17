@@ -1,6 +1,6 @@
 import type { Commentable } from "#/lib/review.ts";
 import type { WorkItem } from "../types.ts";
-import { getIssue, getPull, listPullFiles, type PullFile } from "./api.ts";
+import { getIssue, getPull, getRepo, listPullFiles, type PullFile } from "./api.ts";
 import { ANNOTATION_LEGEND, annotate } from "./diff.ts";
 
 const HOSTS = new Set(["github.com", "www.github.com"]);
@@ -130,15 +130,33 @@ function diffOf(files: PullFile[]): { body: string; commentable: Commentable } {
   return { body: sections.join("\n\n"), commentable };
 }
 
+function filesOverview(files: PullFile[]): string {
+  if (files.length === 0) return "_No files changed._";
+  return files
+    .map((file) => {
+      const counts = [
+        file.additions === undefined ? null : `+${file.additions}`,
+        file.deletions === undefined ? null : `-${file.deletions}`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return `- ${file.filename} (${file.status}${counts ? ` ${counts}` : ""})`;
+    })
+    .join("\n");
+}
+
 /**
- * Everything the agent is allowed to know about the work, written to files it
- * can read. No clone and no token: the diff comes down through the API.
+ * Metadata for the agent. The Connection token stays here: it is used to read
+ * the pull request and to know which lines a comment may land on. Clone URL and
+ * ref are written into the files the agent reads, with no token on them.
  */
 export async function resolveWorkItem(url: string, accessToken: string): Promise<WorkItem> {
   const parsed = parseGithubUrl(url);
   if (!parsed) {
     throw new Error("That does not look like a GitHub pull request or issue link.");
   }
+
+  const cloneUrl = `https://github.com/${parsed.repo}.git`;
 
   if (parsed.kind === "pull_request") {
     const pull = await getPull(accessToken, parsed.repo, parsed.number);
@@ -147,6 +165,13 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
     return {
       kind: "pull_request",
       commentable: diff.commentable,
+      checkout: {
+        url: cloneUrl,
+        ref: `pull/${parsed.number}/head`,
+        sha: pull.head.sha,
+        base: pull.base.ref,
+        repo: parsed.repo,
+      },
       ref: githubRef(parsed.repo, pull.number),
       title: pull.title,
       url: pull.html_url,
@@ -162,19 +187,32 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
             `Draft: ${pull.draft ? "yes" : "no"}`,
             `URL: ${pull.html_url}`,
             ``,
+            `Clone: ${cloneUrl}`,
+            `Ref: pull/${parsed.number}/head`,
+            ``,
             `## Description`,
             ``,
             pull.body?.trim() || "_No description._",
+            ``,
+            `## Changed files`,
+            ``,
+            filesOverview(files),
           ].join("\n"),
         },
-        { name: "CHANGES.md", body: diff.body || "_No file changes returned._" },
       ],
     };
   }
 
   const issue = await getIssue(accessToken, parsed.repo, parsed.number);
+  const repo = await getRepo(accessToken, parsed.repo);
   return {
     kind: "issue",
+    checkout: {
+      url: cloneUrl,
+      ref: repo.default_branch,
+      base: repo.default_branch,
+      repo: parsed.repo,
+    },
     ref: githubRef(parsed.repo, issue.number),
     title: issue.title,
     url: issue.html_url,
@@ -188,6 +226,9 @@ export async function resolveWorkItem(url: string, accessToken: string): Promise
           `Issue: #${issue.number}`,
           `Opened by: ${issue.user.login}`,
           `URL: ${issue.html_url}`,
+          ``,
+          `Clone: ${cloneUrl}`,
+          `Ref: ${repo.default_branch}`,
           ``,
           `## Description`,
           ``,

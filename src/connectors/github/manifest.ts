@@ -44,19 +44,6 @@ const sizeLimit: SettingField = {
 };
 
 /**
- * Where the code is. Needed by anything that writes code rather than words:
- * the change is made in a worktree cut from here, and this clone's `origin` is
- * also how the loop knows which repository to open a pull request on.
- */
-const folder: SettingField = {
-  key: "folder",
-  kind: "text",
-  label: "Your clone of the repository",
-  help: "An absolute path. Work happens in a scratch worktree cut from it, so your own checkout and anything uncommitted in it are left alone.",
-  placeholder: "/Users/you/code/web",
-};
-
-/**
  * Left empty by every loop that answers what it read, which is most of them.
  * Filled in when the trigger is somewhere else entirely and there is no issue
  * in it to comment on.
@@ -144,6 +131,7 @@ export const githubManifest = defineManifest({
       guidancePlaceholder:
         "Anything specific to your team. For example: we require a test for every new endpoint.",
       answer: "review",
+      runsIn: "checkout",
       actionId: "github.submit_review",
     },
     {
@@ -158,12 +146,13 @@ export const githubManifest = defineManifest({
       prompt: PLAN_PROMPT,
       guidancePlaceholder: "Anything specific to this codebase worth knowing before planning.",
       answer: "text",
+      runsIn: "checkout",
       actionId: "github.post_issue_comment",
     },
     {
       id: "github.issue_implement",
       name: "Implement issues assigned to me",
-      summary: "Writes the change in a scratch checkout and opens a draft pull request.",
+      summary: "Writes the change and opens a draft pull request.",
       trigger: "an issue is assigned to you",
       watches: "is:open is:issue assignee:@me",
       writes: "a draft pull request",
@@ -173,7 +162,7 @@ export const githubManifest = defineManifest({
       // are different jobs, and which one an issue deserves is a judgement
       // about the issue.
       runsIn: "checkout",
-      settings: [repositories, folder],
+      settings: [repositories],
       prompt: IMPLEMENT_PROMPT,
       guidancePlaceholder:
         "How work is done here. For example: every new endpoint needs a test, and we do not add dependencies without asking.",
@@ -205,10 +194,9 @@ export const githubManifest = defineManifest({
     {
       id: "github.open_pull_request",
       name: "Open a draft pull request",
-      summary: "Push the branch the agent worked on and open a draft pull request for it.",
-      // Nothing to ask. The loop already named the clone to work in, and where
-      // that clone pushes is where this belongs; a second answer here could
-      // only disagree with the first.
+      summary: "Open a draft pull request for the branch the agent already pushed.",
+      // The agent cloned and pushed with the machine's git. This action only
+      // names the pull request through the Connection.
       target: [],
       accepts: ["code"],
     },

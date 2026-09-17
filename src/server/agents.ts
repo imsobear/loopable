@@ -53,21 +53,13 @@ export async function listAgents(): Promise<AgentView[]> {
         isDefault: false,
         defaultIsImplicit: false,
         commandPreview: `${preview.bin} ${preview.args.join(" ")}`,
+        onRunners: [],
       } satisfies AgentView;
     }),
   );
 
-  // A stored default that is no longer installed should not silently win, and a
-  // single installed agent needs no ceremony to become the one that runs.
-  const usable = views.filter((view) => view.installed);
-  const resolved =
-    usable.find((view) => view.agentId === chosen)?.agentId ??
-    (usable.length === 1 ? usable[0]!.agentId : null);
-
   return views.map((view) =>
-    view.agentId === resolved
-      ? { ...view, isDefault: true, defaultIsImplicit: chosen !== resolved }
-      : view,
+    view.agentId === chosen ? { ...view, isDefault: true, defaultIsImplicit: false } : view,
   );
 }
 

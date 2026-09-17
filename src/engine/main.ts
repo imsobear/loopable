@@ -8,17 +8,13 @@ function log(message: string): void {
 }
 
 /**
- * The engine. Runs as its own process so a loop keeps working when nobody has
- * the app open, which is the whole point of a loop that runs by itself.
- *
- * It talks to the app only through SQLite: the app queues tasks and asks for
- * them to stop, the daemon does the work and records what happened. No ports,
- * no sockets, nothing to authenticate between the two.
+ * The engine. Polls connectors, prepares tasks, writes results back.
+ * Agents always run on a Runner started separately.
  */
 async function main(): Promise<void> {
   const claim = claimSingleInstance();
   if (!claim.ok) {
-    log(`another Loopable daemon is already running (pid ${claim.pid}). Nothing to do.`);
+    log(`another Loopable engine is already running (pid ${claim.pid}). Nothing to do.`);
     process.exitCode = 1;
     return;
   }
@@ -26,10 +22,10 @@ async function main(): Promise<void> {
   const swept = sweepRunDirs();
   if (swept > 0) log(`cleared ${swept} old run director${swept === 1 ? "y" : "ies"}`);
 
-  const worker = createWorker({ log });
+  const queue = createWorker({ log });
   const poller = createPoller({ log });
-  log(`daemon started (pid ${process.pid})`);
-  worker.start();
+  log(`engine started (pid ${process.pid})`);
+  queue.start();
   poller.start();
   log(`watching for signals every ${Math.round(poller.intervalMs / 1000)}s`);
 
@@ -39,7 +35,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     log(`${signal}: stopping`);
     poller.stop();
-    await worker.stop();
+    await queue.stop();
     releaseSingleInstance();
     log("stopped");
     process.exit(0);

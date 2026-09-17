@@ -5,6 +5,7 @@ import { connectorAction, connectorManifest, connectorWorkflow } from "#/connect
 import type { SettingField } from "#/connectors/types.ts";
 import type { ConnectionSettings, LoopDraft, LoopReadiness, LoopView } from "#/lib/domain.ts";
 import { listAgents } from "./agents.ts";
+import { availableAgentIds } from "./runners.ts";
 import { db } from "./db/client.ts";
 import { connections, loops, type Loop } from "./db/schema.ts";
 
@@ -105,7 +106,7 @@ function validate(draft: LoopDraft): LoopDraft {
   // A job that works in a checkout cannot be told which one later: it would
   // sit enabled, come round on time and fail at the last step every time.
   // Caught while the person is still looking at the box.
-  if (workflow.runsIn === "folder" || workflow.runsIn === "checkout") {
+  if (workflow.runsIn === "folder") {
     const folder = draft.settings.folder;
     if (typeof folder !== "string" || folder.trim() === "") {
       throw new Error("Say which folder this should work in.");
@@ -225,9 +226,16 @@ export async function loopReadiness(): Promise<LoopReadiness> {
     .selectDistinct({ connectorId: connections.connectorId })
     .from(connections)
     .all();
+  const available = availableAgentIds();
+  const host = availableAgentIds(true);
+  const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
+  const defaultAgentId =
+    (chosen && available.includes(chosen) ? chosen : null) ??
+    (available.length === 1 ? available[0]! : null);
   return {
     connectedConnectorIds: connected.map((row) => row.connectorId),
-    defaultAgentId: agents.find((agent) => agent.isDefault)?.agentId ?? null,
-    installedAgentIds: agents.filter((agent) => agent.installed).map((agent) => agent.agentId),
+    defaultAgentId,
+    availableAgentIds: available,
+    hostAgentIds: host,
   };
 }

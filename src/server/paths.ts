@@ -14,7 +14,7 @@ export function dbPath(): string {
 
 /**
  * Where a run keeps its scratch files and its log. Not the system temp
- * directory: the daemon writes these and the app reads them, they are the
+ * directory: the engine writes these and the app reads them, they are the
  * first thing to look at when a run goes wrong, and temp gets swept.
  */
 export function runDir(taskId: string): string {
@@ -23,6 +23,6 @@ export function runDir(taskId: string): string {
   return dir;
 }
 
-export function daemonPidPath(): string {
-  return join(dataDir(), "daemon.pid");
+export function enginePidPath(): string {
+  return join(dataDir(), "engine.pid");
 }

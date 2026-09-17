@@ -3,11 +3,11 @@ import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync 
 import { isAbsolute, join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
-import { agentRuntime } from "#/agents/runtimes.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type {
   ActionDescriptor,
+  Changes,
   Signal,
   WorkItem,
   WorkItemRef,
@@ -15,11 +15,13 @@ import type {
 } from "#/connectors/types.ts";
 import type { JsonValue, TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
+import { AGENT_NOTHING, isAgentNothing, type AgentJob } from "./agent-job.ts";
+import { runAgentJob } from "./agent-runner.ts";
 import { listAgents, settingsFor } from "./agents.ts";
-import { closeCheckout, measure, openCheckout } from "./checkout.ts";
+import { branchFor } from "./checkout.ts";
 import { credentialForConnector } from "./connections.ts";
-import { commitAll, hasChanges } from "./git.ts";
 import { db } from "./db/client.ts";
+import { availableAgentIds, pickRunner } from "./runners.ts";
 import { dataDir, runDir } from "./paths.ts";
 import { loops, tasks, type Loop, type Task } from "./db/schema.ts";
 
@@ -27,27 +29,20 @@ import { loops, tasks, type Loop, type Task } from "./db/schema.ts";
  * The agent says this when the honest answer is "nothing". Without it a loop
  * that runs by itself would post filler, which is worse than silence.
  */
-const NOTHING = "NOTHING_TO_DO";
+const NOTHING = AGENT_NOTHING;
 
 /**
  * The answer is the checkout, not the reply, so the reply is asked for as the
  * account somebody reads before deciding whether to look at the diff.
- *
- * The branch is made and committed by Loopable afterwards. An agent told to
- * commit would also be an agent that might push, and what it pushed to would
- * be whatever it inferred.
  */
 const CODE_FORMAT = [
-  "Make the change in the working directory. It is a scratch checkout made for",
-  "you, so edit files freely; do not commit, branch, push, or run git at all.",
-  "",
   "Then reply with the description of a pull request: a first line under about",
   "seventy characters saying what it does, a blank line, and a short account of",
   "what you changed and anything you were unsure about. No preamble.",
 ].join("\n");
 
 /** Written work should say where it came from. */
-const SIGNATURE = "\n\n---\n*Written by Loopable, running locally.*";
+const SIGNATURE = "\n\n---\n*Written by Loopable.*";
 
 // The payload is the connector's own record and stays on the server: it is
 // the only field here that no page has any business reading.
@@ -64,6 +59,7 @@ function toView(row: Omit<Task, "sourcePayload"> & { loopName?: string | null })
     sourceTitle: row.sourceTitle,
     dryRun: row.dryRun,
     agentId: row.agentId,
+    runnerId: row.runnerId,
     agentCommand: row.agentCommand,
     output: row.output,
     comments: row.comments ?? [],
@@ -93,6 +89,7 @@ function select() {
       sourceTitle: tasks.sourceTitle,
       dryRun: tasks.dryRun,
       agentId: tasks.agentId,
+      runnerId: tasks.runnerId,
       agentCommand: tasks.agentCommand,
       output: tasks.output,
       comments: tasks.comments,
@@ -199,7 +196,7 @@ function runnable(loopId: string): Loop {
 /**
  * Queues a run and returns at once. Identifying the link needs no network, so
  * a typo still fails while the person is looking at the box, but everything
- * that can be slow or can fail belongs to the worker.
+ * that can be slow or can fail belongs to the engine.
  */
 export function enqueueTask(input: {
   loopId: string;
@@ -227,7 +224,7 @@ export function enqueueTask(input: {
 
 /**
  * Queues a run for something a poll noticed. The title is already known, so
- * the inbox can say what the task is about before the worker has fetched
+ * the inbox can say what the task is about before the engine has fetched
  * anything.
  */
 export function enqueueSignal(input: { loop: Loop; signal: Signal }): TaskView {
@@ -290,7 +287,7 @@ export class TaskCancelled extends Error {
 }
 
 /**
- * Matched by name rather than by class. The app and the daemon load their own
+ * Matched by name rather than by class. The app and the engine load their own
  * copy of every module, so instanceof cannot be relied on to travel.
  */
 export function isCancellation(error: unknown): boolean {
@@ -319,6 +316,23 @@ const KIND_NOUN: Record<WorkItemKind, string> = {
   occurrence: "the run due at",
 };
 
+function checkoutInstructions(item: WorkItem, branch: string | undefined, writesCode: boolean): string[] {
+  const checkout = item.checkout;
+  if (!checkout) return [];
+  const at = checkout.sha ? `${checkout.ref} (${checkout.sha})` : checkout.ref;
+  if (writesCode && branch) {
+    return [
+      `Clone ${checkout.url} and check out ${at}.`,
+      `Commit your change and push it to ${branch}. Do not open a pull request; Loopable will.`,
+      ``,
+    ];
+  }
+  return [
+    `Clone ${checkout.url} and check out ${at}. Work in that checkout. Do not commit or push.`,
+    ``,
+  ];
+}
+
 /**
  * What the agent is actually sent.
  *
@@ -333,6 +347,7 @@ function promptFor(input: {
   guidance: string | null;
   item: WorkItem;
   files: string[];
+  branch?: string;
 }): string {
   const shape =
     input.workflow.answer === "review"
@@ -347,6 +362,7 @@ function promptFor(input: {
     // nothing to read, and telling it to read nothing reads as a mistake.
     ...(input.files.length > 0 ? [`Read ${input.files.join(" and ")} first.`] : []),
     ``,
+    ...checkoutInstructions(input.item, input.branch, input.workflow.answer === "code"),
     `Your task:`,
     input.ask,
     ...(input.guidance ? [``, `From the person who set this up:`, input.guidance] : []),
@@ -385,17 +401,26 @@ function answerFor(
 }
 
 /**
- * Carries one queued task as far as it can get. Throws so the worker can
- * decide whether to try again; what it must never do is repeat the agent,
- * which is the only expensive part. Once output is stored, a retry picks up at
- * the write.
+ * Engine work on a task: prepare context and park it for a runner, or apply a
+ * write once the agent has finished. The agent itself always runs through
+ * `runAssignedAgent`.
  */
 export async function runTask(id: string, signal?: AbortSignal): Promise<TaskView> {
   const task = taskRow(id);
   if (!task) throw new Error(`Task not found: ${id}`);
-  const stop = () => {
-    if (signal?.aborted || taskRow(id)?.cancelRequested) throw new TaskCancelled();
-  };
+  if (task.state === "applying" || (task.output !== null && task.state === "queued")) {
+    return applyTask(id, signal);
+  }
+  if (task.state === "queued" || task.state === "preparing") {
+    return prepareTask(id, signal);
+  }
+  return getTask(id)!;
+}
+
+async function loadWork(id: string, signal?: AbortSignal) {
+  const task = taskRow(id);
+  if (!task) throw new Error(`Task not found: ${id}`);
+  if (signal?.aborted || task.cancelRequested) throw new TaskCancelled();
 
   const loop = db().select().from(loops).where(eq(loops.id, task.loopId)).get();
   if (!loop) throw new Error("The loop behind this task has been deleted.");
@@ -405,116 +430,144 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
   }
   const runtime = connectorRuntime(task.connectorId);
   if (!runtime.resolveWorkItem) throw new Error(`${task.connectorId} cannot run tasks.`);
-
-  // The write can belong to another connector, with its own runtime and its
-  // own account, so reading and writing are resolved apart from here on.
   const writer = connectorRuntime(task.actionConnectorId);
   if (!writer.applyAction) throw new Error(`${task.actionConnectorId} cannot write anything.`);
   const action = connectorAction(task.actionConnectorId, task.actionId);
   if (!action) throw new Error(`${task.actionConnectorId} no longer offers ${task.actionId}.`);
 
-  stop();
   const { credential } = await credentialForConnector(task.connectorId);
   const item = await runtime.resolveWorkItem({
     url: task.sourceUrl,
     payload: task.sourcePayload ?? null,
     credential,
   });
+  return { task, loop, workflow, writer, action, credential, item };
+}
+
+async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> {
+  const { loop, workflow, item } = await loadWork(id, signal);
   updateTask(id, { sourceTitle: item.title });
 
-  // Opened before the agent and kept until the work has landed somewhere. A
-  // retry skips the agent, and the branch it already built is the thing that
-  // still has to be pushed.
-  const checkout =
-    workflow.runsIn === "checkout"
-      ? await openCheckout({ repo: folderFor(loop), runDir: runDir(id), ref: item.ref, taskId: id })
-      : null;
-
-  // Null means the agent has not run; empty means it ran and had little to
-  // say. Telling those apart is what stops a retry paying for the agent twice.
-  let output = task.output;
-  let comments = task.comments ?? [];
-  if (output === null) {
-    stop();
-    const agentId = task.agentId ?? (await defaultAgentFor(loop.agentId));
-    updateTask(id, { state: "preparing", agentId });
-
-    const workspace = runDir(id);
-    for (const file of item.context) {
-      writeFileSync(join(workspace, file.name), file.body);
-    }
-    const logPath = join(workspace, "agent.log");
-    updateTask(id, { logPath });
-
-    // Context always lands in the run directory, never in the folder being
-    // worked in: a workflow that reads someone's checkout should not leave
-    // files in it.
-    const result = await agentRuntime(agentId).run({
-      prompt: promptFor({
-        workflow,
-        ask: loop.prompt,
-        guidance: loop.guidance,
-        item,
-        files: item.context.map((file) => join(workspace, file.name)),
-      }),
-      cwd: checkout ? checkout.dir : workflow.runsIn === "folder" ? folderFor(loop) : workspace,
-      settings: settingsFor(agentId),
-      outputFile: join(workspace, "answer.txt"),
-      signal,
-      logFile: logPath,
-    });
-    updateTask(id, { agentCommand: result.command });
-
-    if (result.aborted) throw new TaskCancelled();
-    if (!result.ok) {
-      // Never transient: the same prompt and the same timeout would fail again.
-      throw new Error(result.detail ?? "The agent did not finish.");
-    }
-    const said = result.output.trim();
-    // Kept before anything is made of it. When a reply will not parse, what
-    // the agent actually said is the only thing worth looking at.
-    writeFileSync(join(workspace, "reply.txt"), said);
-    if (!said) throw new Error("The agent produced nothing.");
-
-    // Checked before parsing, because the way out of a review is a plain word
-    // rather than a document saying there is nothing to say.
-    if (said.replace(/[`*_.\s]/g, "").toUpperCase() === NOTHING) {
-      if (checkout) await closeCheckout(checkout);
-      finish(id, task, { state: "skipped", output: said });
-      return getTask(id)!;
-    }
-
-    ({ output, comments } = answerFor(workflow, action, item, said));
-    if (!output && comments.length === 0) {
-      throw new Error("The agent produced nothing worth posting.");
-    }
-
-    if (checkout) {
-      // An agent that described a change it did not make is the ordinary way
-      // this goes wrong, and an empty pull request is a worse way to report it
-      // than saying there was nothing to send.
-      if (!(await hasChanges(checkout.dir))) {
-        await closeCheckout(checkout);
-        finish(id, task, {
-          state: "skipped",
-          output: `Nothing was changed, though the agent said:\n\n${output}`,
-        });
-        return getTask(id)!;
-      }
-      await commitAll({ dir: checkout.dir, message: output });
-    }
-    updateTask(id, { output, comments });
+  const task = taskRow(id)!;
+  const agentId = task.agentId ?? (await defaultAgentFor(loop.agentId));
+  const workspace = runDir(id);
+  for (const file of item.context) {
+    writeFileSync(join(workspace, file.name), file.body);
   }
+  const logPath = join(workspace, "agent.log");
+  writeFileSync(logPath, "", { flag: "a" });
+  const runnerId = pickRunner({
+    agentId,
+    requiresHost: workflow.runsIn === "folder",
+  });
+  updateTask(id, {
+    state: "awaiting_agent",
+    agentId,
+    runnerId,
+    logPath,
+    leaseUntil: null,
+  });
+  return getTask(id)!;
+}
+
+export async function jobForTask(id: string): Promise<AgentJob> {
+  const { task, loop, workflow, item } = await loadWork(id);
+  if (!task.agentId) throw new Error("This task has no agent yet.");
+  const workspace = runDir(id);
+  const cwd = workflow.runsIn === "folder" ? folderFor(loop) : undefined;
+  const branch = workflow.answer === "code" ? branchFor({ ref: item.ref, taskId: id }) : undefined;
+  const settings = { ...settingsFor(task.agentId) };
+  // Clone needs a writable workspace and network. A global read-only default
+  // would make every GitHub checkout job fail before the agent started.
+  if (item.checkout && settings.permissionMode === "read_only") {
+    settings.permissionMode = "workspace_write";
+  }
+  return {
+    taskId: id,
+    agentId: task.agentId,
+    prompt: promptFor({
+      workflow,
+      ask: loop.prompt,
+      guidance: loop.guidance,
+      item,
+      // Folder jobs work in a checkout that does not hold these files, so the
+      // prompt has to name them by their Engine path. Everything else runs
+      // where the runner wrote them, so the basename is enough.
+      files: item.context.map((file) => (cwd ? join(workspace, file.name) : file.name)),
+      branch,
+    }),
+    settings,
+    files: item.context.map((file) => ({ name: file.name, body: file.body })),
+    ...(cwd ? { cwd } : {}),
+  };
+}
+
+/** The runner's half: invoke the agent for a task that is already awaiting it. */
+export async function runAssignedAgent(id: string, signal?: AbortSignal): Promise<TaskView> {
+  const task = taskRow(id);
+  if (!task) throw new Error(`Task not found: ${id}`);
+  if (task.output !== null) return getTask(id)!;
+
+  const job = await jobForTask(id);
+  const result = await runAgentJob(job, { signal });
+  updateTask(id, { agentCommand: result.command });
+  if (result.aborted) throw new TaskCancelled();
+  if (!result.ok) throw new Error(result.detail ?? "The agent did not finish.");
+  return absorbAgentOutput(id, result.output);
+}
+
+function changesFrom(item: WorkItem, taskId: string): Changes | undefined {
+  if (!item.checkout) return undefined;
+  return {
+    branch: branchFor({ ref: item.ref, taskId }),
+    base: item.checkout.base,
+    repo: item.checkout.repo,
+    stat: "",
+  };
+}
+
+export async function absorbAgentOutput(id: string, raw: string): Promise<TaskView> {
+  const { task, workflow, action, item } = await loadWork(id);
+  const workspace = runDir(id);
+  const said = raw.trim();
+  writeFileSync(join(workspace, "reply.txt"), said);
+  if (!said) throw new Error("The agent produced nothing.");
+
+  if (isAgentNothing(said)) {
+    finish(id, task, { state: "skipped", output: said });
+    return getTask(id)!;
+  }
+
+  const parsed = answerFor(workflow, action, item, said);
+  if (!parsed.output && parsed.comments.length === 0) {
+    throw new Error("The agent produced nothing worth posting.");
+  }
+
+  updateTask(id, { output: parsed.output, comments: parsed.comments });
+  if (task.dryRun) {
+    finish(id, task, { state: "prepared" });
+    return getTask(id)!;
+  }
+  updateTask(id, { state: "applying", leaseUntil: null });
+  return getTask(id)!;
+}
+
+async function applyTask(id: string, signal?: AbortSignal): Promise<TaskView> {
+  const { task, workflow, writer, credential, item } = await loadWork(id, signal);
+  const output = task.output;
+  const comments = task.comments ?? [];
+  if (output === null) throw new Error("Nothing to write back yet.");
 
   if (task.dryRun) {
     finish(id, task, { state: "prepared" });
     return getTask(id)!;
   }
 
-  stop();
   updateTask(id, { state: "applying" });
   const sameConnector = task.actionConnectorId === task.connectorId;
-  const outcome = await writer.applyAction({
+  const apply = writer.applyAction;
+  if (!apply) throw new Error(`${task.actionConnectorId} cannot write anything.`);
+  const outcome = await apply({
     actionId: task.actionId,
     target: task.actionTarget,
     source: {
@@ -523,21 +576,15 @@ export async function runTask(id: string, signal?: AbortSignal): Promise<TaskVie
       ref: item.ref,
       title: item.title,
       url: item.url,
-      // Withheld across connectors on purpose. It is one connector's private
-      // record of a conversation, and another reading it as its own would be
-      // a confusing failure rather than a clear one.
       carry: sameConnector ? item.carry : undefined,
     },
     body: output + SIGNATURE,
     comments,
-    changes: checkout ? { ...checkout, stat: await measure(checkout) } : undefined,
+    changes: workflow.answer === "code" ? changesFrom(item, id) : undefined,
     credential: sameConnector
       ? credential
       : (await credentialForConnector(task.actionConnectorId)).credential,
   });
-  // Only now. Up to here the worktree is the work, and a failure that leaves it
-  // behind is a retry that costs a push instead of an agent.
-  if (checkout) await closeCheckout(checkout);
   finish(id, task, { state: "done", resultUrl: outcome.url });
   return getTask(id)!;
 }
@@ -552,12 +599,14 @@ function finish(id: string, task: Task, values: Partial<Task>): void {
 }
 
 export async function defaultAgentFor(pinned: string | null): Promise<string> {
-  const agents = await listAgents();
-  const chosen = pinned ?? agents.find((agent) => agent.isDefault)?.agentId ?? null;
-  if (!chosen) throw new Error("No agent is available. Choose a default on the Agents page.");
-  if (!agentManifest(chosen)) throw new Error(`Unknown agent: ${chosen}`);
-  if (!agents.find((agent) => agent.agentId === chosen)?.installed) {
-    throw new Error(`${chosen} is not installed on this machine.`);
+  if (pinned) {
+    if (!agentManifest(pinned)) throw new Error(`Unknown agent: ${pinned}`);
+    return pinned;
   }
-  return chosen;
+  const available = availableAgentIds();
+  const agents = await listAgents();
+  const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
+  if (chosen && available.includes(chosen)) return chosen;
+  if (available.length === 1) return available[0]!;
+  throw new Error("No agent is available. Start a runner with an agent signed in.");
 }

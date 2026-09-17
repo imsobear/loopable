@@ -1,27 +1,17 @@
 /**
- * The git a loop needs to write code back.
- *
- * All of it happens in a worktree cut from a repository the person already has
- * on disk, never in that repository's own working tree. A loop that ran in the
- * folder you have open would stage whatever you had half-finished and commit
- * it under a message about something else, and it would do that while you were
- * typing.
+ * Git helpers used in tests. Loopable does not clone or push for the agent;
+ * that is in the prompt, and the machine's git does the rest.
  */
 
 import { execFile } from "node:child_process";
-import { chmodSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 export type GitResult = { ok: boolean; stdout: string; stderr: string };
 
 /**
- * Never given the agent's environment, and never written to the run log. Both
- * for the same reason: what goes through here is authorized to push.
+ * Never given the agent's environment. A prompt here would hang a loop until
+ * its timeout, so git is told not to ask.
  */
-function run(
-  args: string[],
-  options: { cwd: string; askpass?: string; token?: string },
-): Promise<GitResult> {
+function run(args: string[], options: { cwd: string }): Promise<GitResult> {
   return new Promise((resolve) => {
     execFile(
       "git",
@@ -31,13 +21,7 @@ function run(
         maxBuffer: 32 * 1024 * 1024,
         env: {
           ...process.env,
-          // Nothing here may stop and ask. A prompt in a process nobody is
-          // watching is a loop that hangs until its timeout.
           GIT_TERMINAL_PROMPT: "0",
-          GIT_ASKPASS: options.askpass ?? "",
-          LOOPABLE_GIT_TOKEN: options.token ?? "",
-          // A person's own hooks and identity are theirs, and a loop running
-          // them unattended is a surprise. The identity is set per commit.
           GIT_CONFIG_NOSYSTEM: "1",
           HOME: process.env.HOME ?? "",
         },
@@ -50,10 +34,7 @@ function run(
 }
 
 /** Fails with what git said, which is the only useful thing to say about it. */
-async function must(
-  args: string[],
-  options: { cwd: string; askpass?: string; token?: string },
-): Promise<string> {
+async function must(args: string[], options: { cwd: string }): Promise<string> {
   const result = await run(args, options);
   if (!result.ok) {
     throw new Error(`git ${args[0]} failed: ${result.stderr || result.stdout || "no output"}`);
@@ -91,17 +72,9 @@ export async function originUrl(repo: string): Promise<string> {
   return url.replace(/^https:\/\/[^@/]+@/, "https://");
 }
 
-export async function fetchOrigin(repo: string): Promise<void> {
-  await must(["fetch", "--quiet", "origin"], { cwd: repo });
-}
-
 /**
  * A worktree of `repo` at a new branch, cut from the tip of `base` as the
  * remote has it.
- *
- * A worktree rather than a clone because it shares the object store: cutting
- * one off a large repository takes about as long as writing the files, and a
- * clone of it takes minutes and a copy of its whole history.
  */
 export async function addWorktree(input: {
   repo: string;
@@ -160,40 +133,17 @@ export async function diffStat(input: { dir: string; base: string }): Promise<st
 }
 
 /**
- * A token reaches git through an askpass program and never through the command
- * line or the remote URL. Both of those end up somewhere they are read back:
- * the URL in `.git/config` and in git's own error messages, the command line
- * in the process list.
- */
-function askpassFor(dir: string): string {
-  const path = join(dir, "askpass.sh");
-  writeFileSync(path, '#!/bin/sh\nprintf %s "$LOOPABLE_GIT_TOKEN"\n');
-  chmodSync(path, 0o700);
-  return path;
-}
-
-/**
- * Push the branch, and refuse to be the reason anything is lost.
+ * Push the branch using the clone's own `origin`. No token: if the machine
+ * cannot push, git fails and the task fails.
  *
  * No force, ever: this runs unattended, and the difference between a wasted
- * run and somebody's afternoon is that flag. A rejected push means somebody
- * else moved it, which is a thing to be told about rather than to win.
+ * run and somebody's afternoon is that flag.
  */
-export async function pushBranch(input: {
-  dir: string;
-  url: string;
-  branch: string;
-  token: string;
-}): Promise<void> {
-  const askpass = askpassFor(input.dir);
-  const result = await run(
-    ["push", "--quiet", input.url, `HEAD:refs/heads/${input.branch}`],
-    { cwd: input.dir, askpass, token: input.token },
-  );
+export async function pushBranch(input: { dir: string; branch: string }): Promise<void> {
+  const result = await run(["push", "--quiet", "origin", `HEAD:refs/heads/${input.branch}`], {
+    cwd: input.dir,
+  });
   if (result.ok) return;
-  // Whatever git says here can quote the URL, which is the one string that
-  // must not reach a log. It is built from the remote and has no secret in it,
-  // but that is true only for as long as nobody changes how this is called.
-  const said = (result.stderr || result.stdout).replaceAll(input.token, "[token]");
+  const said = (result.stderr || result.stdout).replace(/^https:\/\/[^@/]+@/gm, "https://");
   throw new Error(`Could not push ${input.branch}: ${said}`);
 }

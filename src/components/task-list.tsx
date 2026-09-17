@@ -26,6 +26,7 @@ const STATES: Record<
 > = {
   queued: { label: "Queued", icon: Clock, tone: "text-muted-foreground" },
   preparing: { label: "Working", icon: Loader, tone: "text-muted-foreground" },
+  awaiting_agent: { label: "On a runner", icon: Bot, tone: "text-muted-foreground" },
   applying: { label: "Writing", icon: Loader, tone: "text-muted-foreground" },
   prepared: { label: "Prepared", icon: FileText, tone: "text-muted-foreground" },
   done: { label: "Written", icon: CircleCheck, tone: "text-emerald-600" },
@@ -37,7 +38,7 @@ const STATES: Record<
 export function TaskStateLabel({ state }: { state: TaskState }) {
   const meta = STATES[state];
   const Icon = meta.icon;
-  const spinning = state === "preparing" || state === "applying";
+  const spinning = state === "preparing" || state === "awaiting_agent" || state === "applying";
   return (
     <span className={cn("flex items-center gap-1.5 text-xs", meta.tone)}>
       <Icon className={cn("size-3.5", spinning && "animate-spin")} />
@@ -144,7 +145,7 @@ export function TaskList({
 
 /**
  * What ran, and what it ran through. Which agent wrote the words matters when
- * two loops disagree, and it is only known once the worker has picked the task
+ * two loops disagree, and it is only known once the engine has picked the task
  * up, so it is absent rather than wrong while a task is queued.
  */
 function TaskMeta({ task, showLoop }: { task: TaskView; showLoop: boolean }) {

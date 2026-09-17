@@ -4,19 +4,25 @@
 
 Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Loops run on their own, and every run is recorded so you can see what happened.
 
-Everything runs on your own machine: the app, the database, and the credentials.
+Everything runs on your own computer: the app, the database, and the credentials.
+
+The names for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
 
 ## Run it
 
 ```bash
 pnpm install
 pnpm dev            # http://127.0.0.1:4321
-pnpm daemon         # the engine: runs the queued work
+pnpm engine         # polls, prepares, writes back
 ```
 
-Two processes, on purpose. The app is the windows and the buttons; the daemon does the work, so a loop keeps running when nobody has the app open. They talk only through SQLite: the app queues a task and the daemon picks it up. If the daemon is not running, the app says so rather than letting work pile up in silence.
+Then copy the command from Runners and start a runner (this host or another):
 
-Other commands:
+```bash
+LOOPABLE_URL=http://127.0.0.1:4321 LOOPABLE_RUNNER_TOKEN=<from Runners> pnpm runner
+```
+
+Three processes, same on a laptop or a server. App and engine share SQLite. Runners pull over HTTP. If the engine is not running, the app says so. If no runner has joined, tasks wait.
 
 ```bash
 pnpm typecheck      # tsc --noEmit
@@ -26,6 +32,8 @@ pnpm db:studio      # browse the local database
 ```
 
 State lives in `~/.loopable/loopable.sqlite` (override with `LOOPABLE_HOME` or `LOOPABLE_DB`). Migrations run automatically when the app first touches the database. Credentials never go in the database: on macOS they go in the keychain, elsewhere in a `0600` file under the data directory.
+
+When Loopable is not on loopback, set `LOOPABLE_BASE_URL` to its public origin (OAuth callbacks) and `LOOPABLE_APP_TOKEN` so the UI is not open to the network.
 
 ## Connectors
 
@@ -63,11 +71,11 @@ http://127.0.0.1/api/connectors/github/callback
 
 Login is the OAuth 2.0 authorization code flow with PKCE (S256) over a loopback redirect.
 
-**Treat the client secret as public, not as a credential.** GitHub lists `client_secret` as required at the token endpoint and does not distinguish between public and confidential clients, so a browser-redirect login cannot avoid shipping it, and anything running on a user's machine can be read. The GitHub CLI embeds its secret for the same reason.
+**Treat the client secret as public, not as a credential.** GitHub lists `client_secret` as required at the token endpoint and does not distinguish between public and confidential clients, so a browser-redirect login cannot avoid shipping it, and anything running on a user's computer can be read. The GitHub CLI embeds its secret for the same reason.
 
 PKCE is what actually protects a login: an intercepted authorization code cannot be redeemed by anyone else, because the exchange must present the verifier held only by the process that started the flow. That matters most for a loopback redirect, where another local process might race for the code.
 
-What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's machine. Anyone who wants their own registration, or who is on GitHub Enterprise, can set the environment variables above instead.
+What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's computer. Anyone who wants their own registration, or who is on GitHub Enterprise, can set the environment variables above instead.
 
 ### WeChat, and logins that finish on a phone
 
@@ -99,7 +107,7 @@ A task usually starts on its own, from a poll. A loop can also be pointed at a l
 
 ## Watching
 
-Nothing calls Loopable back. It runs on a laptop, which has no address for GitHub to reach and no business having one, so the daemon asks instead: every two minutes it asks each loop's connector what matches right now. A connector answers with the present state rather than with what changed, because working out what is new needs to know what has already been acted on, and only Loopable knows that.
+Nothing calls Loopable back. It runs on a laptop, which has no address for GitHub to reach and no business having one, so the engine asks instead: every two minutes it asks each loop's connector what matches right now. A connector answers with the present state rather than with what changed, because working out what is new needs to know what has already been acted on, and only Loopable knows that.
 
 What stops a loop acting twice is the key the connector puts on each signal, which has to change exactly when there is something new to do and not otherwise. A pull request is keyed by its head commit: a new push is worth reviewing again, another comment on it is not. An assigned issue is keyed by the issue alone, since being assigned it twice is not a reason to write a second plan.
 
@@ -111,7 +119,7 @@ A run passes through `preparing` and, if it has something to say, `applying`, en
 
 ## The queue
 
-Pressing Run does not run anything. It checks the link, writes a `queued` task, and returns; the daemon claims it a moment later. The queue is the tasks table itself, which is what lets a run survive both processes being restarted.
+Pressing Run does not run anything. It checks the link, writes a `queued` task, and returns; the engine claims it a moment later. The queue is the tasks table itself, which is what lets a run survive both processes being restarted.
 
 A claim is a lease, renewed while the work goes on. That is what tells a run still in progress apart from one whose worker died: nothing else can, once the process holding it is gone. A lapsed lease is picked up again, and attempts are counted so a task that kills its worker cannot do so forever. Renewal is also when a stop request is noticed, since the person asking is in the other process and the database is where they leave the message.
 
@@ -133,7 +141,7 @@ The reply is read leniently at the edges and strictly inside. An agent that answ
 
 ## Agents
 
-An agent is a coding agent CLI already installed on the machine. Agents live under `src/agents/` and follow the same manifest and runtime split as connectors, but they are discovered rather than connected: every page load looks for the binary, reads its version, and asks the tool whether it is signed in. Installing or removing a CLI shows up without any setup step.
+An agent is a coding agent CLI already installed on a runner. Agents live under `src/agents/` and follow the same manifest and runtime split as connectors, but they are discovered rather than connected: each runner reports which binaries it has, their versions, and whether they are signed in. Installing or removing a CLI on a runner shows up on the next heartbeat.
 
 Because they are discovered, no agent is stored. The only things kept are the choices a person makes: which agent runs the loops, and per agent a permission mode, an optional model, and a timeout.
 
@@ -156,8 +164,9 @@ Detection looks at `PATH`, then at the usual install directories, then asks the 
 | --- | --- |
 | `src/connectors/` | The connector contract and one folder per connector |
 | `src/agents/` | The agent contract and one folder per agent |
-| `src/server/` | Database, secret store, connections, the queue and the worker, server functions |
-| `src/daemon/` | The engine process: single instance, signals, its own logging |
+| `src/server/` | Database, secret store, connections, the queue, server functions |
+| `src/engine/` | The engine process: poll, prepare, write back |
+| `src/runner/` | The runner process: heartbeat, claim a job, run the agent |
 | `src/routes/` | Pages, plus the OAuth endpoints under `api/` |
 | `src/components/` | Shell, shared pieces, and shadcn/ui in `ui/` |
 | `drizzle/` | Generated migrations |

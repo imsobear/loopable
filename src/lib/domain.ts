@@ -17,6 +17,8 @@ export type ConnectionSettings = Record<string, JsonValue>;
 export const TASK_STATE = [
   "queued",
   "preparing",
+  /** Context is ready; a runner has not finished the agent yet. */
+  "awaiting_agent",
   "applying",
   /** Output ready, nothing written: a dry run, and later a loop that asks to be checked. */
   "prepared",
@@ -29,10 +31,15 @@ export const TASK_STATE = [
 export type TaskState = (typeof TASK_STATE)[number];
 
 /**
- * States the worker still owes something for. Used by the pages to know when
+ * States still in flight. Used by the pages to know when
  * to keep looking, and by the reaper to find runs a dead process abandoned.
  */
-export const TASK_ACTIVE_STATES = ["queued", "preparing", "applying"] as const satisfies TaskState[];
+export const TASK_ACTIVE_STATES = [
+  "queued",
+  "preparing",
+  "awaiting_agent",
+  "applying",
+] as const satisfies TaskState[];
 
 export function isTaskActive(state: TaskState): boolean {
   return (TASK_ACTIVE_STATES as readonly TaskState[]).includes(state);
@@ -58,6 +65,7 @@ export type TaskView = {
   sourceTitle: string | null;
   dryRun: boolean;
   agentId: string | null;
+  runnerId: string | null;
   agentCommand: string | null;
   output: string | null;
   /** Findings that will be attached to lines, rather than to the review body. */
@@ -71,7 +79,7 @@ export type TaskView = {
   cancelRequested: boolean;
   durationMs: number | null;
   createdAt: string;
-  /** When the worker picked it up, so the pages can count the minutes. */
+  /** When the engine picked it up, so the pages can count the minutes. */
   startedAt: string | null;
   updatedAt: string;
 };
@@ -155,10 +163,38 @@ export type LoopPollState = {
 export type LoopReadiness = {
   connectedConnectorIds: string[];
   defaultAgentId: string | null;
-  installedAgentIds: string[];
+  /** Agents signed in on an online runner. */
+  availableAgentIds: string[];
+  /** The same, but only on a runner that shares Loopable's disk. */
+  hostAgentIds: string[];
 };
 
-/** An agent as the browser sees it: what was found on the machine plus choices. */
+export type RunnerInventoryEntry = {
+  agentId: string;
+  installed: boolean;
+  version: string | null;
+  signedIn: boolean;
+  detail: string;
+};
+
+export type AgentOnRunner = {
+  runnerId: string;
+  name: string;
+  status: "online" | "offline";
+  signedIn: boolean;
+  version: string | null;
+};
+
+export type RunnerView = {
+  id: string;
+  name: string;
+  hostname: string;
+  status: "online" | "offline";
+  inventory: RunnerInventoryEntry[];
+  lastSeenAt: string | null;
+};
+
+/** An agent as the browser sees it: settings, plus which runners have it. */
 export type AgentView = {
   agentId: string;
   installed: boolean;
@@ -167,9 +203,10 @@ export type AgentView = {
   auth: { signedIn: boolean; detail: string } | null;
   settings: { permissionMode: "read_only" | "workspace_write"; model: string | null; timeoutMs: number };
   isDefault: boolean;
-  /** True when nothing was chosen and this is simply the only agent installed. */
+  /** True when nothing was chosen and this is simply the only agent signed in. */
   defaultIsImplicit: boolean;
   commandPreview: string;
+  onRunners: AgentOnRunner[];
 };
 
 /** A connection as the browser sees it: no credentials, no Date objects. */

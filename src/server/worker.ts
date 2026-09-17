@@ -2,10 +2,9 @@ import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { isTransient } from "#/connectors/errors.ts";
 import { db } from "./db/client.ts";
 import { tasks } from "./db/schema.ts";
-import { runnerSettings } from "./settings.ts";
+import { engineSettings } from "./settings.ts";
 import { isCancellation, runTask, updateTask } from "./tasks.ts";
 
-/** States where the worker still owes the task something. */
 const CLAIMED_STATES = ["preparing", "applying"] as const;
 
 export type WorkerOptions = {
@@ -45,7 +44,7 @@ export function createWorker(options: WorkerOptions = {}) {
       .where(
         and(
           inArray(tasks.state, [...CLAIMED_STATES]),
-          or(isNull(tasks.leaseUntil), lte(tasks.leaseUntil, new Date(now()))),
+          lte(tasks.leaseUntil, new Date(now())),
         ),
       )
       .all()
@@ -69,14 +68,36 @@ export function createWorker(options: WorkerOptions = {}) {
         });
       }
     }
-    return abandoned.length;
-  }
+    const abandonedAgent = db()
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.state, "awaiting_agent"),
+          lte(tasks.leaseUntil, new Date(now())),
+        ),
+      )
+      .all();
 
-  /**
-   * One statement, so two workers cannot take the same task: whoever changes
-   * the row first is the one that owns it.
-   */
-  function claim(id: string): boolean {
+    for (const task of abandonedAgent) {
+      if (task.attempts < maxAttempts) {
+        log(`runner lost ${task.id}: queued for another claim`);
+        updateTask(task.id, {
+          leaseUntil: null,
+          error: "The runner stopped while this was running, so it was offered again.",
+        });
+      } else {
+        log(`fail ${task.id}: runner lost after ${task.attempts} attempts`);
+        updateTask(task.id, {
+          state: "failed",
+          leaseUntil: null,
+          error: "The runner stopped while this was running, and it had run out of attempts.",
+        });
+      }
+    }
+    return abandoned.length + abandonedAgent.length;
+  }
+  function claimQueued(id: string): boolean {
     const at = now();
     const result = db()
       .update(tasks)
@@ -88,6 +109,19 @@ export function createWorker(options: WorkerOptions = {}) {
         updatedAt: new Date(at),
       })
       .where(and(eq(tasks.id, id), eq(tasks.state, "queued")))
+      .run();
+    return result.changes === 1;
+  }
+
+  function claimApplying(id: string): boolean {
+    const at = now();
+    const result = db()
+      .update(tasks)
+      .set({
+        leaseUntil: new Date(at + leaseMs),
+        updatedAt: new Date(at),
+      })
+      .where(and(eq(tasks.id, id), eq(tasks.state, "applying")))
       .run();
     return result.changes === 1;
   }
@@ -118,7 +152,7 @@ export function createWorker(options: WorkerOptions = {}) {
     const durationMs = now() - started;
 
     if (isCancellation(error)) {
-      // A run is also aborted when the daemon is shutting down, which is not
+      // A run is also aborted when the engine is shutting down, which is not
       // the same as a person stopping it: nobody asked for it to end, so it
       // goes back in the queue instead of being recorded as cancelled.
       if (task?.cancelRequested) {
@@ -159,7 +193,9 @@ export function createWorker(options: WorkerOptions = {}) {
 
     const done = execute(id, abort.signal)
       .then(() => {
-        log(`finished ${id}`);
+        const row = db().select().from(tasks).where(eq(tasks.id, id)).get();
+        if (row?.state === "awaiting_agent") log(`waiting for runner ${id}`);
+        else log(`finished ${id}`);
       })
       .catch((error: unknown) => settle(id, error))
       .finally(() => {
@@ -175,12 +211,12 @@ export function createWorker(options: WorkerOptions = {}) {
     reap();
     if (stopping) return 0;
 
-    const { paused, maxConcurrentRuns } = runnerSettings();
+    const { paused, maxConcurrentRuns } = engineSettings();
     if (paused) return 0;
     const capacity = maxConcurrentRuns - inFlight.size;
     if (capacity <= 0) return 0;
 
-    const waiting = db()
+    const queued = db()
       .select({ id: tasks.id })
       .from(tasks)
       .where(and(eq(tasks.state, "queued"), lte(tasks.runAfter, new Date(now()))))
@@ -188,10 +224,30 @@ export function createWorker(options: WorkerOptions = {}) {
       .limit(capacity)
       .all();
 
+    const applying = db()
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.state, "applying"),
+          or(isNull(tasks.leaseUntil), lte(tasks.leaseUntil, new Date(now()))),
+        ),
+      )
+      .orderBy(asc(tasks.createdAt))
+      .limit(Math.max(0, capacity - queued.length))
+      .all();
+
     let started = 0;
-    for (const task of waiting) {
-      if (!claim(task.id)) continue;
+    for (const task of queued) {
+      if (!claimQueued(task.id)) continue;
       log(`started ${task.id}`);
+      launch(task.id);
+      started += 1;
+    }
+    for (const task of applying) {
+      if (inFlight.has(task.id)) continue;
+      if (!claimApplying(task.id)) continue;
+      log(`applying ${task.id}`);
       launch(task.id);
       started += 1;
     }
@@ -212,8 +268,8 @@ export function createWorker(options: WorkerOptions = {}) {
   }
 
   /**
-   * Stops claiming and brings the running agents down with us. Walking away
-   * instead would leave them running with nowhere to report, still spending
+   * Stops claiming and brings the running work down with us. Walking away
+   * instead would leave agents running with nowhere to report, still spending
    * money, while the task they belong to gets queued again and starts a
    * second one alongside the first.
    */
