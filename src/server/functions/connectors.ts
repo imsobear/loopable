@@ -88,6 +88,22 @@ export const continueQrLogin = createServerFn({ method: "POST" })
     return { state: "pending", attempt: outcome.attempt, hint: outcome.hint };
   });
 
+/**
+ * A secret pasted in the UI. Stored here; the page is told only the account
+ * label, never the token back.
+ */
+export const connectWithToken = createServerFn({ method: "POST" })
+  .inputValidator((data: { connectorId: string; fields: Record<string, string> }) => data)
+  .handler(async ({ data }) => {
+    const runtime = connectorRuntime(data.connectorId);
+    if (!runtime.auth.connectWithFields) {
+      throw new Error(`${data.connectorId} does not connect with a token.`);
+    }
+    const result = await runtime.auth.connectWithFields(data.fields);
+    const connection = await saveAuthorizedConnection(data.connectorId, result);
+    return { accountLabel: connection.accountLabel };
+  });
+
 export const disconnectConnection = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data }) => {

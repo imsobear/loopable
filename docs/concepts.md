@@ -16,9 +16,9 @@ There is no second path where “the local dispatcher runs the agent.” The age
 
 ## What you configure
 
-**Connector.** A kind of service: GitHub, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account. Slack is the intended chat surface; it is not shipped yet.
+**Connector.** A kind of service: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account.
 
-**Connection.** One signed-in account of a connector — the GitHub bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
+**Connection.** One credential of a connector — a GitHub login, a Slack bot, a Feishu bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
 
 **Workflow.** A whole job a connector already knows how to do, named the way a person would name it: “Review pull requests I am asked to review.” It owns what to watch for, what to ask the agent, and where the answer is written. A loop is one instance of a workflow with its knobs set.
 
@@ -38,7 +38,7 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 **Agent.** A coding CLI Loopable knows how to invoke: Codex, Cursor Agent (Claude). The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
 
-**Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub or Gmail. Agent login is Codex or Cursor Agent. They live in different places and must not be merged into one “account.”
+**Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub, a Slack bot, a Feishu bot, Gmail, or WeChat. Agent login is Codex or Cursor Agent. They live in different places and must not be merged into one “account.”
 
 **Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. The command is `loopable runner`. The join token lives on the Runners page.
 
@@ -68,7 +68,7 @@ The path does not change with how many runners you have. One runner on the same 
 
 | | Connection | Runtime auth | Agent login |
 | --- | --- | --- | --- |
-| What | GitHub, Gmail, WeChat | git / `gh` on the runner | Codex, Cursor Agent |
+| What | GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat | git / `gh` on the runner | Codex, Cursor Agent |
 | Where | Loopable’s secret store | That host’s home directory | That host’s home directory |
 | Who uses it | App and Dispatcher, to read signals and write back | The agent, via git on that host | Only the agent process |
 

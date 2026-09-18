@@ -29,8 +29,8 @@ Signal → Loop → Task
               → Dispatcher writes back
 ```
 
-The runner claims work over HTTP. Loopable does not push into the runner. Slack, GitHub, and the clock are ways to create a signal. The path inside does not change. Connections live on Loopable. Agent login lives on the runner.
+The runner claims work over HTTP. Loopable does not push into the runner. A Slack bot, a Feishu bot, GitHub, and the clock are ways to create a signal. The path inside does not change. Connections live on Loopable. Agent login lives on the runner.
 
-Shipped today: GitHub, Gmail, WeChat, the clock, runners, Codex and Cursor Agent (Claude). Slack is the intended chat surface; it is not shipped yet.
+Shipped today: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock, runners, Codex and Cursor Agent (Claude).
 
 The words for the parts are in [concepts.md](concepts.md). Extra runners are in [deploy.md](deploy.md).

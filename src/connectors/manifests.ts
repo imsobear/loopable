@@ -1,6 +1,8 @@
 import { githubManifest } from "./github/manifest.ts";
 import { gmailManifest } from "./gmail/manifest.ts";
 import { scheduleManifest } from "./schedule/manifest.ts";
+import { slackManifest } from "./slack/manifest.ts";
+import { feishuManifest } from "./feishu/manifest.ts";
 import { wechatManifest } from "./wechat/manifest.ts";
 import type {
   ActionDescriptor,
@@ -15,6 +17,8 @@ import type {
  */
 export const CONNECTOR_MANIFESTS: ConnectorManifest[] = [
   githubManifest,
+  slackManifest,
+  feishuManifest,
   gmailManifest,
   wechatManifest,
   scheduleManifest,
@@ -25,14 +29,22 @@ export function connectorManifest(id: ConnectorId): ConnectorManifest | undefine
 }
 
 /**
- * Whether this connector is somewhere you have an account.
+ * Whether this connector is somewhere you have a Connection.
  *
  * Asked in three places that would otherwise each assume every connector is:
- * the page listing accounts, the check for what stands between a loop and
+ * the page listing connections, the check for what stands between a loop and
  * running, and the fetch of a credential for a run.
  */
 export function needsAccount(id: ConnectorId): boolean {
   return connectorManifest(id)?.auth.kind !== "none";
+}
+
+/**
+ * What one Connection of this connector is called in the UI.
+ * A Slack or Feishu bot is a pasted app credential, not a login.
+ */
+export function connectionNoun(id: ConnectorId): "account" | "bot" {
+  return connectorManifest(id)?.auth.kind === "token" ? "bot" : "account";
 }
 
 export function connectorWorkflow(

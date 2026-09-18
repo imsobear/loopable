@@ -7,7 +7,7 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { CONNECTOR_MANIFESTS, needsAccount } from "@/connectors/manifests.ts";
+import { CONNECTOR_MANIFESTS, connectionNoun, needsAccount } from "@/connectors/manifests.ts";
 import { getConnectorOverview } from "@/server/functions/connectors.ts";
 
 export const Route = createFileRoute("/connectors/")({
@@ -62,7 +62,8 @@ function ConnectorsPage() {
                     <h2 className="font-medium">{manifest.name}</h2>
                     {connections.length > 0 ? (
                       <Badge variant="secondary">
-                        {connections.length} account{connections.length > 1 ? "s" : ""}
+                        {connections.length} {connectionNoun(manifest.id)}
+                        {connections.length > 1 ? "s" : ""}
                       </Badge>
                     ) : null}
                   </div>

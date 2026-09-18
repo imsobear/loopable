@@ -1,6 +1,6 @@
 # Connectors
 
-A connector is a kind of service: GitHub, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account. A signed-in account is a **Connection**. Credentials live in Loopable. Agents never see them.
+A connector is a kind of service: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account. A signed-in account (or a pasted Slack or Feishu bot) is a **Connection**. Credentials live in Loopable. Agents never see them.
 
 Each connector is a folder under `src/connectors/`. It exports two halves, and the split is load bearing:
 
@@ -38,3 +38,39 @@ WeChat is reached through Tencent's iLink bot API. Loopable speaks it directly r
 Connecting means scanning. The connector hands over what the code should contain and a way to ask how the scan is going; the page renders it and asks every couple of seconds. A code lasts about two minutes. The token never reaches the browser: a confirmed scan is saved server-side.
 
 There are no WeChat workflows yet. Binding an account is worth having on its own.
+
+## Slack bot
+
+The Slack connection is a **bot in a Slack app**, not a Slack user login. Loopable does not ship a Slack app, because an office Mac has no public URL for Slack OAuth or Events. The team creates a Slack app, installs it in their workspace, and pastes the Bot User OAuth Token (`xoxb-…`). That token is not a person's Slack account. Loopable polls. Slack never has to reach this machine.
+
+Bot scopes to add before Install to Workspace:
+
+```
+channels:history channels:read
+groups:history groups:read
+im:history im:read
+mpim:history mpim:read
+chat:write
+```
+
+Invite the bot to any channel it should watch. A loop fires on an @mention in those channels, or on a DM to the bot, and replies in the thread.
+
+## Feishu / Lark bot
+
+The Feishu connection is a **bot in a custom Feishu or Lark app**, not a Feishu user login. Loopable does not ship a Feishu app, because an office Mac has no public URL for Feishu events. The team creates a custom app, enables Bot, publishes a version, and pastes App ID and App Secret. That is not a person's Feishu account. Loopable polls groups the bot is in. Feishu never has to reach this machine.
+
+Open platform:
+
+- Feishu (China): `feishu` — [open.feishu.cn/app](https://open.feishu.cn/app)
+- Lark (international): `lark` — [open.larksuite.com/app](https://open.larksuite.com/app)
+
+Permissions to add before publishing a version:
+
+```
+im:chat:readonly
+im:message
+im:message.group_msg
+im:message:send_as_bot
+```
+
+Invite the bot to any group it should watch. A loop fires on an @mention in those groups and replies in the thread. Feishu does not list p2p chats for a bot, so DMs are not polled.

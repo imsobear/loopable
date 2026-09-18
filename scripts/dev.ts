@@ -20,11 +20,18 @@ function run(file: string, args: string[], extra: NodeJS.ProcessEnv = {}): Child
 }
 
 const app = run(vite, ["dev", "--port", port, "--host", host], { LOOPABLE_DEV: "1" });
-const dispatcher = run(node, ["--experimental-strip-types", join(root, "src/dispatcher/main.ts")], {
-  PORT: "",
-  LOOPABLE_DISPATCHER_PORT: "",
-  LOOPABLE_DEV: "1",
-});
+// --watch reloads when a connector is added. Vite HMR does not reach this process.
+const dispatcher = run(
+  node,
+  ["--watch", "--experimental-strip-types", join(root, "src/dispatcher/main.ts")],
+  {
+    PORT: "",
+    LOOPABLE_DISPATCHER_PORT: "",
+    LOOPABLE_DEV: "1",
+    // Same owner across --watch restarts, so the new process can take the lease.
+    LOOPABLE_DISPATCHER_ID: "dev",
+  },
+);
 let runner: ChildProcess | undefined;
 
 function stop() {

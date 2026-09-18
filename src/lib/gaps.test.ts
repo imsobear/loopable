@@ -40,7 +40,7 @@ describe("gapsFor", () => {
     const gaps = gapsFor({ ...ready, connectedConnectorIds: ["github"] }, [
       loop({ actionConnectorId: "wechat", actionId: "wechat.reply" }),
     ]);
-    expect(gaps).toEqual(["Review my code answers on WeChat, which has no account."]);
+    expect(gaps).toEqual(["Review my code answers on WeChat, which is not connected."]);
   });
 
   it("says both when a loop watches and answers somewhere unconnected", () => {
@@ -48,14 +48,29 @@ describe("gapsFor", () => {
       loop({ connectorId: "wechat", actionConnectorId: "wechat", actionId: "wechat.reply" }),
     ]);
     expect(gaps).toEqual([
-      "Review my code watches WeChat, which has no account.",
-      "Review my code answers on WeChat, which has no account.",
+      "Review my code watches WeChat, which is not connected.",
+      "Review my code answers on WeChat, which is not connected.",
     ]);
   });
 
   it("does not repeat itself per loop when nothing is connected at all", () => {
     const gaps = gapsFor({ ...ready, connectedConnectorIds: [] }, [loop(), loop({ id: "loop-2" })]);
-    expect(gaps).toEqual(["No account is connected yet, so no signal can arrive."]);
+    expect(gaps).toEqual(["Nothing is connected yet, so no signal can arrive."]);
+  });
+
+  it("names a missing Slack bot, not a Slack account", () => {
+    const gaps = gapsFor({ ...ready, connectedConnectorIds: ["github"] }, [
+      loop({
+        connectorId: "slack",
+        workflowId: "slack.ask",
+        actionConnectorId: "slack",
+        actionId: "slack.reply",
+      }),
+    ]);
+    expect(gaps).toEqual([
+      "Review my code watches Slack bot, which is not connected.",
+      "Review my code answers on Slack bot, which is not connected.",
+    ]);
   });
 
   it("separates having no agent from having one but not choosing it", () => {

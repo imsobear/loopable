@@ -157,7 +157,7 @@ async function waitForApp(port: string): Promise<void> {
 
 async function printRunnerHint(flags: Flags): Promise<void> {
   await waitForApp(flags.port);
-  const { lanIPv4 } = await import("./lib/callback.ts");
+  const { lanIPv4 } = await import("./lib/lan.ts");
   const { getJoinToken } = await import("./server/runners.ts");
   const ip = lanIPv4() ?? "127.0.0.1";
   const url = `http://${ip}:${flags.port}`;

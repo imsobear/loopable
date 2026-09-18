@@ -16,7 +16,7 @@ import type { Commentable, Finding } from "#/lib/review.ts";
 
 export type ConnectorId = string;
 
-/** How a user connects an account. The UI renders from this, so the set is closed. */
+/** How a user creates a Connection. The UI renders from this, so the set is closed. */
 export type AuthDescriptor =
   | {
       kind: "oauth_redirect";
@@ -30,6 +30,8 @@ export type AuthDescriptor =
       fields: TokenField[];
       /** Where the user creates the token. */
       helpUrl?: string;
+      /** What they are about to paste, since a token field says less than a consent screen. */
+      note?: string;
     }
   | {
       kind: "qr_scan";

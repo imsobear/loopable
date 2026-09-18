@@ -6,13 +6,14 @@ import { ConnectionSettingsForm } from "@/components/connection-settings-form";
 import { ConnectionStatusBadge } from "@/components/connection-status";
 import { ConnectorIcon } from "@/components/connector-icon";
 import { QrConnect } from "@/components/qr-connect";
+import { TokenConnect } from "@/components/token-connect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { connectorManifest } from "@/connectors/manifests.ts";
+import { connectionNoun, connectorManifest } from "@/connectors/manifests.ts";
 import { registrableCallbackUrl } from "@/lib/callback.ts";
 import type { ConnectionView } from "@/lib/domain.ts";
 import {
@@ -40,7 +41,9 @@ function ConnectorDetailPage() {
   const canAddAccount =
     manifest.allowsMultipleAccounts || state.connections.length === 0;
   const scans = manifest.auth.kind === "qr_scan";
+  const tokens = manifest.auth.kind === "token";
   const [scanning, setScanning] = useState(false);
+  const [pasting, setPasting] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,6 +66,10 @@ function ConnectorDetailPage() {
             <Button onClick={() => setScanning((open) => !open)}>
               {scanning ? "Cancel" : "Connect"}
             </Button>
+          ) : tokens ? (
+            <Button onClick={() => setPasting((open) => !open)}>
+              {pasting ? "Cancel" : "Add bot"}
+            </Button>
           ) : (
             <Button render={<a href={`/api/connectors/${connectorId}/authorize`} />}>
               {state.connections.length > 0 ? "Add another account" : "Connect"}
@@ -76,6 +83,16 @@ function ConnectorDetailPage() {
           connectorId={connectorId}
           note={manifest.auth.note}
           onDone={() => setScanning(false)}
+        />
+      ) : null}
+
+      {pasting && manifest.auth.kind === "token" ? (
+        <TokenConnect
+          connectorId={connectorId}
+          fields={manifest.auth.fields}
+          note={manifest.auth.note}
+          helpUrl={manifest.auth.helpUrl}
+          onDone={() => setPasting(false)}
         />
       ) : null}
 
@@ -94,10 +111,10 @@ function ConnectorDetailPage() {
         </Alert>
       ) : null}
 
-      {state.connections.length === 0 && state.readiness.ready && !scanning ? (
+      {state.connections.length === 0 && state.readiness.ready && !scanning && !pasting ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            No account connected yet.
+            No {connectionNoun(connectorId)} connected yet.
             {manifest.auth.kind === "oauth_redirect" ? (
               <>
                 {" "}
@@ -106,6 +123,9 @@ function ConnectorDetailPage() {
               </>
             ) : null}
             {manifest.auth.kind === "qr_scan" ? " Connecting shows a code to scan." : null}
+            {manifest.auth.kind === "token"
+              ? " Connecting asks for app credentials, not a personal login."
+              : null}
           </CardContent>
         </Card>
       ) : null}

@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   appOrigin,
   callbackUrl,
-  lanIPv4,
-  loopableOrigin,
   registrableCallbackUrl,
 } from "./callback.ts";
+import { lanIPv4, loopableOrigin } from "./lan.ts";
 
 function nics(address: string): NodeJS.Dict<NetworkInterfaceInfo[]> {
   return {

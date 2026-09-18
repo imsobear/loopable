@@ -47,6 +47,6 @@ Then on each runner host, install the CLI once and join:
 loopable runner --url http://192.168.1.10:4321 --token <from Runners>
 ```
 
-Open the UI as `http://192.168.1.10:4321/?token=<LOOPABLE_APP_TOKEN>` to copy the join command. Connect GitHub or Gmail from `http://127.0.0.1:4321` on this laptop.
+Open the UI as `http://192.168.1.10:4321/?token=<LOOPABLE_APP_TOKEN>` to copy the join command. Connect GitHub or Gmail from `http://127.0.0.1:4321` on this laptop. A Slack bot or Feishu / Lark bot is a pasted app credential, so it can be added from the LAN UI; it is not a Slack or Feishu login.
 
 Each runner needs the agent CLI signed in, and git / `gh` if jobs clone. Google will not accept a private IP as an OAuth redirect, so Gmail login from another machine on the LAN will not work. GitHub is the same unless you click Connect on this laptop.

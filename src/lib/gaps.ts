@@ -50,7 +50,7 @@ export function gapsFor(readiness: LoopReadiness, loops: LoopView[]): string[] {
   const missing: string[] = [];
   const connected = new Set(readiness.connectedConnectorIds);
   if (connected.size === 0) {
-    missing.push("No account is connected yet, so no signal can arrive.");
+    missing.push("Nothing is connected yet, so no signal can arrive.");
   }
   if (readiness.availableAgentIds.length === 0) {
     missing.push("No coding agent is signed in on any runner, so nothing can be prepared.");
@@ -63,11 +63,11 @@ export function gapsFor(readiness: LoopReadiness, loops: LoopView[]): string[] {
     for (const loop of loops) {
       if (!loop.enabled) continue;
       if (needsAccount(loop.connectorId) && !connected.has(loop.connectorId)) {
-        missing.push(`${loop.name} watches ${name(loop.connectorId)}, which has no account.`);
+        missing.push(`${loop.name} watches ${name(loop.connectorId)}, which is not connected.`);
       }
       if (needsAccount(loop.actionConnectorId) && !connected.has(loop.actionConnectorId)) {
         missing.push(
-          `${loop.name} answers on ${name(loop.actionConnectorId)}, which has no account.`,
+          `${loop.name} answers on ${name(loop.actionConnectorId)}, which is not connected.`,
         );
       }
     }
