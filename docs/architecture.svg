@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" role="img" aria-labelledby="title desc">
+  <title id="title">Loopable architecture</title>
+  <desc id="desc">Slack bot, GitHub, and Lark bot into Loopable. A runner pulls the job. Loopable writes the result back to Slack, GitHub, and Lark.</desc>
+  <defs>
+    <symbol id="i-slack" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+    </symbol>
+    <symbol id="i-github" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+    </symbol>
+    <symbol id="i-lark" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12.924 12.803c.019-.019.038-.035.057-.054.038-.035.075-.073.11-.11l.076-.076.23-.227 1.335-1.319.334-.331c.063-.063.129-.123.196-.183.123-.11.246-.218.375-.322.117-.094.24-.186.363-.274.173-.123.35-.237.533-.347.18-.107.363-.205.552-.297.177-.085.357-.164.543-.236.104-.041.205-.079.312-.114.054-.019.104-.035.158-.051-.47-1.858-1.335-3.562-2.499-5.013-.227-.284-.574-.448-.94-.448H5.008c-.173 0-.246.224-.107.325 3.284 2.413 6.023 5.514 8.001 9.098.006-.006.016-.013.022-.022z"/>
+      <path fill="currentColor" d="M9.097 21.299c4.985 0 9.326-2.751 11.591-6.815.079-.142.158-.287.23-.432-.114.221-.243.429-.379.625-.05.069-.1.138-.151.205-.066.085-.133.167-.202.246-.054.063-.11.123-.167.183-.117.12-.237.236-.363.344-.069.06-.142.116-.215.173-.085.066-.173.13-.261.186-.057.038-.114.076-.171.11-.06.038-.12.073-.183.107-.126.07-.252.133-.382.193-.113.05-.227.097-.344.139-.126.047-.255.088-.385.123-.192.054-.391.095-.59.126-.145.022-.29.038-.438.05-.155.01-.313.016-.47.013-.174-.003-.347-.013-.524-.032-.13-.013-.259-.031-.388-.057-.114-.019-.228-.044-.341-.069-.06-.016-.12-.028-.18-.044-.167-.044-.331-.092-.495-.139-.082-.025-.164-.047-.246-.072-.123-.038-.246-.073-.366-.11-.101-.032-.199-.063-.3-.095-.095-.031-.189-.063-.284-.094-.063-.022-.13-.044-.193-.066-.079-.025-.155-.054-.233-.082-.057-.019-.11-.038-.167-.06-.11-.041-.221-.079-.328-.12-.063-.025-.126-.047-.189-.072-.085-.032-.17-.067-.252-.098-.089-.035-.177-.07-.268-.108-.057-.022-.117-.047-.174-.069-.073-.028-.142-.06-.215-.088-.053-.022-.11-.047-.163-.069-.057-.025-.114-.05-.171-.076-.051-.022-.098-.044-.149-.066-.044-.019-.091-.041-.135-.06-.048-.022-.092-.041-.139-.063-.048-.022-.095-.044-.143-.066-.06-.028-.12-.057-.18-.082-.063-.028-.123-.06-.186-.088-.066-.032-.132-.064-.198-.098-.057-.028-.114-.057-.171-.082-2.988-1.489-5.638-3.477-7.897-5.887-.113-.12-.312-.041-.312.123l.006 9.209c0 .401.199.779.534 1 2.094 1.394 4.615 2.205 7.325 2.205z"/>
+      <path fill="currentColor" d="M23.732 9.295c-1.01-.498-2.148-.776-3.35-.776-.713 0-1.407.098-2.06.284-.076.022-.151.044-.224.066-.054.016-.107.035-.158.05-.104.035-.208.073-.312.114-.183.073-.366.151-.543.237-.189.091-.372.189-.552.296-.183.107-.363.224-.533.347-.123.089-.243.18-.363.275-.129.104-.252.211-.375.321-.066.06-.13.123-.196.183l-.334.328-1.338 1.322-.23.227-.076.076c-.038.038-.076.072-.11.11-.019.019-.038.035-.057.054-.028.028-.056.054-.085.079-.031.028-.063.06-.094.088-.827.76-1.748 1.413-2.748 1.946.06.029.12.057.18.082.047.022.094.044.142.066.044.022.091.041.138.063.044.019.092.041.136.06.05.022.098.044.148.066.057.025.114.05.171.075.054.022.11.044.164.069.072.028.141.06.214.088.057.022.117.044.174.069.088.034.177.072.268.107.085.032.167.067.252.098.063.025.126.047.189.072.11.041.217.079.328.12.057.019.11.038.167.06.078.028.154.053.233.082.063.022.126.044.193.066.094.031.189.063.284.094.1.032.198.063.3.095.123.037.243.072.365.11.082.025.164.047.247.072.163.047.327.094.494.139.06.016.12.028.18.044.114.028.227.05.341.069.129.022.258.041.388.057.177.019.35.031.524.031.157.003.315-.003.47-.013.148-.009.293-.028.438-.05.202-.032.398-.072.59-.126.13-.035.259-.076.385-.123.117-.044.23-.091.344-.139.129-.06.258-.123.381-.192.06-.035.123-.069.183-.107.057-.038.114-.076.171-.114.088-.06.176-.123.261-.187.073-.057.146-.113.215-.173.126-.107.246-.224.363-.344.057-.06.113-.12.167-.183.069-.079.135-.161.202-.246.05-.066.1-.135.151-.205.136-.196.262-.404.376-.621l.129-.259 1.167-2.325.003.006c.376-.823.896-1.562 1.527-2.186z"/>
+    </symbol>
+    <symbol id="i-codex" viewBox="0 0 24 24">
+      <path fill="none" stroke="#f2eee6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8.2 7.2 3.8 12l4.4 4.8M15.8 7.2 20.2 12l-4.4 4.8"/>
+    </symbol>
+    <symbol id="i-claude" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 1.8 13.2 8.5 19.4 5.1 15.5 10.5 22.2 12 15.5 13.5 19.4 18.9 13.2 15.5 12 22.2 10.8 15.5 4.6 18.9 8.5 13.5 1.8 12 8.5 10.5 4.6 5.1 10.8 8.5Z"/>
+    </symbol>
+  </defs>
+
+  <rect width="920" height="720" rx="24" fill="#070708"/>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" fill="#f2eee6">
+    <g id="connectors" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.4">
+      <g transform="translate(214 36)">
+        <rect width="150" height="36" rx="18" fill="none" stroke="rgba(242,238,230,0.14)"/>
+        <use href="#i-slack" x="16" y="10" width="16" height="16"/>
+        <text x="40" y="23">SLACK BOT</text>
+      </g>
+      <g transform="translate(385 36)">
+        <rect width="150" height="36" rx="18" fill="none" stroke="rgba(242,238,230,0.14)"/>
+        <use href="#i-github" x="28" y="10" width="16" height="16"/>
+        <text x="52" y="23">GITHUB</text>
+      </g>
+      <g transform="translate(556 36)">
+        <rect width="150" height="36" rx="18" fill="none" stroke="rgba(242,238,230,0.14)"/>
+        <use href="#i-lark" x="22" y="10" width="16" height="16"/>
+        <text x="46" y="23">LARK BOT</text>
+      </g>
+    </g>
+
+    <path d="M460 80 v36" stroke="#d4ff3f" stroke-width="1.2" opacity="0.85"/>
+
+    <g transform="translate(80 132)">
+      <rect width="760" height="214" rx="16" fill="#0c0d10" stroke="rgba(212,255,63,0.22)"/>
+      <text x="28" y="36" font-size="22" font-weight="560" letter-spacing="-0.4">Loopable</text>
+      <text x="732" y="34" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.6" fill="#9b968c">APP + DISPATCHER</text>
+
+      <g transform="translate(20 58)" font-size="15">
+        <rect width="720" height="134" rx="12" fill="none" stroke="rgba(242,238,230,0.1)"/>
+        <g transform="translate(0 0)">
+          <text x="24" y="32" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.8" fill="#d4ff3f">WATCH</text>
+          <text x="24" y="58">From Slack, GitHub, Lark.</text>
+          <text x="24" y="80" font-size="13" fill="#9b968c">The tools the team already uses.</text>
+        </g>
+        <path d="M240 1 v132" stroke="rgba(242,238,230,0.1)"/>
+        <path d="M229 22h10l-4 4" fill="none" stroke="#d4ff3f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <g transform="translate(240 0)">
+          <text x="24" y="32" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.8" fill="#d4ff3f">MATCH</text>
+          <text x="24" y="58">Pick the loop.</text>
+          <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" letter-spacing="1" fill="#9b968c">
+            <rect x="24" y="70" width="64" height="22" rx="11" fill="none" stroke="rgba(242,238,230,0.12)"/>
+            <text x="56" y="85" text-anchor="middle">REVIEW</text>
+            <rect x="94" y="70" width="56" height="22" rx="11" fill="none" stroke="rgba(242,238,230,0.12)"/>
+            <text x="122" y="85" text-anchor="middle">CASES</text>
+            <rect x="156" y="70" width="72" height="22" rx="11" fill="none" stroke="rgba(242,238,230,0.12)"/>
+            <text x="192" y="85" text-anchor="middle">MONITORS</text>
+          </g>
+        </g>
+        <path d="M480 1 v132" stroke="rgba(242,238,230,0.1)"/>
+        <path d="M469 22h10l-4 4" fill="none" stroke="#d4ff3f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <g transform="translate(480 0)">
+          <text x="24" y="32" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.8" fill="#d4ff3f">DISPATCH</text>
+          <text x="24" y="58">Queue the job.</text>
+          <text x="24" y="80" font-size="13" fill="#9b968c">A runner pulls it.</text>
+        </g>
+      </g>
+    </g>
+
+    <path d="M460 346 v36" stroke="#d4ff3f" stroke-width="1.2" opacity="0.85"/>
+    <text x="472" y="370" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.8" fill="#d4ff3f">PULL</text>
+
+    <g transform="translate(80 398)">
+      <rect width="760" height="132" rx="16" fill="#0c0d10" stroke="rgba(242,238,230,0.1)"/>
+      <text x="28" y="36" font-size="22" font-weight="560" letter-spacing="-0.4">Runner</text>
+      <text x="732" y="34" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.6" fill="#9b968c">SHARED COMPUTER</text>
+      <text x="28" y="64" font-size="15" fill="#9b968c">Pulls the job. Codex or Claude run on that machine. Loopable writes the result back.</text>
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.4">
+        <g transform="translate(28 84)">
+          <rect width="110" height="32" rx="16" fill="none" stroke="rgba(242,238,230,0.14)"/>
+          <use href="#i-codex" x="14" y="8" width="16" height="16"/>
+          <text x="36" y="21">CODEX</text>
+        </g>
+        <g transform="translate(148 84)">
+          <rect width="118" height="32" rx="16" fill="none" stroke="rgba(242,238,230,0.14)"/>
+          <use href="#i-claude" x="14" y="8" width="16" height="16"/>
+          <text x="36" y="21">CLAUDE</text>
+        </g>
+      </g>
+    </g>
+
+    <path d="M460 530 v36" stroke="#d4ff3f" stroke-width="1.2" opacity="0.85"/>
+    <text x="472" y="554" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" letter-spacing="1.8" fill="#d4ff3f">WRITE BACK</text>
+
+    <use href="#connectors" y="548"/>
+  </g>
+</svg>

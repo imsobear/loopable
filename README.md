@@ -4,7 +4,7 @@ Loopable is the team’s always-on agent for shared-knowledge work — review, c
 
 It picks up a signal, does what the loop says, and writes the result back. Loops run on their own. Every run is recorded in the inbox.
 
-Connect GitHub (Gmail and WeChat also work today). Write a loop. Leave the machine on. Pull requests get reviewed, assigned issues get a draft, a scheduled job runs at 9am. The team does not have to open Codex.
+Connect GitHub, a Slack bot, a Feishu / Lark bot, Gmail, or WeChat. Write a loop. Leave the machine on. Pull requests get reviewed, assigned issues get a draft, a scheduled job runs at 9am. The team does not have to open Codex.
 
 The story is in [docs/narrative.md](docs/narrative.md). The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
 
@@ -12,12 +12,11 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 Three processes. The agent always runs on a Runner, never on the App or Dispatcher.
 
-```text
-Signal → Loop → Task
-              → Dispatcher watches, matches a loop, queues the job
-              → Runner pulls the job, runs the Agent
-              → Dispatcher writes back
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="Slack bot, GitHub, and Lark bot into Loopable. A runner pulls the job. Loopable writes back to the same three." width="920" />
+</p>
+
+Slack bot, GitHub, and Lark bot send work in. Loopable watches, matches a loop, and queues the job. A Runner pulls it, runs Codex or Claude, and Loopable writes the result back.
 
 ```text
 Loopable  ──HTTP pull──  Runner  ──  Agent CLI
