@@ -14,21 +14,21 @@ Three processes. The agent always runs on a Runner, never on the App or Dispatch
 
 ```text
 Signal → Loop → Task
-              → Dispatcher prepares context, picks a Runner
-              → Runner runs the Agent
+              → Dispatcher watches, matches a loop, queues the job
+              → Runner pulls the job, runs the Agent
               → Dispatcher writes back
 ```
 
 ```text
-Loopable  ──HTTP──  Runner  ──  Agent CLI
+Loopable  ──HTTP pull──  Runner  ──  Agent CLI
 (App + Dispatcher)
 ```
 
 | Process | Does |
 | --- | --- |
 | **App** | UI, HTTP API, OAuth, the interface runners pull from |
-| **Dispatcher** | Watches for signals, prepares tasks, writes back |
-| **Runner** | Runs the agent CLI |
+| **Dispatcher** | Watches for signals, matches loops, queues jobs, writes back |
+| **Runner** | Pulls a job over HTTP, runs the agent CLI |
 
 App and Dispatcher share one database and stay on the same host. Only one Dispatcher may run against that database. Runners join over HTTP from that host or other machines. Extra runners are in [docs/deploy.md](docs/deploy.md).
 
@@ -36,7 +36,7 @@ App and Dispatcher share one database and stay on the same host. Only one Dispat
 
 The usual setup is one computer that stays on — a Mac in the office is enough. App, Dispatcher, and a Runner all live there. It looks like a spare machine on a desk. For a small team, that is the product.
 
-You need Node 22+ and an agent CLI signed in on that machine (Codex or Claude / Cursor Agent).
+You need Node 22+ and an agent CLI signed in on that machine (Codex or Cursor Agent / Claude).
 
 ```bash
 npm install -g loopable-cli

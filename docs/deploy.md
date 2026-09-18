@@ -5,10 +5,10 @@ Loopable is three processes. This is local deploy: one machine you control, plus
 | Process | Does | Command |
 | --- | --- | --- |
 | **App** | UI, HTTP API, OAuth, the interface runners pull from | `loopable start` |
-| **Dispatcher** | Watches for signals, prepares tasks, writes back | (started with the App) |
-| **Runner** | Runs the agent CLI | `loopable runner` |
+| **Dispatcher** | Watches for signals, matches loops, queues jobs, writes back | (started with the App) |
+| **Runner** | Pulls a job over HTTP, runs the agent CLI | `loopable runner` |
 
-The Dispatcher is always a single instance. Two of them on one database would fight over every task. Agents always run on a Runner. Connections never leave the App and Dispatcher.
+The Dispatcher is always a single instance. Two of them on one database would fight over every task. Agents always run on a Runner. The runner claims work from `/api/runners/claim`. Loopable does not push jobs into the runner. Connections never leave the App and Dispatcher.
 
 Names for the parts are in [concepts.md](concepts.md).
 

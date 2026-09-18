@@ -1,22 +1,22 @@
 # Concepts
 
-Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded.
+Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. It watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded.
 
-Personal use and team use are the same product. A laptop is the first runner. A team adds more runners. The path a task takes does not change.
+The usual install is one computer that stays on. Extra runners join the same way. The path a task takes does not change.
 
 ```text
 Signal → Loop → Task
-              → Dispatcher prepares context, picks a Runner
-              → Runner runs the Agent
+              → Dispatcher watches, matches a loop, queues the job
+              → Runner pulls the job, runs the Agent
               → Dispatcher writes back
               → Task is recorded
 ```
 
-There is no second path where “the local dispatcher runs the agent.” The agent always runs on a Runner.
+There is no second path where “the local dispatcher runs the agent.” The agent always runs on a Runner. The runner pulls work over HTTP (`/api/runners/claim`). Loopable does not push jobs into the runner.
 
 ## What you configure
 
-**Connector.** A kind of service: GitHub, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account.
+**Connector.** A kind of service: GitHub, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account. Slack is the intended chat surface; it is not shipped yet.
 
 **Connection.** One signed-in account of a connector — the GitHub bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
 
@@ -36,11 +36,11 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 ## What does the work
 
-**Agent.** A coding CLI Loopable knows how to invoke: Codex, Cursor Agent. The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
+**Agent.** A coding CLI Loopable knows how to invoke: Codex, Cursor Agent (Claude). The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
 
-**Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub or Slack. Agent login is Codex or Claude. They live in different places and must not be merged into one “account.”
+**Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub or Gmail. Agent login is Codex or Cursor Agent. They live in different places and must not be merged into one “account.”
 
-**Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, does not clone repositories, and does not write back to GitHub or Slack. The command is `loopable runner`. The join token lives on the Runners page.
+**Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. The command is `loopable runner`. The join token lives on the Runners page.
 
 ## What you install
 
@@ -49,7 +49,7 @@ The first look never acts. Whatever is already waiting when a loop is created is
 | Role | Does |
 | --- | --- |
 | **App** | The UI, the HTTP API, OAuth callbacks, and the interface runners pull from |
-| **Dispatcher** | Watches for signals, moves tasks, writes back through Connections |
+| **Dispatcher** | Watches for signals, matches loops, queues jobs, writes back through Connections |
 
 They share one database. They are not two products. They need not be two services. `loopable start` runs App and Dispatcher on the same host so a loop keeps running when nobody has the window open. How to start each is in [deploy.md](deploy.md). Changing this repo is `pnpm dev`, not a deploy.
 
@@ -58,7 +58,7 @@ Do not call this a management platform. The product is Loopable. The console is 
 **Runner** is a separate process on every host that should run agents. Start it with the URL and join token from Runners:
 
 ```text
-Loopable  ──HTTP──  Runner  ──  Agent CLI
+Loopable  ──HTTP pull──  Runner  ──  Agent CLI
 (App + Dispatcher)
 ```
 
@@ -68,7 +68,7 @@ The path does not change with how many runners you have. One runner on the same 
 
 | | Connection | Runtime auth | Agent login |
 | --- | --- | --- | --- |
-| What | GitHub, Slack, Gmail | git / `gh` on the runner | Codex, Claude Code |
+| What | GitHub, Gmail, WeChat | git / `gh` on the runner | Codex, Cursor Agent |
 | Where | Loopable’s secret store | That host’s home directory | That host’s home directory |
 | Who uses it | App and Dispatcher, to read signals and write back | The agent, via git on that host | Only the agent process |
 

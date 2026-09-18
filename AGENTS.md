@@ -1,8 +1,8 @@
 # Loopable
 
-Build reliable engineering loops across the services and agents you already use.
+Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. A lot of work should not depend on one person.
 
-Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Loops run on their own, and every run is recorded so you can see what happened.
+It watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Loops run on their own, and every run is recorded so you can see what happened.
 
 ## Stack
 
