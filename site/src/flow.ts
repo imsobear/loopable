@@ -13,37 +13,37 @@ export const beats: Beat[] = [
     source: "slack",
     sourceLabel: "Slack",
     line: "@loopable in #eng",
-    detail: "Review the auth PR before it merges",
-    loop: "Review pull requests I am asked to review",
+    detail: "Review the auth PR",
+    loop: "Review pull requests",
     agent: "Codex",
-    writeback: "Then writes a review comment back",
+    writeback: "Writes the review back",
   },
   {
     source: "github",
     sourceLabel: "GitHub",
-    line: "Assigned you for code review",
-    detail: "acme/api#412 · pull request review",
-    loop: "Review pull requests I am asked to review",
+    line: "Assigned for review",
+    detail: "acme/api#412",
+    loop: "Review pull requests",
     agent: "Claude",
-    writeback: "Then leaves the review on the PR",
+    writeback: "Leaves the review",
   },
   {
     source: "monitor",
     sourceLabel: "Monitor",
-    line: "p95 latency · checkout",
-    detail: "Spike 420ms → 2.1s in the last 10 minutes",
-    loop: "Dig the checkout latency case",
+    line: "p95 · checkout",
+    detail: "420ms → 2.1s",
+    loop: "Dig the latency case",
     agent: "Codex",
-    writeback: "Then posts findings in #oncall",
+    writeback: "Posts in #oncall",
   },
   {
     source: "clock",
     sourceLabel: "Clock",
     line: "09:00 weekday",
-    detail: "Sweep issues with no comment for a week",
-    loop: "Morning sweep of stale issues",
+    detail: "Stale issues",
+    loop: "Morning sweep",
     agent: "Codex",
-    writeback: "Then writes a status note on each issue",
+    writeback: "Notes the issue",
   },
 ];
 
@@ -105,7 +105,7 @@ export function startFlow(root: HTMLElement) {
       await wait(480);
       if (token !== run) return;
       hot("runner", true);
-      setText("runner-line", "Agent running on the shared host");
+      setText("runner-line", "Running");
       await wait(2400);
       if (token !== run) return;
 
@@ -115,7 +115,7 @@ export function startFlow(root: HTMLElement) {
       await wait(220);
       if (token !== run) return;
       paint(beats[index]!);
-      setText("runner-line", "Runs on the office machine");
+      setText("runner-line", "Office machine");
       setText("loop-state", "matching");
       hot("signal", false);
       hot("loop", false);

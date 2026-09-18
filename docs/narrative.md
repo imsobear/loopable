@@ -1,6 +1,6 @@
 # Narrative
 
-Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors — jobs that should not wait on someone’s laptop. People keep working in Slack and GitHub. Codex and Claude do the work on shared runners.
+Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. A lot of work should not depend on one person. People assign work in Slack, GitHub, and on a schedule. Codex and Claude finish it on a shared computer.
 
 ## The problem
 

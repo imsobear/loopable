@@ -6,12 +6,12 @@
     <title>Loopable — the team’s always-on agent</title>
     <meta
       name="description"
-      content="Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. People keep working in Slack and GitHub. Codex and Claude do the work on shared runners."
+      content="People assign work in Slack, GitHub, and on a schedule. Codex and Claude finish it on a shared computer."
     />
     <meta property="og:title" content="Loopable — the team’s always-on agent" />
     <meta
       property="og:description"
-      content="Shared-knowledge work should not wait on someone’s laptop. Loopable + one always-on computer is a team agent workflow."
+      content="A lot of work should not depend on one person. Review, cases, monitors — Loopable runs them on a shared agent."
     />
     <meta property="og:type" content="website" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -30,22 +30,16 @@
         Loopable
       </a>
       <nav>
-        <a href="#problem">Why</a>
-        <a href="#flow">How</a>
+        <a href="#why">Why</a>
         <a href="https://github.com/imsobear/loopable">GitHub</a>
       </nav>
     </header>
 
     <main>
       <section class="hero">
-        <p class="kicker">Always on · for the team</p>
-        <h1>Work that should not wait on a laptop.</h1>
-        <p class="lede">
-          Loopable is the team’s always-on agent for
-          <em>shared-knowledge work</em> — review, cases, monitors. People keep
-          working in Slack and GitHub. Codex and Claude do the work on shared
-          runners.
-        </p>
+        <p class="kicker">Shared knowledge · always on · for the team</p>
+        <h1>A lot of work should not depend on one person.</h1>
+        <p class="jobs-line">Review · Cases · Monitors</p>
 
         <div class="flow" id="flow" data-index="0">
           <article class="station" data-role="signal">
@@ -54,7 +48,7 @@
               <span class="source" data-source="slack" id="signal-source">Slack</span>
             </header>
             <p class="line" id="signal-line">@loopable in #eng</p>
-            <p class="detail" id="signal-detail">Review the auth PR before it merges</p>
+            <p class="detail" id="signal-detail">Review the auth PR</p>
           </article>
 
           <div class="rail" aria-hidden="true">
@@ -67,8 +61,8 @@
               <span class="role">Loop</span>
               <span class="source idle" id="loop-state">matching</span>
             </header>
-            <p class="line" id="loop-line">Review pull requests I am asked to review</p>
-            <p class="detail">A loop the team already wrote. Same path every time.</p>
+            <p class="line" id="loop-line">Review pull requests</p>
+            <p class="detail">Same path every time</p>
           </article>
 
           <div class="rail" aria-hidden="true">
@@ -81,8 +75,8 @@
               <span class="role">Runner</span>
               <span class="source idle" id="runner-state">Codex</span>
             </header>
-            <p class="line" id="runner-line">Runs on the office machine</p>
-            <p class="detail" id="runner-detail">Then writes a review comment back</p>
+            <p class="line" id="runner-line">Office machine</p>
+            <p class="detail" id="runner-detail">Writes the review back</p>
           </article>
         </div>
 
@@ -90,83 +84,38 @@
           <code class="install" id="install">npm install -g loopable-cli && loopable start</code>
           <button type="button" class="ghost" id="copy-install">Copy</button>
         </div>
-        <p class="fine">One always-on computer. App, Dispatcher, and a Runner together.</p>
       </section>
 
-      <section class="band" id="problem">
-        <div class="split">
-          <div>
-            <p class="kicker">The default today</p>
-            <h2>Paste it into your own Codex.</h2>
-            <p>
-              That is right when the task needs that person — their context, their
-              laptop, their judgment in the loop.
-            </p>
-          </div>
-          <div>
-            <p class="kicker">A lot of team work does not</p>
-            <h2>The knowledge is already in the tools.</h2>
-            <p>
-              Code review, digging a case, reading monitors. It should not wait on
-              whoever has Codex open. Those jobs stall the same way: ping, “I’ll
-              look later,” laptop sleeps, nothing ran.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="jobs">
-        <p class="kicker">Shared-knowledge work</p>
-        <h2>Jobs that do not need an owner with a laptop.</h2>
+      <section class="band" id="why">
+        <p class="kicker">What it is</p>
+        <h2>The team’s always-on agent.</h2>
+        <p class="lead">
+          People assign work in Slack, GitHub, and on a schedule. Codex and Claude
+          finish it on a shared computer.
+        </p>
         <ul class="cards">
           <li>
             <span class="n">01</span>
             <h3>Code review</h3>
-            <p>A teammate is assigned. The loop reads the diff and leaves a review. Nobody copies the PR into a chat.</p>
+            <p>GitHub assigns it. The agent writes the review.</p>
           </li>
           <li>
             <span class="n">02</span>
             <h3>Dig a case</h3>
-            <p>An on-call thread, a spike, a failing checkout. The agent reads the logs and writes back where the team already is.</p>
+            <p>Slack asks. The agent reads the logs.</p>
           </li>
           <li>
             <span class="n">03</span>
-            <h3>Read the monitors</h3>
-            <p>A morning sweep, a latency alert, stale issues with no comment. Scheduled or triggered. Same runner.</p>
+            <h3>Monitors</h3>
+            <p>A clock or an alert. Same agent.</p>
           </li>
         </ul>
       </section>
 
-      <section class="band tight" id="flow">
-        <p class="kicker">How a job runs</p>
-        <h2>One path. Slack, GitHub, and the clock only change the signal.</h2>
-        <ol class="steps">
-          <li>
-            <span>Signal</span>
-            Something the team already does: an @mention, an assignment, nine o’clock.
-          </li>
-          <li>
-            <span>Loop</span>
-            A job you already wrote. It names the agent, not a person.
-          </li>
-          <li>
-            <span>Runner</span>
-            Codex or Claude on a shared machine. The answer is written back. The inbox is the record.
-          </li>
-        </ol>
-        <p class="note">
-          Loopable is not a coding agent. Codex and Claude are. Loopable watches,
-          dispatches, and writes back so nobody has to open the agent.
-        </p>
-      </section>
-
       <section class="host">
-        <p class="kicker">How you run it</p>
+        <p class="kicker">Run it</p>
         <h2>One computer that stays on.</h2>
-        <p>
-          A Mac in the office is enough. App, Dispatcher, and a Runner live there.
-          Extra runners or a company VM only if that box is not enough.
-        </p>
+        <p>A Mac in the office. App, Dispatcher, Runner.</p>
         <pre class="install-block">npm install -g loopable-cli
 loopable start
 loopable runner --url http://&lt;LAN-IP&gt;:4321 --token &lt;from Runners&gt;</pre>
@@ -176,7 +125,6 @@ loopable runner --url http://&lt;LAN-IP&gt;:4321 --token &lt;from Runners&gt;</p
     <footer class="foot">
       <span>Loopable</span>
       <a href="https://github.com/imsobear/loopable">Source</a>
-      <a href="https://github.com/imsobear/loopable/blob/main/docs/narrative.md">Narrative</a>
     </footer>
 
     <script type="module" src="/src/main.ts"></script>
