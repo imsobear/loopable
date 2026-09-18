@@ -216,6 +216,17 @@ export async function pollAllLoops(): Promise<PollReport[]> {
   return reports;
 }
 
+/**
+ * One look, now, whether the interval says it is due or not. The loop page
+ * asks for this when waiting for the dispatcher is the thing being tested.
+ */
+export async function lookNow(loopId: string): Promise<PollReport> {
+  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
+  if (!loop) throw new Error("Loop not found");
+  if (!loop.enabled) throw new Error("This loop is off");
+  return await pollLoop(loop, new Set());
+}
+
 function toBacklogItem(row: typeof signals.$inferSelect): BacklogItem {
   return {
     key: row.key,

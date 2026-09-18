@@ -1,7 +1,7 @@
 import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, CircleAlert, Eye, Play } from "lucide-react";
+import { ArrowLeft, CircleAlert, Eye, Play, RefreshCw } from "lucide-react";
 import { LoopForm } from "@/components/loop-form";
 import { TaskList } from "@/components/task-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,7 +15,7 @@ import { connectorManifest } from "@/connectors/manifests.ts";
 import type { LoopPollState } from "@/lib/domain.ts";
 import { issuesFor } from "@/lib/gaps.ts";
 import { useLiveRefresh } from "@/components/use-live-tasks.ts";
-import { getLoopById, getLoopPollState, getLoopReadiness, runLoopBacklog } from "@/server/functions/loops.ts";
+import { getLoopById, getLoopPollState, getLoopReadiness, lookLoopNow, runLoopBacklog } from "@/server/functions/loops.ts";
 import { getLoopTasks, runLoopNow } from "@/server/functions/tasks.ts";
 
 export const Route = createFileRoute("/loops/$loopId")({
@@ -83,6 +83,38 @@ function LoopPage() {
   );
 }
 
+function LookNowButton({ loopId }: { loopId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const report = await lookLoopNow({ data: { id: loopId } });
+          await router.invalidate();
+          if (report.error) {
+            toast.error(report.error);
+          } else {
+            toast.success("Looked");
+          }
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : String(error));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <RefreshCw className={busy ? "animate-spin" : undefined} />
+      {busy ? "Looking..." : "Look now"}
+    </Button>
+  );
+}
+
 function when(iso: string): string {
   return new Date(iso).toLocaleString();
 }
@@ -115,7 +147,10 @@ function Watching({
       <Alert variant="destructive">
         <CircleAlert />
         <AlertTitle>The last look did not work</AlertTitle>
-        <AlertDescription>{poll.pollError}</AlertDescription>
+        <AlertDescription className="flex flex-col items-start gap-3">
+          <span>{poll.pollError}</span>
+          <LookNowButton loopId={loop.id} />
+        </AlertDescription>
       </Alert>
     );
   }
@@ -123,13 +158,16 @@ function Watching({
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 pt-6">
-        <div className="flex items-start gap-3 text-sm">
-          <Eye className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <p className="text-muted-foreground">
-            {poll.polledAt
-              ? `Watching. Last looked ${when(poll.polledAt)}.`
-              : "Not looked yet. The dispatcher checks every couple of minutes; the first look records what is already waiting without running it."}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3 text-sm">
+          <div className="flex items-start gap-3">
+            <Eye className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <p className="text-muted-foreground">
+              {poll.polledAt
+                ? `Watching. Last looked ${when(poll.polledAt)}.`
+                : "Not looked yet. The dispatcher checks every couple of minutes; the first look records what is already waiting without running it."}
+            </p>
+          </div>
+          <LookNowButton loopId={loop.id} />
         </div>
 
         {poll.backlog.length > 0 ? (

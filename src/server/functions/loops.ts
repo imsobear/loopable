@@ -10,7 +10,7 @@ import {
   updateLoop,
 } from "../loops.ts";
 import type { LoopEdit } from "#/lib/domain.ts";
-import { loopPollState, runBacklog } from "../signals.ts";
+import { lookNow, loopPollState, runBacklog } from "../signals.ts";
 
 /**
  * Saving is both making and changing, told apart by whether there is an id.
@@ -59,3 +59,7 @@ export const getLoopPollState = createServerFn({ method: "GET" })
 export const runLoopBacklog = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data }) => ({ queued: await runBacklog(data.id) }));
+
+export const lookLoopNow = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data }) => await lookNow(data.id));

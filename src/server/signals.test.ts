@@ -48,7 +48,7 @@ vi.mock("./agents.ts", () => ({
 
 const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, signals, tasks } = await import("./db/schema.ts");
-const { pollAllLoops, loopPollState, runBacklog } = await import("./signals.ts");
+const { pollAllLoops, loopPollState, runBacklog, lookNow } = await import("./signals.ts");
 const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { asc, eq } = await import("drizzle-orm");
 
@@ -314,6 +314,30 @@ describe("how often to look", () => {
     expect(reports.map((report) => report.loopId)).toEqual(["second"]);
     expect(await tasksFor("second")).toHaveLength(1);
     expect(await tasksFor("first")).toHaveLength(0);
+  });
+
+  it("looks now even when the interval would wait", async () => {
+    await givenLoop("a", 1);
+    await every("a", 30 * 60_000);
+    answer = [];
+    await pollAllLoops();
+
+    answer = [pull(1)];
+    expect(await pollAllLoops()).toEqual([]);
+
+    const report = await lookNow("a");
+    expect(report).toMatchObject({ found: 1, queued: 1, error: null });
+    expect(await tasksFor("a")).toHaveLength(1);
+  });
+
+  it("does not look at a loop that is off", async () => {
+    await givenLoop("a", 1);
+    await db().update(loops).set({ enabled: false }).where(eq(loops.id, "a")).run();
+    await expect(lookNow("a")).rejects.toThrow("This loop is off");
+  });
+
+  it("says when the loop is gone", async () => {
+    await expect(lookNow("missing")).rejects.toThrow("Loop not found");
   });
 });
 
