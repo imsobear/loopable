@@ -43,6 +43,9 @@
     "db:studio": "LOOPABLE_DEV=1 drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "deploy": "LOOPABLE_CF=1 vite build && wrangler deploy",
+    "site:dev": "pnpm --filter loopable-site dev",
+    "site:build": "pnpm --filter loopable-site build",
+    "site:deploy": "pnpm --filter loopable-site deploy",
     "prepublishOnly": "pnpm build && pnpm typecheck"
   },
   "dependencies": {
