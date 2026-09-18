@@ -44,10 +44,16 @@ function TaskPage() {
         <div className="flex-1">
           <h1 className="text-xl font-semibold tracking-tight">{taskTitle(task)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {task.sourceRef} ·{" "}
-            <Link to="/loops/$loopId" params={{ loopId: task.loopId }} className="underline">
-              {task.loopName}
-            </Link>
+            {task.loopId ? (
+              <>
+                {task.sourceRef} ·{" "}
+                <Link to="/loops/$loopId" params={{ loopId: task.loopId }} className="underline">
+                  {task.loopName}
+                </Link>
+              </>
+            ) : (
+              task.loopName
+            )}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -112,8 +118,9 @@ function TaskPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
           <Row label="Source">
-            {/* A chat message has no address, so there is nothing to link to. */}
-            {task.sourceUrl ? (
+            {task.sourceKind === "prompt" ? (
+              <span>{KIND_LABEL.prompt}</span>
+            ) : task.sourceUrl ? (
               <a
                 href={task.sourceUrl}
                 target="_blank"
@@ -129,12 +136,22 @@ function TaskPage() {
               </span>
             )}
           </Row>
-          <Row label="Action">
-            {action?.name ?? task.actionId}
-            {task.actionConnectorId === task.connectorId
-              ? null
-              : ` on ${writer?.name ?? task.actionConnectorId}`}
-          </Row>
+          {task.prompt ? (
+            <div>
+              <p className="text-xs text-muted-foreground">Prompt</p>
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-2.5 text-xs">
+                {task.prompt}
+              </pre>
+            </div>
+          ) : null}
+          {task.sourceKind === "prompt" ? null : (
+            <Row label="Action">
+              {action?.name ?? task.actionId}
+              {task.actionConnectorId === task.connectorId
+                ? null
+                : ` on ${writer?.name ?? task.actionConnectorId}`}
+            </Row>
+          )}
           <Row label="Agent">{task.agentId ?? "unknown"}</Row>
           <Row label="Queued">{new Date(task.createdAt).toLocaleString()}</Row>
           {task.attempts > 1 ? <Row label="Attempt">{task.attempts}</Row> : null}

@@ -66,6 +66,7 @@ export const KIND_LABEL: Record<WorkItemKind, string> = {
   message: "Message",
   email: "Email",
   occurrence: "Scheduled run",
+  prompt: "Test run",
 };
 
 function when(iso: string): string {
@@ -107,11 +108,15 @@ export function TaskList({
           className="rounded-lg border bg-card p-4 transition-colors hover:bg-accent/40"
         >
           <div className="flex items-start gap-3">
-            <ConnectorIcon
-              icon={connectorManifest(task.connectorId)?.icon ?? "Plug"}
-              accent={connectorManifest(task.connectorId)?.accent ?? "bg-muted"}
-              className="mt-0.5 size-7 shrink-0"
-            />
+            {task.sourceKind === "prompt" ? (
+              <Bot className="mt-0.5 size-7 shrink-0 text-muted-foreground" />
+            ) : (
+              <ConnectorIcon
+                icon={connectorManifest(task.connectorId)?.icon ?? "Plug"}
+                accent={connectorManifest(task.connectorId)?.accent ?? "bg-muted"}
+                className="mt-0.5 size-7 shrink-0"
+              />
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{taskTitle(task)}</p>
               {/* Only where it says something. "acme/web#7" is which change,
@@ -153,7 +158,7 @@ function TaskMeta({ task, showLoop }: { task: TaskView; showLoop: boolean }) {
   const agent = task.agentId ? agentManifest(task.agentId) : undefined;
 
   const parts: Array<{ icon: typeof Workflow; label: string }> = [];
-  if (showLoop) parts.push({ icon: Workflow, label: task.loopName });
+  if (showLoop && task.loopName) parts.push({ icon: Workflow, label: task.loopName });
   if (connector) parts.push({ icon: Plug, label: connector.name });
   if (agent) parts.push({ icon: Bot, label: agent.name });
   parts.push({ icon: Clock, label: when(task.createdAt) });

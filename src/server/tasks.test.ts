@@ -89,7 +89,8 @@ vi.mock("./agents.ts", () => ({
 
 const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, tasks } = await import("./db/schema.ts");
-const { enqueueTask, getTask, jobForTask, runAssignedAgent, runTask, taskRow } = await import("./tasks.ts");
+const { enqueuePrompt, enqueueTask, getTask, jobForTask, runAssignedAgent, runTask, taskRow } =
+  await import("./tasks.ts");
 const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { branchFor } = await import("./checkout.ts");
 
@@ -492,5 +493,49 @@ describe("a loop that writes code", () => {
     };
     const done = await runTask(queued.id);
     expect(done.state).toBe("done");
+  });
+});
+
+describe("a prompt from the inbox", () => {
+  it("queues a task with no loop and the chosen agent", async () => {
+    const queued = await enqueuePrompt({
+      prompt: "Say hello in one word.",
+      agentId: "cursor-agent",
+    });
+
+    expect(queued.loopId).toBeNull();
+    expect(queued.loopName).toBe("Test run");
+    expect(queued.agentId).toBe("cursor-agent");
+    expect(queued.sourceKind).toBe("prompt");
+    expect(queued.sourceTitle).toBe("Say hello in one word.");
+    expect(queued.state).toBe("queued");
+    expect(queued.dryRun).toBe(false);
+  });
+
+  it("rejects a blank prompt", async () => {
+    await expect(enqueuePrompt({ prompt: "  \n", agentId: "cursor-agent" })).rejects.toThrow(
+      "Write a prompt",
+    );
+  });
+
+  it("rejects an agent nobody has signed in", async () => {
+    await db().delete(runners).run();
+    await expect(
+      enqueuePrompt({ prompt: "Say hello.", agentId: "cursor-agent" }),
+    ).rejects.toThrow("No runner is online that can run this agent.");
+  });
+
+  it("runs on a runner and keeps the reply in the inbox, without writing anywhere", async () => {
+    said = "hello";
+    const queued = await enqueuePrompt({
+      prompt: "Say hello in one word.",
+      agentId: "cursor-agent",
+    });
+    const done = await driveTask(queued.id);
+
+    expect(asked).toBe("Say hello in one word.");
+    expect(done.state).toBe("prepared");
+    expect(done.output).toBe("hello");
+    expect(writes).toHaveLength(0);
   });
 });

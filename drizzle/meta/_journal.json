@@ -169,6 +169,13 @@
       "when": 1789100000008,
       "tag": "0023_shared_host",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1789100000009,
+      "tag": "0024_prompt_tasks",
+      "breakpoints": true
     }
   ]
 }

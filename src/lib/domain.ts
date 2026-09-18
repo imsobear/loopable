@@ -50,11 +50,11 @@ export function isTaskActive(state: TaskState): boolean {
  * the list is closed so that the few places which phrase a kind for a person
  * have to say something for every one of them.
  */
-export type WorkItemKind = "pull_request" | "issue" | "message" | "email" | "occurrence";
+export type WorkItemKind = "pull_request" | "issue" | "message" | "email" | "occurrence" | "prompt";
 
 export type TaskView = {
   id: string;
-  loopId: string;
+  loopId: string | null;
   loopName: string;
   connectorId: string;
   state: TaskState;
@@ -63,6 +63,8 @@ export type TaskView = {
   sourceRef: string;
   /** Only known once the connector has fetched it. */
   sourceTitle: string | null;
+  /** Inbox prompt runs store the ask on the task; loop runs keep it on the loop. */
+  prompt: string | null;
   dryRun: boolean;
   agentId: string | null;
   runnerId: string | null;

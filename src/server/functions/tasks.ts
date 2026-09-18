@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { dispatcherIsAlive } from "../../dispatcher/instance.ts";
-import { enqueueTask, getTask, listTasks, readTaskLog, requestCancel } from "../tasks.ts";
+import { enqueuePrompt, enqueueTask, getTask, listRunnableAgents, listTasks, readTaskLog, requestCancel } from "../tasks.ts";
 import { dispatcherSettings, setDispatcherPaused } from "../settings.ts";
 import { onlineRunnerCount } from "../runners.ts";
 
-export const getInbox = createServerFn({ method: "GET" }).handler(async () => await listTasks());
+export const getInbox = createServerFn({ method: "GET" }).handler(async () => ({
+  tasks: await listTasks(),
+  agents: await listRunnableAgents(),
+}));
 
 export const getLoopTasks = createServerFn({ method: "GET" })
   .inputValidator((data: { loopId: string }) => data)
@@ -17,6 +20,10 @@ export const getTaskById = createServerFn({ method: "GET" })
 export const getTaskLog = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data }) => await readTaskLog(data.id));
+
+export const runPrompt = createServerFn({ method: "POST" })
+  .inputValidator((data: { prompt: string; agentId: string }) => data)
+  .handler(async ({ data }) => await enqueuePrompt(data));
 
 export const runLoopNow = createServerFn({ method: "POST" })
   .inputValidator((data: { loopId: string; url: string; dryRun: boolean }) => data)

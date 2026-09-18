@@ -70,9 +70,7 @@ export const tasks = sqliteTable(
   "tasks",
   {
     id: text("id").primaryKey(),
-    loopId: text("loop_id")
-      .notNull()
-      .references(() => loops.id, { onDelete: "cascade" }),
+    loopId: text("loop_id").references(() => loops.id, { onDelete: "cascade" }),
     connectorId: text("connector_id").notNull(),
     state: text("state").$type<TaskState>().notNull().default("queued"),
     /** What the task is about, resolved once so the record survives the source. */
@@ -87,6 +85,8 @@ export const tasks = sqliteTable(
      * when the dispatcher fetches rather than when the task is queued.
      */
     sourceTitle: text("source_title"),
+    /** Inbox test runs: the ask itself. Loop runs leave this null and read loops.prompt. */
+    prompt: text("prompt"),
     /** Set when a run was asked to stop before writing anything. */
     dryRun: integer("dry_run", { mode: "boolean" }).notNull().default(false),
     agentId: text("agent_id"),

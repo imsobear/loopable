@@ -50,13 +50,14 @@ function toView(row: Omit<Task, "sourcePayload"> & { loopName?: string | null })
   return {
     id: row.id,
     loopId: row.loopId,
-    loopName: row.loopName ?? "Deleted loop",
+    loopName: row.loopName ?? (row.loopId ? "Deleted loop" : "Test run"),
     connectorId: row.connectorId,
     state: row.state,
     sourceUrl: row.sourceUrl,
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
     sourceTitle: row.sourceTitle,
+    prompt: row.prompt ?? null,
     dryRun: row.dryRun,
     agentId: row.agentId,
     runnerId: row.runnerId,
@@ -87,6 +88,7 @@ function select() {
       sourceKind: tasks.sourceKind,
       sourceRef: tasks.sourceRef,
       sourceTitle: tasks.sourceTitle,
+      prompt: tasks.prompt,
       dryRun: tasks.dryRun,
       agentId: tasks.agentId,
       runnerId: tasks.runnerId,
@@ -171,6 +173,60 @@ async function queue(input: {
     })
     .run();
   return (await getTask(id))!;
+}
+
+function titleFromPrompt(prompt: string): string {
+  const line = prompt.split("\n")[0]?.trim() ?? "";
+  return line.slice(0, 120) || "Test run";
+}
+
+function isPromptTask(task: Pick<Task, "loopId">): boolean {
+  return task.loopId == null;
+}
+
+/**
+ * A free-form ask from Inbox. No loop, no connector, no write-back: the runner
+ * runs the agent and the reply stays on the task.
+ */
+export async function enqueuePrompt(input: { prompt: string; agentId: string }): Promise<TaskView> {
+  const prompt = input.prompt.trim();
+  if (!prompt) throw new Error("Write a prompt.");
+  if (!agentManifest(input.agentId)) throw new Error(`Unknown agent: ${input.agentId}`);
+  const available = await availableAgentIds();
+  if (!available.includes(input.agentId)) {
+    throw new Error("No runner is online that can run this agent.");
+  }
+
+  const id = randomUUID();
+  await db()
+    .insert(tasks)
+    .values({
+      id,
+      loopId: null,
+      connectorId: "prompt",
+      state: "queued",
+      sourceUrl: "",
+      sourceKind: "prompt",
+      sourceRef: "prompt",
+      sourceTitle: titleFromPrompt(prompt),
+      prompt,
+      dryRun: false,
+      agentId: input.agentId,
+      actionConnectorId: "prompt",
+      actionId: "none",
+    })
+    .run();
+  return (await getTask(id))!;
+}
+
+export async function listRunnableAgents(): Promise<{ agentId: string; name: string }[]> {
+  const available = new Set(await availableAgentIds());
+  return (await listAgents())
+    .filter((agent) => available.has(agent.agentId))
+    .map((agent) => ({
+      agentId: agent.agentId,
+      name: agentManifest(agent.agentId)?.name ?? agent.agentId,
+    }));
 }
 
 /** Everything a loop needs before it can produce a task, or a reason it cannot. */
@@ -321,6 +377,7 @@ const KIND_NOUN: Record<WorkItemKind, string> = {
   message: "the message",
   email: "the email",
   occurrence: "the run due at",
+  prompt: "the prompt",
 };
 
 function checkoutInstructions(item: WorkItem, branch: string | undefined, writesCode: boolean): string[] {
@@ -428,6 +485,8 @@ async function loadWork(id: string, signal?: AbortSignal) {
   const task = await taskRow(id);
   if (!task) throw new Error(`Task not found: ${id}`);
   if (signal?.aborted || task.cancelRequested) throw new TaskCancelled();
+  if (isPromptTask(task)) throw new Error("A prompt run has no work item to load.");
+  if (!task.loopId) throw new Error("The loop behind this task has been deleted.");
 
   const loop = await db().select().from(loops).where(eq(loops.id, task.loopId)).get();
   if (!loop) throw new Error("The loop behind this task has been deleted.");
@@ -451,7 +510,31 @@ async function loadWork(id: string, signal?: AbortSignal) {
   return { task, loop, workflow, writer, action, credential, item };
 }
 
+async function preparePromptTask(id: string, signal?: AbortSignal): Promise<TaskView> {
+  const task = (await taskRow(id))!;
+  if (signal?.aborted || task.cancelRequested) throw new TaskCancelled();
+  if (!task.agentId) throw new Error("This task has no agent yet.");
+  let logPath: string | null = null;
+  if (!isHosted()) {
+    const workspace = runDir(id);
+    logPath = join(workspace, "agent.log");
+    writeFileSync(logPath, "", { flag: "a" });
+  }
+  const runnerId = await pickRunner({ agentId: task.agentId, requiresHost: false });
+  await updateTask(id, {
+    state: "awaiting_agent",
+    runnerId,
+    logPath,
+    leaseUntil: null,
+  });
+  return (await getTask(id))!;
+}
+
 async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> {
+  const existing = await taskRow(id);
+  if (!existing) throw new Error(`Task not found: ${id}`);
+  if (isPromptTask(existing)) return await preparePromptTask(id, signal);
+
   const { loop, workflow, item } = await loadWork(id, signal);
   await updateTask(id, { sourceTitle: item.title });
 
@@ -481,6 +564,20 @@ async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> 
 }
 
 export async function jobForTask(id: string): Promise<AgentJob> {
+  const existing = await taskRow(id);
+  if (!existing) throw new Error(`Task not found: ${id}`);
+  if (isPromptTask(existing)) {
+    if (!existing.agentId) throw new Error("This task has no agent yet.");
+    if (!existing.prompt) throw new Error("This task has no prompt.");
+    return {
+      taskId: id,
+      agentId: existing.agentId,
+      prompt: existing.prompt,
+      settings: await settingsFor(existing.agentId),
+      files: [],
+    };
+  }
+
   const { task, loop, workflow, item } = await loadWork(id);
   if (!task.agentId) throw new Error("This task has no agent yet.");
   const workspace = runDir(id);
@@ -538,6 +635,22 @@ function changesFrom(item: WorkItem, taskId: string): Changes | undefined {
 }
 
 export async function absorbAgentOutput(id: string, raw: string): Promise<TaskView> {
+  const existing = await taskRow(id);
+  if (!existing) throw new Error(`Task not found: ${id}`);
+  if (isPromptTask(existing)) {
+    const workspace = runDir(id);
+    const said = raw.trim();
+    writeFileSync(join(workspace, "reply.txt"), said);
+    if (!said) throw new Error("The agent produced nothing.");
+    if (isAgentNothing(said)) {
+      await finish(id, existing, { state: "skipped", output: said });
+      return (await getTask(id))!;
+    }
+    await updateTask(id, { output: said, comments: [] });
+    await finish(id, existing, { state: "prepared" });
+    return (await getTask(id))!;
+  }
+
   const { task, workflow, action, item } = await loadWork(id);
   const workspace = runDir(id);
   const said = raw.trim();
