@@ -1,49 +1,74 @@
 export type Beat = {
-  source: "slack" | "github" | "clock" | "monitor";
-  sourceLabel: string;
-  line: string;
-  detail: string;
-  loop: string;
+  kind: "slack" | "github" | "clock" | "monitor";
+  askPlace: string;
+  askVia: string;
+  askWho: string;
+  askMsg: string;
   agent: string;
-  writeback: string;
+  runLine: string;
+  backKind: "slack" | "github" | "clock" | "monitor";
+  backPlace: string;
+  backVia: string;
+  backWho: string;
+  backMsg: string;
 };
 
 export const beats: Beat[] = [
   {
-    source: "slack",
-    sourceLabel: "Slack",
-    line: "@loopable in #eng",
-    detail: "Review the auth PR",
-    loop: "Review pull requests",
+    kind: "slack",
+    askPlace: "#oncall",
+    askVia: "Slack",
+    askWho: "Maya",
+    askMsg: "@loopable checkout 5xx since 4pm",
     agent: "Codex",
-    writeback: "Writes the review back",
+    runLine: "Reading checkout logs",
+    backKind: "slack",
+    backPlace: "#oncall",
+    backVia: "Slack",
+    backWho: "Loopable",
+    backMsg: "Cause: redis timeout on cart",
   },
   {
-    source: "github",
-    sourceLabel: "GitHub",
-    line: "Assigned for review",
-    detail: "acme/api#412",
-    loop: "Review pull requests",
+    kind: "github",
+    askPlace: "acme/api#412",
+    askVia: "GitHub",
+    askWho: "Assigned you",
+    askMsg: "Please review this pull request",
     agent: "Claude",
-    writeback: "Leaves the review",
+    runLine: "Walking the diff",
+    backKind: "github",
+    backPlace: "acme/api#412",
+    backVia: "GitHub",
+    backWho: "Review",
+    backMsg: "LGTM with two notes",
   },
   {
-    source: "monitor",
-    sourceLabel: "Monitor",
-    line: "p95 · checkout",
-    detail: "420ms → 2.1s",
-    loop: "Dig the latency case",
+    kind: "monitor",
+    askPlace: "checkout p95",
+    askVia: "Monitor",
+    askWho: "Alert",
+    askMsg: "Latency 420ms → 2.1s",
     agent: "Codex",
-    writeback: "Posts in #oncall",
+    runLine: "Tailing the checkout logs",
+    backKind: "slack",
+    backPlace: "#oncall",
+    backVia: "Slack",
+    backWho: "Loopable",
+    backMsg: "Cause: lock on payments DB",
   },
   {
-    source: "clock",
-    sourceLabel: "Clock",
-    line: "09:00 weekday",
-    detail: "Stale issues",
-    loop: "Morning sweep",
+    kind: "clock",
+    askPlace: "09:00 weekdays",
+    askVia: "Schedule",
+    askWho: "Clock",
+    askMsg: "Sweep issues with no comment",
     agent: "Codex",
-    writeback: "Notes the issue",
+    runLine: "Checking open issues",
+    backKind: "github",
+    backPlace: "3 issues",
+    backVia: "GitHub",
+    backWho: "Note",
+    backMsg: "Status posted on each",
   },
 ];
 
@@ -54,17 +79,62 @@ function setText(id: string, value: string) {
   if (el) el.textContent = value;
 }
 
-function paint(beat: Beat) {
-  const source = document.getElementById("signal-source");
-  if (source) {
-    source.dataset.source = beat.source;
-    source.textContent = beat.sourceLabel;
+function iconHref(kind: string) {
+  return `#i-${kind}`;
+}
+
+function setIcon(root: Element | null, kind: string) {
+  const node = root?.querySelector("use");
+  if (!node) return;
+  const href = iconHref(kind);
+  node.setAttribute("href", href);
+  node.setAttribute("xlink:href", href);
+}
+
+function setSource(id: string, kind: Beat["kind"] | Beat["backKind"], label: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.source = kind;
+  setIcon(el, kind);
+  const text = el.querySelector("b");
+  if (text) text.textContent = label;
+}
+
+function agentKind(name: string) {
+  return name.toLowerCase().includes("claude") ? "claude" : "codex";
+}
+
+function paintAsk(beat: Beat) {
+  const ask = document.getElementById("ask");
+  if (ask) ask.dataset.kind = beat.kind;
+  setText("ask-place", beat.askPlace);
+  setSource("ask-via", beat.kind, beat.askVia);
+  setText("ask-who", beat.askWho);
+  setText("ask-msg", beat.askMsg);
+}
+
+function paintBack(beat: Beat, filled: boolean) {
+  const back = document.getElementById("back");
+  if (back) back.dataset.kind = beat.backKind;
+  setText("back-place", beat.backPlace);
+  setSource("back-via", beat.backKind, beat.backVia);
+  setText("back-who", filled ? beat.backWho : "…");
+  setText("back-msg", filled ? beat.backMsg : "Waiting");
+}
+
+function paintRun(beat: Beat, state: "idle" | "running" | "done") {
+  setText("run-agent", beat.agent);
+  setIcon(document.getElementById("run-agent-wrap"), agentKind(beat.agent));
+  const badge = document.getElementById("run-state");
+  if (badge) {
+    badge.classList.toggle("idle", state !== "running");
+    badge.textContent = state === "running" ? "Running" : state === "done" ? "Done" : "Idle";
   }
-  setText("signal-line", beat.line);
-  setText("signal-detail", beat.detail);
-  setText("loop-line", beat.loop);
-  setText("runner-state", beat.agent);
-  setText("runner-detail", beat.writeback);
+  document.querySelector('[data-role="run"]')?.classList.toggle("is-running", state === "running");
+  setText(
+    "run-line",
+    state === "running" ? beat.runLine : state === "done" ? "Done" : "Waiting",
+  );
 }
 
 function hot(role: string, on: boolean) {
@@ -92,36 +162,44 @@ export function startFlow(root: HTMLElement) {
         continue;
       }
 
-      hot("signal", true);
-      hot("loop", false);
-      hot("runner", false);
-      setText("loop-state", "matching");
+      const beat = beats[index]!;
+      paintAsk(beat);
+      paintRun(beat, "idle");
+      paintBack(beat, false);
+      hot("ask", true);
+      hot("run", false);
+      hot("back", false);
       ride("packet");
-      await wait(480);
+      await wait(520);
       if (token !== run) return;
-      hot("loop", true);
-      setText("loop-state", "matched");
+
+      hot("ask", false);
+      hot("run", true);
+      paintRun(beat, "running");
       ride("packet-2");
-      await wait(480);
+      await wait(1600);
       if (token !== run) return;
-      hot("runner", true);
-      setText("runner-line", "Running");
-      await wait(2400);
+
+      hot("run", false);
+      hot("back", true);
+      paintRun(beat, "done");
+      paintBack(beat, true);
+      await wait(2200);
       if (token !== run) return;
 
       index = (index + 1) % beats.length;
       root.dataset.index = String(index);
-      document.querySelector('[data-role="signal"]')?.classList.add("is-swap");
-      await wait(220);
+      root.classList.add("is-swap");
+      await wait(240);
       if (token !== run) return;
-      paint(beats[index]!);
-      setText("runner-line", "Office machine");
-      setText("loop-state", "matching");
-      hot("signal", false);
-      hot("loop", false);
-      hot("runner", false);
-      document.querySelector('[data-role="signal"]')?.classList.remove("is-swap");
-      await wait(700);
+      paintAsk(beats[index]!);
+      paintRun(beats[index]!, "idle");
+      paintBack(beats[index]!, false);
+      hot("ask", false);
+      hot("run", false);
+      hot("back", false);
+      root.classList.remove("is-swap");
+      await wait(500);
     }
   };
 

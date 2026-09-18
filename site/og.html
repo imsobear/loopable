@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200" />
+    <title>Loopable</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <style>
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        margin: 0;
+        overflow: hidden;
+        background: #070708;
+      }
+      .og {
+        position: relative;
+        z-index: 1;
+        box-sizing: border-box;
+        width: 1200px;
+        height: 630px;
+        padding: 64px 72px 56px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .og-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 28px;
+        font-weight: 560;
+        letter-spacing: -0.04em;
+      }
+      .og-top .mark {
+        width: 28px;
+        height: 28px;
+      }
+      .og h1 {
+        margin: 0;
+        max-width: 14ch;
+        font-size: 72px;
+        font-weight: 520;
+        letter-spacing: -0.055em;
+        line-height: 0.94;
+      }
+      .og-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-family: var(--mono);
+        font-size: 18px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--live);
+      }
+      .og-foot span:last-child {
+        color: var(--muted);
+        letter-spacing: 0.08em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="og">
+      <div class="og-top">
+        <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M17.14 5.87A8 8 0 1 1 12 4" stroke="currentColor" stroke-width="2.6" />
+          <path d="M15.4 4 10.8 5.9 10.8 2.1Z" fill="currentColor" />
+          <circle cx="12" cy="12" r="2.1" fill="currentColor" />
+        </svg>
+        Loopable
+      </div>
+      <h1>A lot of work should not depend on one person.</h1>
+      <div class="og-foot">
+        <span>Review · Cases · Monitors</span>
+        <span>Shared knowledge</span>
+      </div>
+    </div>
+  </body>
+</html>
