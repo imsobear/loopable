@@ -1,12 +1,16 @@
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { eq } from "drizzle-orm";
 import { join } from "node:path";
-import { dataDir } from "./paths.ts";
+import { isHosted } from "#/lib/hosted.ts";
+import { db } from "./db/client.ts";
+import { secrets } from "./db/schema.ts";
+import { dataDir, secretNamespace } from "./paths.ts";
 
 /**
- * Credentials never go in SQLite. Local runs keep them in the OS keychain; the
- * interface exists so a hosted deployment can swap in a server-side vault
- * without any connector knowing the difference.
+ * Credentials never go in SQLite in the clear. Local runs keep them in the OS
+ * keychain; a hosted App and Dispatcher share an encrypted row, keyed by
+ * LOOPABLE_MASTER_KEY.
  */
 export type SecretStore = {
   get(key: string): Promise<string | null>;
@@ -14,14 +18,12 @@ export type SecretStore = {
   delete(key: string): Promise<void>;
 };
 
-const SERVICE_PREFIX = "loopable";
-
 function account(): string {
   return process.env.USER ?? "loopable";
 }
 
 function service(key: string): string {
-  return `${SERVICE_PREFIX}.${key}`;
+  return `${secretNamespace()}.${key}`;
 }
 
 const keychainStore: SecretStore = {
@@ -87,7 +89,74 @@ const fileStore: SecretStore = {
   },
 };
 
+function masterKey(): string {
+  const key = process.env.LOOPABLE_MASTER_KEY?.trim();
+  if (!key) {
+    throw new Error("Set LOOPABLE_MASTER_KEY so App and Dispatcher can share credentials.");
+  }
+  return key;
+}
+
+async function aesKey(): Promise<CryptoKey> {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(masterKey()));
+  return crypto.subtle.importKey("raw", hash, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+async function encrypt(plain: string): Promise<string> {
+  const key = await aesKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plain));
+  const packed = new Uint8Array(iv.length + sealed.byteLength);
+  packed.set(iv);
+  packed.set(new Uint8Array(sealed), iv.length);
+  return bytesToBase64(packed);
+}
+
+async function decrypt(blob: string): Promise<string> {
+  const key = await aesKey();
+  const packed = base64ToBytes(blob);
+  const iv = packed.slice(0, 12);
+  const data = packed.slice(12);
+  const opened = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+  return new TextDecoder().decode(opened);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBytes(blob: string): Uint8Array {
+  const binary = atob(blob);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+const tableStore: SecretStore = {
+  async get(key) {
+    const row = await db().select().from(secrets).where(eq(secrets.key, key)).get();
+    if (!row) return null;
+    return decrypt(row.value);
+  },
+  async set(key, value) {
+    const stored = await encrypt(value);
+    const now = new Date();
+    const existing = await db().select().from(secrets).where(eq(secrets.key, key)).get();
+    if (existing) {
+      await db().update(secrets).set({ value: stored, updatedAt: now }).where(eq(secrets.key, key)).run();
+      return;
+    }
+    await db().insert(secrets).values({ key, value: stored, updatedAt: now }).run();
+  },
+  async delete(key) {
+    await db().delete(secrets).where(eq(secrets.key, key)).run();
+  },
+};
+
 export function secretStore(): SecretStore {
+  if (isHosted() || process.env.LOOPABLE_MASTER_KEY) return tableStore;
   const useKeychain = process.platform === "darwin" && process.env.LOOPABLE_KEYCHAIN !== "0";
   return useKeychain ? keychainStore : fileStore;
 }

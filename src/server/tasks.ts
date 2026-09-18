@@ -15,8 +15,8 @@ import type {
 } from "#/connectors/types.ts";
 import type { JsonValue, TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
+import { isHosted } from "#/lib/hosted.ts";
 import { AGENT_NOTHING, isAgentNothing, type AgentJob } from "./agent-job.ts";
-import { runAgentJob } from "./agent-runner.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { branchFor } from "./checkout.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -99,6 +99,7 @@ function select() {
       resultUrl: tasks.resultUrl,
       error: tasks.error,
       logPath: tasks.logPath,
+      logText: tasks.logText,
       attempts: tasks.attempts,
       runAfter: tasks.runAfter,
       leaseUntil: tasks.leaseUntil,
@@ -114,23 +115,25 @@ function select() {
     .leftJoin(loops, eq(tasks.loopId, loops.id));
 }
 
-export function listTasks(options: { loopId?: string; limit?: number } = {}): TaskView[] {
+export async function listTasks(options: { loopId?: string; limit?: number } = {}): Promise<TaskView[]> {
   const query = select().orderBy(desc(tasks.createdAt)).limit(options.limit ?? 100);
-  const rows = options.loopId ? query.where(eq(tasks.loopId, options.loopId)).all() : query.all();
+  const rows = options.loopId
+    ? await query.where(eq(tasks.loopId, options.loopId)).all()
+    : await query.all();
   return rows.map(toView);
 }
 
-export function getTask(id: string): TaskView | null {
-  const row = select().where(eq(tasks.id, id)).get();
+export async function getTask(id: string): Promise<TaskView | null> {
+  const row = await select().where(eq(tasks.id, id)).get();
   return row ? toView(row) : null;
 }
 
-export function taskRow(id: string): Task | undefined {
-  return db().select().from(tasks).where(eq(tasks.id, id)).get();
+export async function taskRow(id: string): Promise<Task | undefined> {
+  return await db().select().from(tasks).where(eq(tasks.id, id)).get();
 }
 
-export function updateTask(id: string, values: Partial<Task>): void {
-  db()
+export async function updateTask(id: string, values: Partial<Task>): Promise<void> {
+  await db()
     .update(tasks)
     .set({ ...values, updatedAt: new Date() })
     .where(eq(tasks.id, id))
@@ -138,7 +141,7 @@ export function updateTask(id: string, values: Partial<Task>): void {
 }
 
 /** The one place a task is created, whether a person or a poll asked for it. */
-function queue(input: {
+async function queue(input: {
   loop: Loop;
   item: WorkItemRef;
   payload?: JsonValue;
@@ -146,9 +149,9 @@ function queue(input: {
   title?: string;
   dryRun: boolean;
   dedupeKey?: string;
-}): TaskView {
+}): Promise<TaskView> {
   const id = randomUUID();
-  db()
+  await db()
     .insert(tasks)
     .values({
       id,
@@ -167,12 +170,12 @@ function queue(input: {
       dedupeKey: input.dedupeKey,
     })
     .run();
-  return getTask(id)!;
+  return (await getTask(id))!;
 }
 
 /** Everything a loop needs before it can produce a task, or a reason it cannot. */
-function runnable(loopId: string): Loop {
-  const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
+async function runnable(loopId: string): Promise<Loop> {
+  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
   if (!loop) throw new Error("Loop not found");
 
   const manifest = connectorManifest(loop.connectorId);
@@ -196,14 +199,14 @@ function runnable(loopId: string): Loop {
 /**
  * Queues a run and returns at once. Identifying the link needs no network, so
  * a typo still fails while the person is looking at the box, but everything
- * that can be slow or can fail belongs to the engine.
+ * that can be slow or can fail belongs to the dispatcher.
  */
-export function enqueueTask(input: {
+export async function enqueueTask(input: {
   loopId: string;
   url: string;
   dryRun: boolean;
-}): TaskView {
-  const loop = runnable(input.loopId);
+}): Promise<TaskView> {
+  const loop = await runnable(input.loopId);
   const manifest = connectorManifest(loop.connectorId)!;
   const runtime = connectorRuntime(loop.connectorId);
 
@@ -211,7 +214,7 @@ export function enqueueTask(input: {
   // by hand is about is this moment, and only the connector can say what that
   // looks like as a work item.
   if (manifest.byHand.kind === "now" && runtime.itemForNow) {
-    return queue({ loop, item: runtime.itemForNow(), url: "", dryRun: input.dryRun });
+    return await queue({ loop, item: runtime.itemForNow(), url: "", dryRun: input.dryRun });
   }
   if (!runtime.identifyLink) throw new Error(`${manifest.name} cannot read links.`);
 
@@ -219,17 +222,17 @@ export function enqueueTask(input: {
   if (!item) {
     throw new Error(`That does not look like a ${manifest.name} link Loopable can work on.`);
   }
-  return queue({ loop, item, url: input.url, dryRun: input.dryRun });
+  return await queue({ loop, item, url: input.url, dryRun: input.dryRun });
 }
 
 /**
  * Queues a run for something a poll noticed. The title is already known, so
- * the inbox can say what the task is about before the engine has fetched
+ * the inbox can say what the task is about before the dispatcher has fetched
  * anything.
  */
-export function enqueueSignal(input: { loop: Loop; signal: Signal }): TaskView {
-  const loop = runnable(input.loop.id);
-  return queue({
+export async function enqueueSignal(input: { loop: Loop; signal: Signal }): Promise<TaskView> {
+  const loop = await runnable(input.loop.id);
+  return await queue({
     loop,
     item: input.signal,
     payload: input.signal.payload,
@@ -243,10 +246,14 @@ export function enqueueSignal(input: { loop: Loop; signal: Signal }): TaskView {
 /** The tail is what matters while a run is going; the whole thing rarely is. */
 const LOG_TAIL_BYTES = 64_000;
 
-export function readTaskLog(id: string): string | null {
-  const task = taskRow(id);
-  if (!task?.logPath || !existsSync(task.logPath)) return null;
-  const text = readFileSync(task.logPath, "utf8");
+export async function readTaskLog(id: string): Promise<string | null> {
+  const task = await taskRow(id);
+  if (!task) return null;
+  let text = task.logText;
+  if (!text && task.logPath && existsSync(task.logPath)) {
+    text = readFileSync(task.logPath, "utf8");
+  }
+  if (!text) return null;
   if (text.length <= LOG_TAIL_BYTES) return text;
   return `[earlier output not shown]\n\n${text.slice(-LOG_TAIL_BYTES)}`;
 }
@@ -272,11 +279,11 @@ export function sweepRunDirs(maxAgeMs = 7 * 24 * 60 * 60 * 1_000): number {
   return removed;
 }
 
-export function requestCancel(id: string): TaskView | null {
-  const row = taskRow(id);
+export async function requestCancel(id: string): Promise<TaskView | null> {
+  const row = await taskRow(id);
   if (!row) return null;
-  updateTask(id, { cancelRequested: true });
-  return getTask(id);
+  await updateTask(id, { cancelRequested: true });
+  return await getTask(id);
 }
 
 export class TaskCancelled extends Error {
@@ -287,7 +294,7 @@ export class TaskCancelled extends Error {
 }
 
 /**
- * Matched by name rather than by class. The app and the engine load their own
+ * Matched by name rather than by class. The app and the dispatcher load their own
  * copy of every module, so instanceof cannot be relied on to travel.
  */
 export function isCancellation(error: unknown): boolean {
@@ -401,28 +408,28 @@ function answerFor(
 }
 
 /**
- * Engine work on a task: prepare context and park it for a runner, or apply a
+ * Dispatcher work on a task: prepare context and park it for a runner, or apply a
  * write once the agent has finished. The agent itself always runs through
  * `runAssignedAgent`.
  */
 export async function runTask(id: string, signal?: AbortSignal): Promise<TaskView> {
-  const task = taskRow(id);
+  const task = await taskRow(id);
   if (!task) throw new Error(`Task not found: ${id}`);
   if (task.state === "applying" || (task.output !== null && task.state === "queued")) {
-    return applyTask(id, signal);
+    return await applyTask(id, signal);
   }
   if (task.state === "queued" || task.state === "preparing") {
-    return prepareTask(id, signal);
+    return await prepareTask(id, signal);
   }
-  return getTask(id)!;
+  return (await getTask(id))!;
 }
 
 async function loadWork(id: string, signal?: AbortSignal) {
-  const task = taskRow(id);
+  const task = await taskRow(id);
   if (!task) throw new Error(`Task not found: ${id}`);
   if (signal?.aborted || task.cancelRequested) throw new TaskCancelled();
 
-  const loop = db().select().from(loops).where(eq(loops.id, task.loopId)).get();
+  const loop = await db().select().from(loops).where(eq(loops.id, task.loopId)).get();
   if (!loop) throw new Error("The loop behind this task has been deleted.");
   const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
   if (!workflow) {
@@ -446,28 +453,31 @@ async function loadWork(id: string, signal?: AbortSignal) {
 
 async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> {
   const { loop, workflow, item } = await loadWork(id, signal);
-  updateTask(id, { sourceTitle: item.title });
+  await updateTask(id, { sourceTitle: item.title });
 
-  const task = taskRow(id)!;
+  const task = (await taskRow(id))!;
   const agentId = task.agentId ?? (await defaultAgentFor(loop.agentId));
-  const workspace = runDir(id);
-  for (const file of item.context) {
-    writeFileSync(join(workspace, file.name), file.body);
+  let logPath: string | null = null;
+  if (!isHosted()) {
+    const workspace = runDir(id);
+    for (const file of item.context) {
+      writeFileSync(join(workspace, file.name), file.body);
+    }
+    logPath = join(workspace, "agent.log");
+    writeFileSync(logPath, "", { flag: "a" });
   }
-  const logPath = join(workspace, "agent.log");
-  writeFileSync(logPath, "", { flag: "a" });
-  const runnerId = pickRunner({
+  const runnerId = await pickRunner({
     agentId,
     requiresHost: workflow.runsIn === "folder",
   });
-  updateTask(id, {
+  await updateTask(id, {
     state: "awaiting_agent",
     agentId,
     runnerId,
     logPath,
     leaseUntil: null,
   });
-  return getTask(id)!;
+  return (await getTask(id))!;
 }
 
 export async function jobForTask(id: string): Promise<AgentJob> {
@@ -476,7 +486,7 @@ export async function jobForTask(id: string): Promise<AgentJob> {
   const workspace = runDir(id);
   const cwd = workflow.runsIn === "folder" ? folderFor(loop) : undefined;
   const branch = workflow.answer === "code" ? branchFor({ ref: item.ref, taskId: id }) : undefined;
-  const settings = { ...settingsFor(task.agentId) };
+  const settings = { ...(await settingsFor(task.agentId)) };
   // Clone needs a writable workspace and network. A global read-only default
   // would make every GitHub checkout job fail before the agent started.
   if (item.checkout && settings.permissionMode === "read_only") {
@@ -491,7 +501,7 @@ export async function jobForTask(id: string): Promise<AgentJob> {
       guidance: loop.guidance,
       item,
       // Folder jobs work in a checkout that does not hold these files, so the
-      // prompt has to name them by their Engine path. Everything else runs
+      // prompt has to name them by their dispatcher path. Everything else runs
       // where the runner wrote them, so the basename is enough.
       files: item.context.map((file) => (cwd ? join(workspace, file.name) : file.name)),
       branch,
@@ -504,16 +514,17 @@ export async function jobForTask(id: string): Promise<AgentJob> {
 
 /** The runner's half: invoke the agent for a task that is already awaiting it. */
 export async function runAssignedAgent(id: string, signal?: AbortSignal): Promise<TaskView> {
-  const task = taskRow(id);
+  const task = await taskRow(id);
   if (!task) throw new Error(`Task not found: ${id}`);
-  if (task.output !== null) return getTask(id)!;
+  if (task.output !== null) return (await getTask(id))!;
 
   const job = await jobForTask(id);
+  const { runAgentJob } = await import("./agent-runner.ts");
   const result = await runAgentJob(job, { signal });
-  updateTask(id, { agentCommand: result.command });
+  await updateTask(id, { agentCommand: result.command });
   if (result.aborted) throw new TaskCancelled();
   if (!result.ok) throw new Error(result.detail ?? "The agent did not finish.");
-  return absorbAgentOutput(id, result.output);
+  return await absorbAgentOutput(id, result.output);
 }
 
 function changesFrom(item: WorkItem, taskId: string): Changes | undefined {
@@ -534,8 +545,8 @@ export async function absorbAgentOutput(id: string, raw: string): Promise<TaskVi
   if (!said) throw new Error("The agent produced nothing.");
 
   if (isAgentNothing(said)) {
-    finish(id, task, { state: "skipped", output: said });
-    return getTask(id)!;
+    await finish(id, task, { state: "skipped", output: said });
+    return (await getTask(id))!;
   }
 
   const parsed = answerFor(workflow, action, item, said);
@@ -543,13 +554,13 @@ export async function absorbAgentOutput(id: string, raw: string): Promise<TaskVi
     throw new Error("The agent produced nothing worth posting.");
   }
 
-  updateTask(id, { output: parsed.output, comments: parsed.comments });
+  await updateTask(id, { output: parsed.output, comments: parsed.comments });
   if (task.dryRun) {
-    finish(id, task, { state: "prepared" });
-    return getTask(id)!;
+    await finish(id, task, { state: "prepared" });
+    return (await getTask(id))!;
   }
-  updateTask(id, { state: "applying", leaseUntil: null });
-  return getTask(id)!;
+  await updateTask(id, { state: "applying", leaseUntil: null });
+  return (await getTask(id))!;
 }
 
 async function applyTask(id: string, signal?: AbortSignal): Promise<TaskView> {
@@ -559,11 +570,11 @@ async function applyTask(id: string, signal?: AbortSignal): Promise<TaskView> {
   if (output === null) throw new Error("Nothing to write back yet.");
 
   if (task.dryRun) {
-    finish(id, task, { state: "prepared" });
-    return getTask(id)!;
+    await finish(id, task, { state: "prepared" });
+    return (await getTask(id))!;
   }
 
-  updateTask(id, { state: "applying" });
+  await updateTask(id, { state: "applying" });
   const sameConnector = task.actionConnectorId === task.connectorId;
   const apply = writer.applyAction;
   if (!apply) throw new Error(`${task.actionConnectorId} cannot write anything.`);
@@ -585,17 +596,17 @@ async function applyTask(id: string, signal?: AbortSignal): Promise<TaskView> {
       ? credential
       : (await credentialForConnector(task.actionConnectorId)).credential,
   });
-  finish(id, task, { state: "done", resultUrl: outcome.url });
-  return getTask(id)!;
+  await finish(id, task, { state: "done", resultUrl: outcome.url });
+  return (await getTask(id))!;
 }
 
-function finish(id: string, task: Task, values: Partial<Task>): void {
+async function finish(id: string, task: Task, values: Partial<Task>): Promise<void> {
   const started = task.startedAt?.getTime() ?? task.createdAt.getTime();
   // Every way of getting here is an attempt that came good, so whatever an
   // earlier one left behind stops being true. A task is retried, and one that
   // failed twice before working would otherwise sit in the log marked done
   // with a reason it did not work next to it.
-  updateTask(id, { error: null, ...values, durationMs: Date.now() - started, leaseUntil: null });
+  await updateTask(id, { error: null, ...values, durationMs: Date.now() - started, leaseUntil: null });
 }
 
 export async function defaultAgentFor(pinned: string | null): Promise<string> {
@@ -603,7 +614,7 @@ export async function defaultAgentFor(pinned: string | null): Promise<string> {
     if (!agentManifest(pinned)) throw new Error(`Unknown agent: ${pinned}`);
     return pinned;
   }
-  const available = availableAgentIds();
+  const available = await availableAgentIds();
   const agents = await listAgents();
   const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
   if (chosen && available.includes(chosen)) return chosen;

@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/connectors/$connectorId/authorize")({
             redirectUri,
             state,
           });
-          startAuthAttempt({ connectorId, state, verifier, redirectUri });
+          await startAuthAttempt({ connectorId, state, verifier, redirectUri });
           return Response.redirect(redirectUrl, 302);
         } catch (error) {
           return failed(error instanceof Error ? error.message : String(error));

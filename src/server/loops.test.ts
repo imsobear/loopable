@@ -7,11 +7,13 @@ const home = mkdtempSync(join(tmpdir(), "loopable-loops-"));
 process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
 
-const { db } = await import("./db/client.ts");
+const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops } = await import("./db/schema.ts");
 const { createLoop, getLoop, updateLoop } = await import("./loops.ts");
 const { draftForWorkflow } = await import("#/lib/loop-draft.ts");
 const { githubManifest } = await import("#/connectors/github/manifest.ts");
+
+await migrateIfNeeded();
 
 const REVIEW = githubManifest.workflows.find((entry) => entry.id === "github.review_requested")!;
 
@@ -21,8 +23,8 @@ function added(connectorId: string, workflowId: string, changes: Record<string, 
 }
 
 /** A saved loop, with only the field under test changed. */
-function edited(id: string, changes: Record<string, unknown>) {
-  const loop = getLoop(id)!;
+async function edited(id: string, changes: Record<string, unknown>) {
+  const loop = (await getLoop(id))!;
   return updateLoop(id, {
     name: loop.name,
     connectorId: loop.connectorId,
@@ -40,8 +42,8 @@ function edited(id: string, changes: Record<string, unknown>) {
   });
 }
 
-beforeEach(() => {
-  db().delete(loops).run();
+beforeEach(async () => {
+  await db().delete(loops).run();
 });
 
 describe("choosing a workflow", () => {
@@ -50,14 +52,14 @@ describe("choosing a workflow", () => {
    * opening the page and looking at what was on offer left a live loop
    * behind: enabled, watching, and with none of its questions answered.
    */
-  it("writes nothing down until it is saved", () => {
+  it("writes nothing down until it is saved", async () => {
     const draft = draftForWorkflow("github", "github.review_requested");
 
     expect(draft.id).toBeNull();
-    expect(db().select().from(loops).all()).toHaveLength(0);
+    expect(await db().select().from(loops).all()).toHaveLength(0);
 
-    createLoop({ ...draft, settings: { repositories: [] } });
-    expect(db().select().from(loops).all()).toHaveLength(1);
+    await createLoop({ ...draft, settings: { repositories: [] } });
+    expect(await db().select().from(loops).all()).toHaveLength(1);
   });
 
   it("hands the form something to fill in rather than defaults to discover", () => {
@@ -72,7 +74,7 @@ describe("choosing a workflow", () => {
 
 describe("turning a workflow into a loop", () => {
   it("takes a copy of what the workflow asks and where it writes", async () => {
-    const loop = added("github", "github.review_requested");
+    const loop = await added("github", "github.review_requested");
 
     expect(loop.prompt).toBe(REVIEW.prompt);
     expect(loop.actionConnectorId).toBe("github");
@@ -80,20 +82,20 @@ describe("turning a workflow into a loop", () => {
     expect(loop.actionTarget).toEqual({});
   });
 
-  it("keeps an edited prompt, and does not read it back off the workflow", () => {
-    const { id } = added("github", "github.review_requested");
-    edited(id, { prompt: "Only check the tests." });
+  it("keeps an edited prompt, and does not read it back off the workflow", async () => {
+    const { id } = await added("github", "github.review_requested");
+    await edited(id, { prompt: "Only check the tests." });
 
-    expect(getLoop(id)!.prompt).toBe("Only check the tests.");
+    expect((await getLoop(id))!.prompt).toBe("Only check the tests.");
     // The workflow is untouched, so a second loop still starts from it.
-    expect(added("github", "github.review_requested").prompt).toBe(REVIEW.prompt);
+    expect((await added("github", "github.review_requested")).prompt).toBe(REVIEW.prompt);
   });
 
-  it("refuses to be left with nothing to ask", () => {
-    const { id } = added("github", "github.review_requested");
+  it("refuses to be left with nothing to ask", async () => {
+    const { id } = await added("github", "github.review_requested");
     // Quietly restoring the template would be worse: the loop would run and
     // write, and not with what the box on screen said.
-    expect(() => edited(id, { prompt: "   " })).toThrow(/what the agent should do/);
+    await expect(edited(id, { prompt: "   " })).rejects.toThrow(/what the agent should do/);
   });
 
   /**
@@ -101,8 +103,8 @@ describe("turning a workflow into a loop", () => {
    * has to name where its answer goes or be useless the moment it is turned
    * on. It still only starts there; the loop can be pointed anywhere after.
    */
-  it("starts on another connector when the workflow says so", () => {
-    const loop = added("gmail", "gmail.new_mail");
+  it("starts on another connector when the workflow says so", async () => {
+    const loop = await added("gmail", "gmail.new_mail");
 
     expect(loop.connectorId).toBe("gmail");
     expect(loop.actionConnectorId).toBe("wechat");
@@ -120,36 +122,36 @@ describe("turning a workflow into a loop", () => {
  * time, which is a slow way to be told to fill in a box.
  */
 describe("a loop that has to work somewhere", () => {
-  it("will not be saved without the folder it works in", () => {
-    expect(() => added("schedule", "schedule.recurring")).toThrow(/which folder/);
-    expect(() => added("schedule", "schedule.recurring", { settings: { folder: "  " } })).toThrow(
+  it("will not be saved without the folder it works in", async () => {
+    await expect(added("schedule", "schedule.recurring")).rejects.toThrow(/which folder/);
+    await expect(added("schedule", "schedule.recurring", { settings: { folder: "  " } })).rejects.toThrow(
       /which folder/,
     );
   });
 
-  it("is saved once it has one", () => {
-    const loop = added("schedule", "schedule.recurring", {
+  it("is saved once it has one", async () => {
+    const loop = await added("schedule", "schedule.recurring", {
       settings: { every: "day", at: "09:00", weekday: "1", folder: "/Users/you/code/web" },
     });
 
     expect(loop.settings.folder).toBe("/Users/you/code/web");
   });
 
-  it("does not ask for one where the agent is given no checkout", () => {
+  it("does not ask for one where the agent is given no checkout", async () => {
     // Judging a diff needs the diff and nothing else, so there is nothing to
     // name and nothing to refuse.
-    expect(() => added("github", "github.review_requested")).not.toThrow();
+    await expect(added("github", "github.review_requested")).resolves.toBeTruthy();
   });
 
-  it("does not ask for a local clone when the agent will clone the repository", () => {
-    expect(() => added("github", "github.issue_implement")).not.toThrow();
+  it("does not ask for a local clone when the agent will clone the repository", async () => {
+    await expect(added("github", "github.issue_implement")).resolves.toBeTruthy();
   });
 });
 
 describe("choosing where a loop writes", () => {
-  it("accepts an action on a connector it does not watch", () => {
-    const { id } = added("github", "github.review_requested");
-    const saved = edited(id, {
+  it("accepts an action on a connector it does not watch", async () => {
+    const { id } = await added("github", "github.review_requested");
+    const saved = await edited(id, {
       actionConnectorId: "wechat",
       actionId: "wechat.reply",
       actionTarget: { to: "me" },
@@ -159,17 +161,17 @@ describe("choosing where a loop writes", () => {
     expect(saved.actionTarget).toEqual({ to: "me" });
   });
 
-  it("drops a target the chosen action never asked for", () => {
+  it("drops a target the chosen action never asked for", async () => {
     // Left alone, a stale answer would sit in the column looking meaningful
     // and be read by nothing.
-    const { id } = added("github", "github.review_requested");
-    const saved = edited(id, { actionTarget: { issue: "https://github.com/acme/web/issues/1" } });
+    const { id } = await added("github", "github.review_requested");
+    const saved = await edited(id, { actionTarget: { issue: "https://github.com/acme/web/issues/1" } });
 
     expect(saved.actionTarget).toEqual({});
   });
 
-  it("refuses an action the connector does not have", () => {
-    const { id } = added("github", "github.review_requested");
-    expect(() => edited(id, { actionId: "github.merge_it" })).toThrow(/cannot github.merge_it/);
+  it("refuses an action the connector does not have", async () => {
+    const { id } = await added("github", "github.review_requested");
+    await expect(edited(id, { actionId: "github.merge_it" })).rejects.toThrow(/cannot github.merge_it/);
   });
 });

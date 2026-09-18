@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "loopable",
+  "compatibility_date": "2026-09-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/worker.ts",
+  "observability": { "enabled": true },
+  "vars": {
+    "LOOPABLE_SKIP_MIGRATE": "1"
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "containers": [
+    {
+      "class_name": "DispatcherContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DISPATCHER",
+        "class_name": "DispatcherContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DispatcherContainer"]
+    }
+  ]
+}

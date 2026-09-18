@@ -89,5 +89,12 @@ describe("appAccessCookie", () => {
   it("sets a host-only cookie", () => {
     expect(appAccessCookie("secret")).toContain(`${APP_ACCESS_COOKIE}=secret`);
     expect(appAccessCookie("secret")).toContain("HttpOnly");
+    expect(appAccessCookie("secret")).not.toContain("Secure");
+  });
+
+  it("marks the cookie Secure on HTTPS", () => {
+    process.env.LOOPABLE_BASE_URL = "https://loopable.example";
+    expect(appAccessCookie("secret")).toContain("Secure");
+    delete process.env.LOOPABLE_BASE_URL;
   });
 });

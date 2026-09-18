@@ -10,10 +10,12 @@ process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
 process.env.LOOPABLE_KEYCHAIN = "0";
 
-const { db } = await import("./db/client.ts");
+const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, tasks } = await import("./db/schema.ts");
 const { forgetRunner, getJoinToken, heartbeatRunner, joinRunner, pickRunner } =
   await import("./runners.ts");
+
+await migrateIfNeeded();
 
 const CODEX = [
   { agentId: "codex", installed: true, version: "1", signedIn: true, detail: "ok" },
@@ -25,43 +27,43 @@ async function givenRunner(hostname: string, inventory = CODEX) {
     hostname,
     inventory,
   });
-  heartbeatRunner(joined.runnerId, inventory);
+  await heartbeatRunner(joined.runnerId, inventory);
   return joined;
 }
 
-beforeEach(() => {
-  db().delete(tasks).run();
-  db().delete(loops).run();
-  db().delete(runners).run();
+beforeEach(async () => {
+  await db().delete(tasks).run();
+  await db().delete(loops).run();
+  await db().delete(runners).run();
 });
 
 describe("pickRunner", () => {
   it("sends folder jobs to a runner on this host", async () => {
     const local = await givenRunner(osHostname());
     await givenRunner("other-box");
-    expect(pickRunner({ agentId: "codex", requiresHost: true })).toBe(
+    expect(await pickRunner({ agentId: "codex", requiresHost: true })).toBe(
       local.runnerId,
     );
   });
 
   it("refuses folder jobs when no runner is on this host", async () => {
     await givenRunner("other-box");
-    expect(() =>
+    await expect(
       pickRunner({ agentId: "codex", requiresHost: true }),
-    ).toThrow("same host as Loopable");
+    ).rejects.toThrow("same host as Loopable");
   });
 
   it("prefers an idle runner that has the agent", async () => {
     const first = await givenRunner("box-a");
-    expect(pickRunner({ agentId: "codex", requiresHost: false })).toBe(
+    expect(await pickRunner({ agentId: "codex", requiresHost: false })).toBe(
       first.runnerId,
     );
   });
 
-  it("refuses when no runner is online", () => {
-    expect(() =>
+  it("refuses when no runner is online", async () => {
+    await expect(
       pickRunner({ agentId: "codex", requiresHost: false }),
-    ).toThrow("No runner is online");
+    ).rejects.toThrow("No runner is online");
   });
 });
 
@@ -84,7 +86,7 @@ describe("joinRunner", () => {
 describe("forgetRunner", () => {
   it("refuses while a run is in flight", async () => {
     const joined = await givenRunner("box-a");
-    db()
+    await db()
       .insert(loops)
       .values({
         id: "loop-1",
@@ -97,7 +99,7 @@ describe("forgetRunner", () => {
         priority: 1,
       })
       .run();
-    db()
+    await db()
       .insert(tasks)
       .values({
         id: randomUUID(),

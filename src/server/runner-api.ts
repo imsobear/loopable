@@ -2,19 +2,20 @@ import { hostname as osHostname } from "node:os";
 import { appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { and, eq, isNull, lte, or } from "drizzle-orm";
+import { isHosted } from "#/lib/hosted.ts";
 import { jobRequiresHost, type AgentJob } from "./agent-job.ts";
-import { db } from "./db/client.ts";
+import { db, rowsChanged } from "./db/client.ts";
 import { tasks } from "./db/schema.ts";
 import { getRunner, heartbeatRunner, isRunnerOnline } from "./runners.ts";
 import { runDir } from "./paths.ts";
 import { absorbAgentOutput, jobForTask, taskRow, updateTask } from "./tasks.ts";
 import type { RunnerInventoryEntry } from "#/lib/domain.ts";
 
-export function claimAgentJob(runnerId: string): Promise<AgentJob | null> {
-  const row = getRunner(runnerId);
-  if (!row || !isRunnerOnline(row)) return Promise.resolve(null);
+export async function claimAgentJob(runnerId: string): Promise<AgentJob | null> {
+  const row = await getRunner(runnerId);
+  if (!row || !isRunnerOnline(row)) return null;
 
-  const waiting = db()
+  const waiting = await db()
     .select()
     .from(tasks)
     .where(
@@ -27,28 +28,36 @@ export function claimAgentJob(runnerId: string): Promise<AgentJob | null> {
     .all();
 
   for (const task of waiting) {
-    const claimed = db()
+    const claimed = await db()
       .update(tasks)
       .set({ leaseUntil: new Date(Date.now() + 60_000), updatedAt: new Date() })
       .where(and(eq(tasks.id, task.id), eq(tasks.state, "awaiting_agent")))
       .run();
-    if (claimed.changes !== 1) continue;
-    return jobForTask(task.id).then((job) => {
-      if (jobRequiresHost(job) && row.hostname !== osHostname()) {
-        updateTask(task.id, { leaseUntil: null });
-        return null;
-      }
-      return job;
-    });
+    if (rowsChanged(claimed) !== 1) continue;
+    const job = await jobForTask(task.id);
+    if (jobRequiresHost(job) && row.hostname !== osHostname()) {
+      await updateTask(task.id, { leaseUntil: null });
+      return null;
+    }
+    return job;
   }
-  return Promise.resolve(null);
+  return null;
 }
 
-export function appendAgentLog(taskId: string, runnerId: string, chunk: string): void {
-  const task = taskRow(taskId);
+export async function appendAgentLog(taskId: string, runnerId: string, chunk: string): Promise<void> {
+  const task = await taskRow(taskId);
   if (!task || task.runnerId !== runnerId) throw new Error("This run is not yours.");
+  const next = `${task.logText ?? ""}${chunk}`;
+  if (isHosted()) {
+    await updateTask(taskId, { logText: next });
+    return;
+  }
   const path = task.logPath ?? join(runDir(taskId), "agent.log");
-  if (!existsSync(path) && !task.logPath) updateTask(taskId, { logPath: path });
+  if (!existsSync(path) && !task.logPath) {
+    await updateTask(taskId, { logPath: path, logText: next });
+  } else {
+    await updateTask(taskId, { logText: next });
+  }
   appendFileSync(task.logPath ?? path, chunk);
 }
 
@@ -57,15 +66,15 @@ export async function completeAgentJob(
   runnerId: string,
   result: { ok: boolean; output: string; detail?: string; aborted?: boolean; command: string },
 ) {
-  const task = taskRow(taskId);
+  const task = await taskRow(taskId);
   if (!task || task.runnerId !== runnerId) throw new Error("This run is not yours.");
-  updateTask(taskId, { agentCommand: result.command, leaseUntil: null });
+  await updateTask(taskId, { agentCommand: result.command, leaseUntil: null });
   if (result.aborted) {
-    updateTask(taskId, { state: "cancelled", error: "Stopped before it finished." });
+    await updateTask(taskId, { state: "cancelled", error: "Stopped before it finished." });
     return;
   }
   if (!result.ok) {
-    updateTask(taskId, { state: "failed", error: result.detail ?? "The agent did not finish." });
+    await updateTask(taskId, { state: "failed", error: result.detail ?? "The agent did not finish." });
     return;
   }
   await absorbAgentOutput(taskId, result.output);

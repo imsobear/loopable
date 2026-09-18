@@ -82,12 +82,13 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
     report.found = found.length;
 
     const known = new Set(
-      db()
-        .select({ key: signals.key })
-        .from(signals)
-        .where(eq(signals.loopId, loop.id))
-        .all()
-        .map((row) => row.key),
+      (
+        await db()
+          .select({ key: signals.key })
+          .from(signals)
+          .where(eq(signals.loopId, loop.id))
+          .all()
+      ).map((row) => row.key),
     );
     const first = loop.polledAt === null;
 
@@ -129,8 +130,8 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
           : first
             ? "backlog"
             : "queued";
-      const task = outcome === "queued" ? enqueueSignal({ loop, signal }) : null;
-      db()
+      const task = outcome === "queued" ? await enqueueSignal({ loop, signal }) : null;
+      await db()
         .insert(signals)
         .values({
           loopId: loop.id,
@@ -158,7 +159,7 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
     // The cursor moves only once everything the last answer carried is on
     // disk. A stream will not hand those messages over twice, so saving the
     // new position before the signals would lose whatever fell in between.
-    db()
+    await db()
       .update(loops)
       .set({
         polledAt: new Date(),
@@ -171,7 +172,7 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
     report.error = error instanceof Error ? error.message : String(error);
     // polledAt is deliberately left alone: a look that failed told us nothing
     // about the backlog, and moving the mark would silently swallow it.
-    db().update(loops).set({ pollError: report.error }).where(eq(loops.id, loop.id)).run();
+    await db().update(loops).set({ pollError: report.error }).where(eq(loops.id, loop.id)).run();
   }
 
   return report;
@@ -199,7 +200,7 @@ export function isDue(loop: Loop, now: number): boolean {
  */
 export async function pollAllLoops(): Promise<PollReport[]> {
   const now = Date.now();
-  const enabled = db()
+  const enabled = await db()
     .select()
     .from(loops)
     .where(eq(loops.enabled, true))
@@ -236,9 +237,9 @@ function toBacklogItem(row: typeof signals.$inferSelect): BacklogItem {
 const WAITING = ["backlog", "held"] as const;
 
 /** What the loop page needs to say whether the loop is actually watching. */
-export function loopPollState(loopId: string): LoopPollState {
-  const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
-  const backlog = db()
+export async function loopPollState(loopId: string): Promise<LoopPollState> {
+  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
+  const backlog = await db()
     .select()
     .from(signals)
     .where(and(eq(signals.loopId, loopId), inArray(signals.outcome, [...WAITING])))
@@ -256,18 +257,18 @@ export function loopPollState(loopId: string): LoopPollState {
  * one moment a loop does a month of work at once, and because something held
  * back for being too big is being run against the connector's advice.
  */
-export function runBacklog(loopId: string): number {
-  const loop = db().select().from(loops).where(eq(loops.id, loopId)).get();
+export async function runBacklog(loopId: string): Promise<number> {
+  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
   if (!loop) throw new Error("Loop not found");
 
-  const waiting = db()
+  const waiting = await db()
     .select()
     .from(signals)
     .where(and(eq(signals.loopId, loopId), inArray(signals.outcome, [...WAITING])))
     .all();
 
   for (const row of waiting) {
-    const task = enqueueSignal({
+    const task = await enqueueSignal({
       loop,
       signal: {
         key: row.key,
@@ -278,7 +279,7 @@ export function runBacklog(loopId: string): number {
         payload: row.sourcePayload ?? undefined,
       },
     });
-    db()
+    await db()
       .update(signals)
       .set({ outcome: "queued", taskId: task.id })
       .where(and(eq(signals.loopId, loopId), eq(signals.key, row.key)))

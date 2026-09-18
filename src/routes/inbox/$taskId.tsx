@@ -222,7 +222,7 @@ function AgentLog({ log, live }: { log: string; live: boolean }) {
 }
 
 /**
- * The run is in the other process, so this only leaves a note. The engine
+ * The run is in the other process, so this only leaves a note. The dispatcher
  * sees it when it next renews its claim, which is why the button says it has
  * been asked for rather than pretending it is already done.
  */

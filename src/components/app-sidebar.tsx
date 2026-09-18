@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Bot, Inbox, Plug, Server, Settings, Workflow } from "lucide-react";
 import { LoopableMark } from "@/components/brand";
-import { EngineStatus } from "@/components/engine-status";
+import { DispatcherStatus } from "@/components/dispatcher-status";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -101,9 +101,9 @@ export function AppSidebar() {
         <NavGroup label="Setup" items={SETUP} />
       </SidebarContent>
       <SidebarFooter>
-        {/* The engine is what makes every page true, so it is reported once
+        {/* The dispatcher is what makes every page true, so it is reported once
             here rather than repeated on the pages that happen to care. */}
-        <EngineStatus />
+        <DispatcherStatus />
       </SidebarFooter>
     </Sidebar>
   );

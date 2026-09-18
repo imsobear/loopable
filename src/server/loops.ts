@@ -123,23 +123,23 @@ function validate(draft: LoopDraft): LoopDraft {
   };
 }
 
-export function listLoops(): LoopView[] {
-  return db().select().from(loops).orderBy(asc(loops.priority)).all().map(toView);
+export async function listLoops(): Promise<LoopView[]> {
+  return (await db().select().from(loops).orderBy(asc(loops.priority)).all()).map(toView);
 }
 
-export function getLoop(id: string): LoopView | null {
-  const row = db().select().from(loops).where(eq(loops.id, id)).get();
+export async function getLoop(id: string): Promise<LoopView | null> {
+  const row = await db().select().from(loops).where(eq(loops.id, id)).get();
   return row ? toView(row) : null;
 }
 
-export function createLoop(draft: LoopDraft): LoopView {
+export async function createLoop(draft: LoopDraft): Promise<LoopView> {
   const checked = validate(draft);
-  const last = db()
+  const last = await db()
     .select({ value: sql<number | null>`max(${loops.priority})` })
     .from(loops)
     .get();
   const id = randomUUID();
-  db()
+  await db()
     .insert(loops)
     .values({
       id,
@@ -158,13 +158,13 @@ export function createLoop(draft: LoopDraft): LoopView {
       pollEveryMs: checked.pollEveryMs,
     })
     .run();
-  return getLoop(id)!;
+  return (await getLoop(id))!;
 }
 
-export function updateLoop(id: string, draft: LoopDraft): LoopView {
-  if (!getLoop(id)) throw new Error("Loop not found");
+export async function updateLoop(id: string, draft: LoopDraft): Promise<LoopView> {
+  if (!(await getLoop(id))) throw new Error("Loop not found");
   const checked = validate(draft);
-  db()
+  await db()
     .update(loops)
     .set({
       name: checked.name,
@@ -183,25 +183,25 @@ export function updateLoop(id: string, draft: LoopDraft): LoopView {
     })
     .where(eq(loops.id, id))
     .run();
-  return getLoop(id)!;
+  return (await getLoop(id))!;
 }
 
-export function setLoopEnabled(id: string, enabled: boolean): LoopView {
-  if (!getLoop(id)) throw new Error("Loop not found");
-  db().update(loops).set({ enabled, updatedAt: new Date() }).where(eq(loops.id, id)).run();
-  return getLoop(id)!;
+export async function setLoopEnabled(id: string, enabled: boolean): Promise<LoopView> {
+  if (!(await getLoop(id))) throw new Error("Loop not found");
+  await db().update(loops).set({ enabled, updatedAt: new Date() }).where(eq(loops.id, id)).run();
+  return (await getLoop(id))!;
 }
 
-export function deleteLoop(id: string): void {
-  db().delete(loops).where(eq(loops.id, id)).run();
+export async function deleteLoop(id: string): Promise<void> {
+  await db().delete(loops).where(eq(loops.id, id)).run();
 }
 
 /**
  * The first matching loop wins, so a person has to be able to say which comes
  * first. Swapping with the neighbour keeps that to one obvious gesture.
  */
-export function moveLoop(id: string, direction: "up" | "down"): LoopView[] {
-  const ordered = db().select().from(loops).orderBy(asc(loops.priority)).all();
+export async function moveLoop(id: string, direction: "up" | "down"): Promise<LoopView[]> {
+  const ordered = await db().select().from(loops).orderBy(asc(loops.priority)).all();
   const index = ordered.findIndex((row) => row.id === id);
   if (index === -1) throw new Error("Loop not found");
   const target = direction === "up" ? index - 1 : index + 1;
@@ -209,11 +209,11 @@ export function moveLoop(id: string, direction: "up" | "down"): LoopView[] {
 
   const moving = ordered[index]!;
   const neighbour = ordered[target]!;
-  db().transaction((tx) => {
-    tx.update(loops).set({ priority: neighbour.priority }).where(eq(loops.id, moving.id)).run();
-    tx.update(loops).set({ priority: moving.priority }).where(eq(loops.id, neighbour.id)).run();
+  await db().transaction(async (tx) => {
+    await tx.update(loops).set({ priority: neighbour.priority }).where(eq(loops.id, moving.id)).run();
+    await tx.update(loops).set({ priority: moving.priority }).where(eq(loops.id, neighbour.id)).run();
   });
-  return listLoops();
+  return await listLoops();
 }
 
 /**
@@ -222,12 +222,12 @@ export function moveLoop(id: string, direction: "up" | "down"): LoopView[] {
  */
 export async function loopReadiness(): Promise<LoopReadiness> {
   const agents = await listAgents();
-  const connected = db()
+  const connected = await db()
     .selectDistinct({ connectorId: connections.connectorId })
     .from(connections)
     .all();
-  const available = availableAgentIds();
-  const host = availableAgentIds(true);
+  const available = await availableAgentIds();
+  const host = await availableAgentIds(true);
   const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
   const defaultAgentId =
     (chosen && available.includes(chosen) ? chosen : null) ??

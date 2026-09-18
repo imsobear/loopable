@@ -46,14 +46,16 @@ vi.mock("./agents.ts", () => ({
   settingsFor: () => ({ permissionMode: "read_only", model: null, timeoutMs: 1_000 }),
 }));
 
-const { db } = await import("./db/client.ts");
+const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, signals, tasks } = await import("./db/schema.ts");
 const { pollAllLoops, loopPollState, runBacklog } = await import("./signals.ts");
 const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { asc, eq } = await import("drizzle-orm");
 
-function givenLoop(id: string, priority: number, repositories: string[] = []): void {
-  db()
+await migrateIfNeeded();
+
+async function givenLoop(id: string, priority: number, repositories: string[] = []): Promise<void> {
+  await db()
     .insert(loops)
     .values({
       id,
@@ -79,12 +81,12 @@ function pull(number: number, sha = "sha1"): Signal {
   };
 }
 
-function tasksFor(loopId: string) {
-  return db().select().from(tasks).where(eq(tasks.loopId, loopId)).all();
+async function tasksFor(loopId: string) {
+  return await db().select().from(tasks).where(eq(tasks.loopId, loopId)).all();
 }
 
-function signalsFor(loopId: string) {
-  return db()
+async function signalsFor(loopId: string) {
+  return await db()
     .select()
     .from(signals)
     .where(eq(signals.loopId, loopId))
@@ -93,10 +95,10 @@ function signalsFor(loopId: string) {
 }
 
 beforeEach(async () => {
-  db().delete(tasks).run();
-  db().delete(signals).run();
-  db().delete(loops).run();
-  db().delete(runners).run();
+  await db().delete(tasks).run();
+  await db().delete(signals).run();
+  await db().delete(loops).run();
+  await db().delete(runners).run();
   answer = [];
   triaged = '{"needsMe": []}';
   triageRuns = 0;
@@ -111,17 +113,17 @@ beforeEach(async () => {
 
 describe("the first look", () => {
   it("records what is already waiting without running any of it", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [pull(1), pull(2)];
 
     const [report] = await pollAllLoops();
     expect(report).toMatchObject({ found: 2, queued: 0, backlog: 2, superseded: 0, error: null });
-    expect(tasksFor("a")).toHaveLength(0);
-    expect(signalsFor("a").map((row) => row.outcome)).toEqual(["backlog", "backlog"]);
+    expect(await tasksFor("a")).toHaveLength(0);
+    expect((await signalsFor("a")).map((row) => row.outcome)).toEqual(["backlog", "backlog"]);
   });
 
   it("acts on everything that turns up after it", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [pull(1)];
     await pollAllLoops();
 
@@ -129,7 +131,7 @@ describe("the first look", () => {
     const [report] = await pollAllLoops();
     expect(report).toMatchObject({ found: 2, queued: 1, backlog: 0 });
 
-    const queued = tasksFor("a");
+    const queued = await tasksFor("a");
     expect(queued).toHaveLength(1);
     expect(queued[0]).toMatchObject({
       sourceRef: "acme/web#2",
@@ -141,23 +143,23 @@ describe("the first look", () => {
   });
 
   it("is not spent by a look that failed, so the backlog is still the backlog", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = new Error("GitHub 401: bad credentials");
 
     const [failed] = await pollAllLoops();
     expect(failed).toMatchObject({ error: "GitHub 401: bad credentials", found: 0 });
-    expect(loopPollState("a").polledAt).toBeNull();
+    expect((await loopPollState("a")).polledAt).toBeNull();
 
     answer = [pull(1)];
     const [recovered] = await pollAllLoops();
     expect(recovered).toMatchObject({ backlog: 1, queued: 0, error: null });
-    expect(loopPollState("a").pollError).toBeNull();
+    expect((await loopPollState("a")).pollError).toBeNull();
   });
 });
 
 describe("looking again", () => {
   it("leaves a key it has already dealt with alone", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [pull(1)];
     await pollAllLoops();
     answer = [pull(2)];
@@ -166,11 +168,11 @@ describe("looking again", () => {
     answer = [pull(2)];
     const [report] = await pollAllLoops();
     expect(report).toMatchObject({ found: 1, queued: 0, backlog: 0 });
-    expect(tasksFor("a")).toHaveLength(1);
+    expect(await tasksFor("a")).toHaveLength(1);
   });
 
   it("acts again when the same pull request has a new commit", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [];
     await pollAllLoops();
 
@@ -179,12 +181,12 @@ describe("looking again", () => {
     answer = [pull(1, "sha2")];
     await pollAllLoops();
 
-    expect(tasksFor("a")).toHaveLength(2);
+    expect(await tasksFor("a")).toHaveLength(2);
   });
 
   it("skips a loop that is off", async () => {
-    givenLoop("a", 1);
-    db().update(loops).set({ enabled: false }).where(eq(loops.id, "a")).run();
+    await givenLoop("a", 1);
+    await db().update(loops).set({ enabled: false }).where(eq(loops.id, "a")).run();
     answer = [pull(1)];
     expect(await pollAllLoops()).toEqual([]);
   });
@@ -192,8 +194,8 @@ describe("looking again", () => {
 
 describe("two loops wanting the same thing", () => {
   it("gives it to the one that comes first", async () => {
-    givenLoop("first", 1);
-    givenLoop("second", 2);
+    await givenLoop("first", 1);
+    await givenLoop("second", 2);
     // Both are past their first look, so both would otherwise queue it.
     answer = [];
     await pollAllLoops();
@@ -204,56 +206,56 @@ describe("two loops wanting the same thing", () => {
       ["first", 1, 0],
       ["second", 0, 1],
     ]);
-    expect(tasksFor("first")).toHaveLength(1);
-    expect(tasksFor("second")).toHaveLength(0);
+    expect(await tasksFor("first")).toHaveLength(1);
+    expect(await tasksFor("second")).toHaveLength(0);
   });
 
   it("does not hand it back to the second loop on the next look", async () => {
-    givenLoop("first", 1);
-    givenLoop("second", 2);
+    await givenLoop("first", 1);
+    await givenLoop("second", 2);
     answer = [];
     await pollAllLoops();
     answer = [pull(1)];
     await pollAllLoops();
     await pollAllLoops();
 
-    expect(tasksFor("second")).toHaveLength(0);
-    expect(signalsFor("second").map((row) => row.outcome)).toEqual(["superseded"]);
+    expect(await tasksFor("second")).toHaveLength(0);
+    expect((await signalsFor("second")).map((row) => row.outcome)).toEqual(["superseded"]);
   });
 });
 
 describe("running the backlog", () => {
   it("queues everything that was held, once", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [pull(1), pull(2)];
     await pollAllLoops();
 
-    expect(loopPollState("a").backlog.map((item) => item.sourceRef)).toEqual([
+    expect((await loopPollState("a")).backlog.map((item) => item.sourceRef)).toEqual([
       "acme/web#1",
       "acme/web#2",
     ]);
-    expect(runBacklog("a")).toBe(2);
+    expect(await runBacklog("a")).toBe(2);
 
-    const queued = tasksFor("a");
+    const queued = await tasksFor("a");
     expect(queued).toHaveLength(2);
     expect(queued.every((task) => task.state === "queued")).toBe(true);
-    expect(loopPollState("a").backlog).toEqual([]);
+    expect((await loopPollState("a")).backlog).toEqual([]);
 
     // Nothing left to run, and the next look does not queue them again.
-    expect(runBacklog("a")).toBe(0);
+    expect(await runBacklog("a")).toBe(0);
     await pollAllLoops();
-    expect(tasksFor("a")).toHaveLength(2);
+    expect(await tasksFor("a")).toHaveLength(2);
   });
 });
 
 describe("how often to look", () => {
-  function every(id: string, ms: number | null): void {
-    db().update(loops).set({ pollEveryMs: ms }).where(eq(loops.id, id)).run();
+  async function every(id: string, ms: number | null): Promise<void> {
+    await db().update(loops).set({ pollEveryMs: ms }).where(eq(loops.id, id)).run();
   }
 
   /** As if the last look happened this long ago. */
-  function lastLooked(id: string, msAgo: number): void {
-    db()
+  async function lastLooked(id: string, msAgo: number): Promise<void> {
+    await db()
       .update(loops)
       .set({ polledAt: new Date(Date.now() - msAgo) })
       .where(eq(loops.id, id))
@@ -261,64 +263,64 @@ describe("how often to look", () => {
   }
 
   it("looks straight away the first time, whatever the interval says", async () => {
-    givenLoop("a", 1);
-    every("a", 30 * 60_000);
+    await givenLoop("a", 1);
+    await every("a", 30 * 60_000);
 
     answer = [pull(1)];
     expect(await pollAllLoops()).toHaveLength(1);
   });
 
   it("then leaves it alone until the interval is up", async () => {
-    givenLoop("a", 1);
-    every("a", 30 * 60_000);
+    await givenLoop("a", 1);
+    await every("a", 30 * 60_000);
     answer = [];
     await pollAllLoops();
 
     answer = [pull(1)];
     expect(await pollAllLoops()).toEqual([]);
-    expect(tasksFor("a")).toHaveLength(0);
+    expect(await tasksFor("a")).toHaveLength(0);
 
-    lastLooked("a", 29 * 60_000);
+    await lastLooked("a", 29 * 60_000);
     expect(await pollAllLoops()).toEqual([]);
 
-    lastLooked("a", 31 * 60_000);
+    await lastLooked("a", 31 * 60_000);
     expect(await pollAllLoops()).toHaveLength(1);
-    expect(tasksFor("a")).toHaveLength(1);
+    expect(await tasksFor("a")).toHaveLength(1);
   });
 
   it("looks every time when no interval is set", async () => {
-    givenLoop("a", 1);
-    every("a", null);
+    await givenLoop("a", 1);
+    await every("a", null);
     answer = [];
     await pollAllLoops();
 
     answer = [pull(1)];
     expect(await pollAllLoops()).toHaveLength(1);
-    expect(tasksFor("a")).toHaveLength(1);
+    expect(await tasksFor("a")).toHaveLength(1);
   });
 
   it("lets a loop that is due take what a waiting one would have claimed", async () => {
     // Priority settles a tie between loops looked at together, and two loops
     // on different clocks are not looked at together. Worth a test because it
     // reads as priority being ignored.
-    givenLoop("first", 1);
-    givenLoop("second", 2);
-    every("first", 30 * 60_000);
+    await givenLoop("first", 1);
+    await givenLoop("second", 2);
+    await every("first", 30 * 60_000);
     answer = [];
     await pollAllLoops();
 
     answer = [pull(1)];
     const reports = await pollAllLoops();
     expect(reports.map((report) => report.loopId)).toEqual(["second"]);
-    expect(tasksFor("second")).toHaveLength(1);
-    expect(tasksFor("first")).toHaveLength(0);
+    expect(await tasksFor("second")).toHaveLength(1);
+    expect(await tasksFor("first")).toHaveLength(0);
   });
 });
 
 describe("deciding what is worth a run", () => {
   /** A loop that asks for the cheap look first. */
-  function givenTriagingLoop(id: string): void {
-    db()
+  async function givenTriagingLoop(id: string): Promise<void> {
+    await db()
       .insert(loops)
       .values({
         id,
@@ -336,7 +338,7 @@ describe("deciding what is worth a run", () => {
 
   /** Past the first look, which goes to the backlog whatever triage thinks. */
   async function settled(id: string): Promise<void> {
-    givenTriagingLoop(id);
+    await givenTriagingLoop(id);
     answer = [];
     await pollAllLoops();
     triageRuns = 0;
@@ -352,9 +354,9 @@ describe("deciding what is worth a run", () => {
     // One agent run decided the fate of three, instead of three runs.
     expect(triageRuns).toBe(1);
     expect(report).toMatchObject({ found: 3, queued: 1, held: 2, triaged: 2 });
-    expect(tasksFor("a")).toHaveLength(1);
+    expect(await tasksFor("a")).toHaveLength(1);
 
-    const held = signalsFor("a").filter((row) => row.outcome === "held");
+    const held = (await signalsFor("a")).filter((row) => row.outcome === "held");
     expect(held.map((row) => row.sourceRef)).toEqual(["acme/web#1", "acme/web#3"]);
     expect(held[0]!.hold).toBe("nothing in it was being asked of you");
   });
@@ -365,15 +367,15 @@ describe("deciding what is worth a run", () => {
 
     answer = [pull(1), pull(2), pull(3)];
     await pollAllLoops();
-    expect(tasksFor("a")).toHaveLength(0);
+    expect(await tasksFor("a")).toHaveLength(0);
 
     // The whole reason for holding rather than dropping.
-    expect(runBacklog("a")).toBe(3);
-    expect(tasksFor("a")).toHaveLength(3);
+    expect(await runBacklog("a")).toBe(3);
+    expect(await tasksFor("a")).toHaveLength(3);
   });
 
   it("leaves a loop that did not ask for it alone", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [];
     await pollAllLoops();
 
@@ -387,7 +389,7 @@ describe("deciding what is worth a run", () => {
   it("does not weigh up a backlog nobody was going to run", async () => {
     // The first look is the case: everything is going to the backlog, so
     // asking which of it matters would be paying for an answer nothing uses.
-    givenTriagingLoop("a");
+    await givenTriagingLoop("a");
     answer = [pull(1), pull(2), pull(3)];
     const [report] = await pollAllLoops();
 
@@ -424,7 +426,7 @@ describe("deciding what is worth a run", () => {
 
     expect(triageRuns).toBe(0);
     expect(report).toMatchObject({ held: 1, triaged: 0 });
-    expect(signalsFor("a")[0]!.hold).toBe("80 files changed");
+    expect((await signalsFor("a"))[0]!.hold).toBe("80 files changed");
   });
 });
 
@@ -435,16 +437,16 @@ describe("something the connector will not run by itself", () => {
   });
 
   it("is kept and named rather than dropped, long after the first look", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [];
     await pollAllLoops();
 
     answer = [tooBig(1)];
     const [report] = await pollAllLoops();
     expect(report).toMatchObject({ found: 1, queued: 0, held: 1, backlog: 0 });
-    expect(tasksFor("a")).toHaveLength(0);
+    expect(await tasksFor("a")).toHaveLength(0);
 
-    const [waiting] = loopPollState("a").backlog;
+    const [waiting] = (await loopPollState("a")).backlog;
     expect(waiting).toMatchObject({
       sourceRef: "acme/web#1",
       hold: "80 files changed, over this loop's 50",
@@ -452,7 +454,7 @@ describe("something the connector will not run by itself", () => {
   });
 
   it("is not held a second time once it is on the list", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [];
     await pollAllLoops();
 
@@ -460,25 +462,25 @@ describe("something the connector will not run by itself", () => {
     await pollAllLoops();
     const [again] = await pollAllLoops();
     expect(again).toMatchObject({ found: 1, held: 0 });
-    expect(loopPollState("a").backlog).toHaveLength(1);
+    expect((await loopPollState("a")).backlog).toHaveLength(1);
   });
 
   it("runs when it is asked for on purpose", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [];
     await pollAllLoops();
 
     answer = [tooBig(1)];
     await pollAllLoops();
-    expect(runBacklog("a")).toBe(1);
+    expect(await runBacklog("a")).toBe(1);
 
-    expect(tasksFor("a")).toHaveLength(1);
-    expect(loopPollState("a").backlog).toEqual([]);
+    expect(await tasksFor("a")).toHaveLength(1);
+    expect((await loopPollState("a")).backlog).toEqual([]);
   });
 
   it("still counts as taken, so a later loop does not pick it up", async () => {
-    givenLoop("a", 1);
-    givenLoop("b", 2);
+    await givenLoop("a", 1);
+    await givenLoop("b", 2);
     answer = [];
     await pollAllLoops();
 
@@ -486,11 +488,11 @@ describe("something the connector will not run by itself", () => {
     const [first, second] = await pollAllLoops();
     expect(first).toMatchObject({ held: 1 });
     expect(second).toMatchObject({ queued: 0, superseded: 1 });
-    expect(tasksFor("b")).toHaveLength(0);
+    expect(await tasksFor("b")).toHaveLength(0);
   });
 
   it("leaves a new commit on it held as well", async () => {
-    givenLoop("a", 1);
+    await givenLoop("a", 1);
     answer = [];
     await pollAllLoops();
 
@@ -500,7 +502,7 @@ describe("something the connector will not run by itself", () => {
     const [report] = await pollAllLoops();
 
     expect(report).toMatchObject({ held: 1, queued: 0 });
-    expect(loopPollState("a").backlog.map((item) => item.hold)).toEqual([
+    expect((await loopPollState("a")).backlog.map((item) => item.hold)).toEqual([
       "80 files changed, over this loop's 50",
       "81 files changed, over this loop's 50",
     ]);

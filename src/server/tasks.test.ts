@@ -87,31 +87,33 @@ vi.mock("./agents.ts", () => ({
   settingsFor: () => ({ permissionMode: "read_only", model: null, timeoutMs: 1_000 }),
 }));
 
-const { db } = await import("./db/client.ts");
+const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, tasks } = await import("./db/schema.ts");
 const { enqueueTask, getTask, jobForTask, runAssignedAgent, runTask, taskRow } = await import("./tasks.ts");
 const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { branchFor } = await import("./checkout.ts");
+
+await migrateIfNeeded();
 
 const LOOP_ID = "loop-under-test";
 
 async function driveTask(id: string) {
   await runTask(id);
   await runAssignedAgent(id);
-  if (taskRow(id)?.state === "applying") await runTask(id);
-  return getTask(id)!;
+  if ((await taskRow(id))?.state === "applying") await runTask(id);
+  return (await getTask(id))!;
 }
 
 /** Nothing like the workflow's own words, so the two cannot be confused. */
 const PROMPT = "Only say whether the lockfile changed.";
 
 /** A loop that watches GitHub, with where it writes left to the caller. */
-function givenLoop(action: {
+async function givenLoop(action: {
   actionConnectorId: string;
   actionId: string;
   actionTarget?: ConnectionSettings;
-}): void {
-  db()
+}): Promise<void> {
+  await db()
     .insert(loops)
     .values({
       id: LOOP_ID,
@@ -127,9 +129,9 @@ function givenLoop(action: {
 }
 
 beforeEach(async () => {
-  db().delete(tasks).run();
-  db().delete(loops).run();
-  db().delete(runners).run();
+  await db().delete(tasks).run();
+  await db().delete(loops).run();
+  await db().delete(runners).run();
   writes.length = 0;
   said = "";
   asked = "";
@@ -150,10 +152,10 @@ describe("what the agent is asked", () => {
   it("is the loop's own words, not the words its workflow still has", async () => {
     // The point of copying the prompt onto the loop: once someone has changed
     // it, the template is history and must not creep back in.
-    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    await givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
     said = "Looks right.";
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
@@ -165,10 +167,10 @@ describe("what the agent is asked", () => {
   });
 
   it("puts clone instructions in the prompt, not on the job", async () => {
-    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    await givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
     said = "Looks right.";
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
@@ -188,7 +190,7 @@ describe("what the agent is asked", () => {
 
   it("names a host folder as cwd and leaves the rest to the prompt", async () => {
     const folder = mkdtempSync(join(tmpdir(), "loopable-folder-"));
-    db()
+    await db()
       .insert(loops)
       .values({
         id: LOOP_ID,
@@ -204,7 +206,7 @@ describe("what the agent is asked", () => {
       })
       .run();
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: true,
@@ -220,13 +222,13 @@ describe("what the agent is asked", () => {
 
 describe("runTask", () => {
   it("writes with the connector that read it, when they are the same", async () => {
-    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    await givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
     said = JSON.stringify({
       summary: "Looks right.",
       findings: [{ path: "src/a.ts", line: 4, body: "Name this." }],
     });
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
@@ -250,15 +252,15 @@ describe("runTask", () => {
    * beside it, why it could not be.
    */
   it("clears what an earlier attempt failed with once it works", async () => {
-    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    await givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
     said = "Looks right.";
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
     });
-    db()
+    await db()
       .update(tasks)
       .set({ error: "GitHub answered 500", attempts: 1 })
       .where(eq(tasks.id, queued.id))
@@ -273,7 +275,7 @@ describe("runTask", () => {
   it("writes with the connector the loop chose, on its own account", async () => {
     // Asked for a review on GitHub, answered in a chat: the case a loop with
     // one connector could not express at all.
-    givenLoop({
+    await givenLoop({
       actionConnectorId: "wechat",
       actionId: "wechat.reply",
       actionTarget: { to: "me" },
@@ -283,7 +285,7 @@ describe("runTask", () => {
       findings: [{ path: "src/a.ts", line: 4, body: "Name this." }],
     });
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
@@ -312,10 +314,10 @@ describe("runTask", () => {
     // `carry` is whatever the reading connector needs to answer and nobody
     // else can make sense of. Handed across, it would read as a conversation
     // the writer never had.
-    givenLoop({ actionConnectorId: "wechat", actionId: "wechat.reply" });
+    await givenLoop({ actionConnectorId: "wechat", actionId: "wechat.reply" });
     said = "Nothing to worry about.";
 
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
@@ -326,15 +328,15 @@ describe("runTask", () => {
   });
 
   it("stays with what it was queued with after the loop is pointed elsewhere", async () => {
-    givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    await givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
     said = "Looks right.";
-    const queued = enqueueTask({
+    const queued = await enqueueTask({
       loopId: LOOP_ID,
       url: "https://github.com/acme/web/pull/7",
       dryRun: false,
     });
 
-    db()
+    await db()
       .update(loops)
       .set({ actionConnectorId: "wechat", actionId: "wechat.reply" })
       .run();
@@ -356,8 +358,8 @@ describe("a loop that writes code", () => {
     }).trim();
   }
 
-  function givenCodeLoop(): void {
-    db()
+  async function givenCodeLoop(): Promise<void> {
+    await db()
       .insert(loops)
       .values({
         id: LOOP_ID,
@@ -382,7 +384,7 @@ describe("a loop that writes code", () => {
     });
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), "loopable-code-"));
     origin = join(root, "origin.git");
     mkdirSync(origin, { recursive: true });
@@ -403,7 +405,7 @@ describe("a loop that writes code", () => {
       context: [{ name: "ISSUE.md", body: "the issue" }],
       checkout: { url: origin, ref: "main", base: "main", repo: "acme/web" },
     };
-    givenCodeLoop();
+    await givenCodeLoop();
   });
 
   afterEach(() => {
@@ -425,7 +427,7 @@ describe("a loop that writes code", () => {
   }
 
   it("tells the agent which branch to push, then opens a pull request for it", async () => {
-    const queued = queue();
+    const queued = await queue();
     const branch = branchFor({ ref: "acme/web#7", taskId: queued.id });
     agentDoes = pushAsAgent(branch, "feature.ts", "export const x = 1;\n");
     said = "Add the feature\n\nIt does the thing.";
@@ -445,7 +447,7 @@ describe("a loop that writes code", () => {
   });
 
   it("leaves git to the agent", async () => {
-    const queued = queue();
+    const queued = await queue();
     agentDoes = pushAsAgent(
       branchFor({ ref: "acme/web#7", taskId: queued.id }),
       "feature.ts",
@@ -465,14 +467,14 @@ describe("a loop that writes code", () => {
     agentDoes = null;
     said = "NOTHING_TO_DO";
 
-    const done = await driveTask(queue().id);
+    const done = await driveTask((await queue()).id);
 
     expect(done.state).toBe("skipped");
     expect(writes).toHaveLength(0);
   });
 
   it("keeps the pushed branch when the write failed, so a retry need not run the agent again", async () => {
-    const queued = queue();
+    const queued = await queue();
     const branch = branchFor({ ref: "acme/web#7", taskId: queued.id });
     agentDoes = pushAsAgent(branch, "feature.ts", "x\n");
     said = "Add the feature";

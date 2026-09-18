@@ -9,7 +9,7 @@ const home = mkdtempSync(join(tmpdir(), "loopable-test-"));
 process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
 
-const { db } = await import("./db/client.ts");
+const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, tasks } = await import("./db/schema.ts");
 const { createWorker } = await import("./worker.ts");
 const { writeSetting } = await import("./settings.ts");
@@ -17,10 +17,12 @@ const { TransientError } = await import("#/connectors/errors.ts");
 const { TaskCancelled } = await import("./tasks.ts");
 const { eq } = await import("drizzle-orm");
 
+await migrateIfNeeded();
+
 const LOOP_ID = "loop-under-test";
 
-function givenLoop(): void {
-  db()
+async function givenLoop(): Promise<void> {
+  await db()
     .insert(loops)
     .values({
       id: LOOP_ID,
@@ -36,9 +38,9 @@ function givenLoop(): void {
     .run();
 }
 
-function givenTask(values: Partial<typeof tasks.$inferInsert> = {}): string {
+async function givenTask(values: Partial<typeof tasks.$inferInsert> = {}): Promise<string> {
   const id = values.id ?? randomUUID();
-  db()
+  await db()
     .insert(tasks)
     .values({
       id,
@@ -56,8 +58,8 @@ function givenTask(values: Partial<typeof tasks.$inferInsert> = {}): string {
   return id;
 }
 
-function taskById(id: string) {
-  return db().select().from(tasks).where(eq(tasks.id, id)).get()!;
+async function taskById(id: string) {
+  return (await db().select().from(tasks).where(eq(tasks.id, id)).get())!;
 }
 
 /** Stands in for a real run, which would take minutes and cost money. */
@@ -68,22 +70,22 @@ function fakeRun(behaviour: (id: string) => void | Promise<void>) {
     run: async (id: string) => {
       seen.push(id);
       await behaviour(id);
-      db().update(tasks).set({ state: "done" }).where(eq(tasks.id, id)).run();
+      await db().update(tasks).set({ state: "done" }).where(eq(tasks.id, id)).run();
     },
   };
 }
 
-beforeEach(() => {
-  db().delete(tasks).run();
-  db().delete(loops).run();
-  givenLoop();
-  writeSetting("engine.paused", false);
-  writeSetting("engine.maxConcurrentRuns", 1);
+beforeEach(async () => {
+  await db().delete(tasks).run();
+  await db().delete(loops).run();
+  await givenLoop();
+  await writeSetting("dispatcher.paused", false);
+  await writeSetting("dispatcher.maxConcurrentRuns", 1);
 });
 
 describe("worker", () => {
   it("claims a queued task, runs it, and records the attempt", async () => {
-    const id = givenTask();
+    const id = await givenTask();
     const agent = fakeRun(() => {});
     const worker = createWorker({ runTask: agent.run });
 
@@ -91,14 +93,14 @@ describe("worker", () => {
     await worker.drain();
 
     expect(agent.seen).toEqual([id]);
-    const task = taskById(id);
+    const task = await taskById(id);
     expect(task.state).toBe("done");
     expect(task.attempts).toBe(1);
     expect(task.startedAt).not.toBeNull();
   });
 
   it("never lets two workers take the same task", async () => {
-    const id = givenTask();
+    const id = await givenTask();
     const first = fakeRun(() => {});
     const second = fakeRun(() => {});
 
@@ -109,14 +111,14 @@ describe("worker", () => {
 
     expect(started.reduce((a, b) => a + b, 0)).toBe(1);
     expect([...first.seen, ...second.seen]).toEqual([id]);
-    expect(taskById(id).attempts).toBe(1);
+    expect((await taskById(id)).attempts).toBe(1);
   });
 
   it("starts no more than the configured number at once", async () => {
-    givenTask();
-    givenTask();
-    givenTask();
-    writeSetting("engine.maxConcurrentRuns", 2);
+    await givenTask();
+    await givenTask();
+    await givenTask();
+    await writeSetting("dispatcher.maxConcurrentRuns", 2);
 
     let release = () => {};
     const holding = new Promise<void>((resolve) => {
@@ -136,8 +138,8 @@ describe("worker", () => {
   });
 
   it("starts nothing while paused", async () => {
-    givenTask();
-    writeSetting("engine.paused", true);
+    await givenTask();
+    await writeSetting("dispatcher.paused", true);
     const agent = fakeRun(() => {});
 
     expect(await createWorker({ runTask: agent.run }).tick()).toBe(0);
@@ -145,7 +147,7 @@ describe("worker", () => {
   });
 
   it("tries a transient failure again, after a wait", async () => {
-    const id = givenTask();
+    const id = await givenTask();
     const worker = createWorker({
       runTask: async () => {
         throw new TransientError("GitHub is having a moment");
@@ -155,7 +157,7 @@ describe("worker", () => {
     await worker.tick();
     await worker.drain();
 
-    const task = taskById(id);
+    const task = await taskById(id);
     expect(task.state).toBe("queued");
     expect(task.attempts).toBe(1);
     expect(task.error).toContain("GitHub is having a moment");
@@ -163,7 +165,7 @@ describe("worker", () => {
   });
 
   it("gives up on a transient failure once the attempts run out", async () => {
-    const id = givenTask({ attempts: 2 });
+    const id = await givenTask({ attempts: 2 });
     const worker = createWorker({
       maxAttempts: 3,
       runTask: async () => {
@@ -174,12 +176,12 @@ describe("worker", () => {
     await worker.tick();
     await worker.drain();
 
-    expect(taskById(id).state).toBe("failed");
-    expect(taskById(id).attempts).toBe(3);
+    expect((await taskById(id)).state).toBe("failed");
+    expect((await taskById(id)).attempts).toBe(3);
   });
 
   it("does not retry a failure that would just happen again", async () => {
-    const id = givenTask();
+    const id = await givenTask();
     const worker = createWorker({
       runTask: async () => {
         throw new Error("The agent did not finish.");
@@ -189,61 +191,61 @@ describe("worker", () => {
     await worker.tick();
     await worker.drain();
 
-    const task = taskById(id);
+    const task = await taskById(id);
     expect(task.state).toBe("failed");
     expect(task.error).toBe("The agent did not finish.");
   });
 
-  it("queues again what a dead worker abandoned", () => {
-    const id = givenTask({
+  it("queues again what a dead worker abandoned", async () => {
+    const id = await givenTask({
       state: "preparing",
       attempts: 1,
       leaseUntil: new Date(Date.now() - 1_000),
     });
 
-    expect(createWorker({}).reap()).toBe(1);
-    const task = taskById(id);
+    expect(await createWorker({}).reap()).toBe(1);
+    const task = await taskById(id);
     expect(task.state).toBe("queued");
     expect(task.leaseUntil).toBeNull();
     expect(task.error).toContain("Loopable stopped");
   });
 
-  it("fails an abandoned task that has run out of attempts", () => {
-    const id = givenTask({
+  it("fails an abandoned task that has run out of attempts", async () => {
+    const id = await givenTask({
       state: "applying",
       attempts: 3,
       leaseUntil: new Date(Date.now() - 1_000),
     });
 
-    createWorker({ maxAttempts: 3 }).reap();
-    expect(taskById(id).state).toBe("failed");
+    await createWorker({ maxAttempts: 3 }).reap();
+    expect((await taskById(id)).state).toBe("failed");
   });
 
-  it("leaves alone a task whose worker is still renewing its claim", () => {
-    const id = givenTask({
+  it("leaves alone a task whose worker is still renewing its claim", async () => {
+    const id = await givenTask({
       state: "preparing",
       attempts: 1,
       leaseUntil: new Date(Date.now() + 60_000),
     });
 
-    expect(createWorker({}).reap()).toBe(0);
-    expect(taskById(id).state).toBe("preparing");
+    expect(await createWorker({}).reap()).toBe(0);
+    expect((await taskById(id)).state).toBe("preparing");
   });
 
-  it("does not take back an applying task that is waiting to be claimed", () => {
-    const id = givenTask({
+  it("does not take back an applying task that is waiting to be claimed", async () => {
+    const id = await givenTask({
       state: "applying",
       output: "Looks fine.",
       attempts: 1,
       leaseUntil: null,
     });
 
-    expect(createWorker({}).reap()).toBe(0);
-    expect(taskById(id).state).toBe("applying");
+    expect(await createWorker({}).reap()).toBe(0);
+    expect((await taskById(id)).state).toBe("applying");
   });
 
   it("applies a task a runner has already finished", async () => {
-    const id = givenTask({
+    const id = await givenTask({
       state: "applying",
       output: "Looks fine.",
       leaseUntil: null,
@@ -262,11 +264,11 @@ describe("worker", () => {
    * still going, which it does when it renews its claim.
    */
   it("notices a stop asked for by the other process", async () => {
-    const id = givenTask();
+    const id = await givenTask();
     const worker = createWorker({
       leaseMs: 1_500,
       runTask: async (taskId, signal) => {
-        db().update(tasks).set({ cancelRequested: true }).where(eq(tasks.id, taskId)).run();
+        await db().update(tasks).set({ cancelRequested: true }).where(eq(tasks.id, taskId)).run();
         await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve()));
         throw new TaskCancelled();
       },
@@ -275,18 +277,18 @@ describe("worker", () => {
     await worker.tick();
     await worker.drain();
 
-    const task = taskById(id);
+    const task = await taskById(id);
     expect(task.state).toBe("cancelled");
     expect(task.error).toBe("Stopped before it finished.");
   });
 
   /**
    * Shutting down also aborts whatever is running, but nobody asked for those
-   * to end, so they have to be waiting when the engine comes back rather than
+   * to end, so they have to be waiting when the dispatcher comes back rather than
    * recorded as though a person stopped them.
    */
-  it("queues again a run that only stopped because the engine did", async () => {
-    const id = givenTask();
+  it("queues again a run that only stopped because the dispatcher did", async () => {
+    const id = await givenTask();
     const worker = createWorker({
       runTask: async (_id, signal) => {
         await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve()));
@@ -297,7 +299,7 @@ describe("worker", () => {
     await worker.tick();
     await worker.stop(2_000);
 
-    const task = taskById(id);
+    const task = await taskById(id);
     expect(task.state).toBe("queued");
     expect(task.error).toContain("shutting down");
   });

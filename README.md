@@ -1,172 +1,81 @@
 # Loopable
 
-**Build reliable engineering loops across the services and agents you already use.**
+Loopable watches the tools a team already uses and finishes the work with a coding agent. It picks up a signal, does what the loop says, and writes the result back. Loops run on their own. Every run is recorded.
 
-Loopable watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Loops run on their own, and every run is recorded so you can see what happened.
+Connect GitHub or Gmail, write a loop, leave a runner on. Pull requests get reviewed, mail gets triaged, assigned issues get a draft. You see what happened in the inbox.
 
-Everything runs on your own computer: the app, the database, and the credentials.
+The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
 
-The names for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
+## Architecture
 
-## Run it
+Three processes. The agent always runs on a Runner, never on the App or Dispatcher.
+
+```text
+Signal → Loop → Task
+              → Dispatcher prepares context, picks a Runner
+              → Runner runs the Agent
+              → Dispatcher writes back
+```
+
+```text
+Loopable  ──HTTP──  Runner  ──  Agent CLI
+(App + Dispatcher)
+```
+
+| Process | Does |
+| --- | --- |
+| **App** | UI, HTTP API, OAuth, the interface runners pull from |
+| **Dispatcher** | Watches for signals, prepares tasks, writes back |
+| **Runner** | Runs the agent CLI |
+
+App and Dispatcher share one database and stay on the same host. Only one Dispatcher may run against that database. Runners join over HTTP: this machine, or others. Extra machines are in [docs/deploy.md](docs/deploy.md).
+
+## Use it locally
+
+You need Node 22+ and an agent CLI signed in on the runner host (Codex or Cursor Agent).
+
+```bash
+npm install -g loopable-cli
+loopable start                # App + Dispatcher at http://127.0.0.1:4321
+```
+
+Open the app. Connect an account. Write a loop. On Runners, copy the join command:
+
+```bash
+loopable runner --url http://127.0.0.1:4321 --token <from Runners>
+```
+
+If the dispatcher is not running, the app says so. If no runner has joined, tasks wait.
+
+Connect GitHub from `http://127.0.0.1:4321` on this machine. Extra runners on other machines are in [docs/deploy.md](docs/deploy.md).
+
+State lives in `~/.loopable/`. Credentials stay in the OS keychain.
+
+## Develop
+
+This section is only for working on the code. Running Loopable as a product is the CLI above, not pnpm. Dev uses `~/.loopable-dev/` and a separate keychain namespace, so it does not touch the local deploy database.
+
+TanStack Start (React + Vite), SQLite, Tailwind. Tests are Vitest.
 
 ```bash
 pnpm install
-pnpm dev            # http://127.0.0.1:4321
-pnpm engine         # polls, prepares, writes back
+pnpm dev            # App + Dispatcher + Runner, ~/.loopable-dev, hot reload
+pnpm typecheck
+pnpm test
+pnpm db:generate    # after changing src/server/db/schema.ts
+pnpm db:studio
 ```
 
-Then copy the command from Runners and start a runner (this host or another):
-
-```bash
-LOOPABLE_URL=http://127.0.0.1:4321 LOOPABLE_RUNNER_TOKEN=<from Runners> pnpm runner
-```
-
-Three processes, same on a laptop or a server. App and engine share SQLite. Runners pull over HTTP. If the engine is not running, the app says so. If no runner has joined, tasks wait.
-
-```bash
-pnpm typecheck      # tsc --noEmit
-pnpm test           # vitest
-pnpm db:generate    # write a migration after changing the schema
-pnpm db:studio      # browse the local database
-```
-
-State lives in `~/.loopable/loopable.sqlite` (override with `LOOPABLE_HOME` or `LOOPABLE_DB`). Migrations run automatically when the app first touches the database. Credentials never go in the database: on macOS they go in the keychain, elsewhere in a `0600` file under the data directory.
-
-When Loopable is not on loopback, set `LOOPABLE_BASE_URL` to its public origin (OAuth callbacks) and `LOOPABLE_APP_TOKEN` so the UI is not open to the network.
-
-## Connectors
-
-A connector is a folder under `src/connectors/`. It exports two halves, and the split is load bearing:
-
-| File | Runs where | Contents |
-| --- | --- | --- |
-| `manifest.ts` | Browser and server | Pure data: name, icon, how to authorize, which signals it watches, which actions it can propose, which settings a connection has |
-| `runtime.ts` | Server only | Behaviour: authorizing, reading the account, resolving work items, carrying out actions |
-
-The pages render entirely from manifests, so adding a connector means adding a folder and one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. No page changes. The contract lives in `src/connectors/types.ts`.
-
-Connections are rows rather than a single slot per connector, so the storage side already holds several accounts. The product exposes one account per connector for now, which each manifest states through `allowsMultipleAccounts`: a browser redirect authorizes whichever account the provider is already signed in as, so a second account cannot be reached without signing out there first.
-
-### The GitHub app registration (maintainer only)
-
-End users never register anything; they click Connect. One OAuth App ships with Loopable, configured either through the environment:
-
-```bash
-export LOOPABLE_GITHUB_CLIENT_ID=...
-export LOOPABLE_GITHUB_CLIENT_SECRET=...
-```
-
-or through `config/oauth-app.json`, which is gitignored:
-
-```json
-{ "clientId": "Ov23...", "clientSecret": "..." }
-```
-
-Register the callback URL without a port, because loopback redirects match on host and path only:
-
-```
-http://127.0.0.1/api/connectors/github/callback
-```
-
-Login is the OAuth 2.0 authorization code flow with PKCE (S256) over a loopback redirect.
-
-**Treat the client secret as public, not as a credential.** GitHub lists `client_secret` as required at the token endpoint and does not distinguish between public and confidential clients, so a browser-redirect login cannot avoid shipping it, and anything running on a user's computer can be read. The GitHub CLI embeds its secret for the same reason.
-
-PKCE is what actually protects a login: an intercepted authorization code cannot be redeemed by anyone else, because the exchange must present the verifier held only by the process that started the flow. That matters most for a loopback redirect, where another local process might race for the code.
-
-What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's computer. Anyone who wants their own registration, or who is on GitHub Enterprise, can set the environment variables above instead.
-
-### WeChat, and logins that finish on a phone
-
-WeChat is reached through Tencent's iLink bot API, the one their OpenClaw plugin speaks. Loopable speaks it directly rather than running that plugin: nothing else has to be installed, nothing else is listening to the same account, and there is no second daemon to keep alive. Tencent [documents the protocol](https://github.com/Tencent/openclaw-weixin/blob/main/docs/protocol.md) for exactly this and leaves a field for clients to name themselves in, which is where `Loopable/0.1` goes. Nothing needs registering; there is no app and no secret.
-
-Connecting means scanning, which the browser-redirect flow has no room for, so authorizing has a third shape. The connector hands over what the code should contain and a way to ask how the scan is going; the page renders it and asks every couple of seconds. A code lasts about two minutes — measured, not documented — so the page says when one has gone stale and offers another, because a dead square with no explanation is the thing people stare at.
-
-Two details are deliberate. The code's identity travels to the page and back rather than being held on the server, because these logins are short and a reload should not silently kill one in progress; nothing secret is in it, since whatever identifies the code is already on screen inside the code. And the token never reaches the browser at all: a confirmed scan is saved server-side, and the page is told only that it worked.
-
-There are no WeChat workflows yet. Binding an account is worth having on its own, and what a loop should do with a message is better answered by watching real ones arrive than by guessing first.
-
-## Loops
-
-A connector declares **workflows**: whole jobs, named the way a person would name them. "Review pull requests I am asked to review" is one. A workflow owns what to watch for, what to ask the agent, and where the answer is written; a **loop** is one instance of a workflow with its few knobs set. Loops run by themselves and nobody has to click anything; a per-loop "check this before it goes out" switch is a door left open for later.
-
-The prompt belongs to the workflow rather than to the loop. Reviewing a pull request is a well-understood job, and a connector that knows how to do it should get it right once instead of leaving every person to rediscover it in an empty box. A loop may add guidance — what is true of your team rather than of the job — and that guidance is appended to the workflow's prompt, never substituted for it, so a loop cannot quietly turn a review into something else. Timeouts and models are deliberately absent, because those belong to the agent and would only drift if restated here.
-
-Knobs are the interesting part. "Repositories" and "drafts" are GitHub's words, so they are not columns: each workflow declares the settings a loop can narrow it by, using the same field type as connection settings, and the loop stores whatever those fields produce as JSON. The loops table therefore knows nothing about GitHub, and the loop form renders knobs it has never seen. A stored setting a connector no longer offers is discarded rather than left narrowing invisibly.
-
-The first loop that matches something is the one that runs, so loops are ordered and the order is editable. Creating a loop is choosing a workflow: every workflow already defaults everything it needs, so the form is for changing one afterwards rather than for filling one in. A workflow that stops being offered leaves its loops readable and deletable but not runnable, said plainly rather than failing later.
-
-Loops can be written before anything is connected or installed. The page says what is still missing instead of refusing to save.
-
-## Tasks and the inbox
-
-A task is one run of one loop against one thing: fetch the context, let the agent work, write the result back. It is kept whether it wrote anything or not, because a loop that runs on its own is only worth having if you can see afterwards what it did. The inbox is every task in the order it happened; a loop's own page shows the same records filtered to that loop, next to the settings that produced them.
-
-A task usually starts on its own, from a poll. A loop can also be pointed at a link on its own page, which is how one gets shaped without waiting for a real signal to turn up; dry run prepares the result and shows it without writing, so shaping leaves no marks on a real repository.
-
-## Watching
-
-Nothing calls Loopable back. It runs on a laptop, which has no address for GitHub to reach and no business having one, so the engine asks instead: every two minutes it asks each loop's connector what matches right now. A connector answers with the present state rather than with what changed, because working out what is new needs to know what has already been acted on, and only Loopable knows that.
-
-What stops a loop acting twice is the key the connector puts on each signal, which has to change exactly when there is something new to do and not otherwise. A pull request is keyed by its head commit: a new push is worth reviewing again, another comment on it is not. An assigned issue is keyed by the issue alone, since being assigned it twice is not a reason to write a second plan.
-
-**The first look never acts.** Whatever is already waiting when a loop is created is that loop's backlog, and turning on a loop is not a request to run an agent over a review queue that has been piling up for a month. It is recorded rather than discarded, so the loop's page can offer to run it on purpose. A look that fails does not spend that first look, or a token that expired overnight would swallow the backlog silently.
-
-When two loops want the same pull request, the one that comes first in the list gets it and the other records that it was taken. Order already decides which loop runs; this is the same principle applied to the only case where it could be ambiguous.
-
-A run passes through `preparing` and, if it has something to say, `applying`, ending at `done` with a link to what was written. Two other endings matter as much. `skipped` is the agent answering `NOTHING_TO_DO`, which the prompt asks for explicitly: a loop that runs by itself must be able to stay quiet, or it posts filler. `prepared` is output with nothing written, which today means a dry run and later will mean a loop that asked to be checked first.
-
-## The queue
-
-Pressing Run does not run anything. It checks the link, writes a `queued` task, and returns; the engine claims it a moment later. The queue is the tasks table itself, which is what lets a run survive both processes being restarted.
-
-A claim is a lease, renewed while the work goes on. That is what tells a run still in progress apart from one whose worker died: nothing else can, once the process holding it is gone. A lapsed lease is picked up again, and attempts are counted so a task that kills its worker cannot do so forever. Renewal is also when a stop request is noticed, since the person asking is in the other process and the database is where they leave the message.
-
-Retries are deliberately lopsided, because the phases cost wildly different amounts. Fetching and writing are milliseconds and fail for reasons that pass, so a connector marks those as transient and they are tried again with a growing wait. The agent is minutes of compute and real money, and a prompt that failed will fail the same way, so it is never repeated. Once output is stored it stays stored: a write that fails because GitHub returned 502 resumes at the write, and nobody pays for the review twice.
-
-The agent never gets a clone or a credential. The pull request body and its patches come down through the API and are written into `~/.loopable/runs/<task>/` as files for the agent to read, which is enough for review and comment work and keeps the read-only default honest. Where a diff is too large to include, the omission is stated in the file rather than silently truncated, because an agent that cannot tell it is missing code will hedge every finding or, worse, guess. What the agent replied is kept alongside them, because when a reply cannot be made sense of, the reply is the only thing worth looking at.
-
-Written work is signed, so nobody has to wonder whether a person or a loop wrote it.
-
-## Reviews that point at lines
-
-A review that describes a change back to the person who wrote it is worth little. A workflow therefore says what shape its answer takes: prose to post, or a summary plus findings that get attached to particular lines.
-
-Anchoring is the whole difficulty, because GitHub refuses an entire review if one comment names a line outside the diff. One wrong number would lose everything the agent had to say, so every anchor is checked against the diff first and a finding that cannot be placed is moved into the body with its location written out: losing the point is worse than losing its position. Where there is nothing to check against, nothing is anchored rather than anchored on a guess.
-
-The diff the agent reads carries its own line numbers, written into each line, and removed lines are deliberately left unnumbered so they cannot be aimed at. An agent can work the numbers out from the `@@` headers and gets them wrong often enough to point a few lines off, which in a review is worse than useless.
-
-The reply is read leniently at the edges and strictly inside. An agent that answered in prose is taken at its word and gets a review with no anchors. Several blocks may look like the answer — a streamed reply can arrive twice, once in pieces and once whole — so each is tried and the first that parses wins. An agent that plainly meant to answer in JSON and produced nothing readable is an error, because the alternative is posting the wreckage to somebody's pull request.
-
-## Agents
-
-An agent is a coding agent CLI already installed on a runner. Agents live under `src/agents/` and follow the same manifest and runtime split as connectors, but they are discovered rather than connected: each runner reports which binaries it has, their versions, and whether they are signed in. Installing or removing a CLI on a runner shows up on the next heartbeat.
-
-Because they are discovered, no agent is stored. The only things kept are the choices a person makes: which agent runs the loops, and per agent a permission mode, an optional model, and a timeout.
-
-Two agents ship today, both with a verified non-interactive invocation:
-
-| Agent | Read-only invocation |
-| --- | --- |
-| Codex | `codex exec --sandbox read-only ...` |
-| Cursor Agent | `cursor-agent -p --output-format stream-json --mode ask --trust ...` |
-
-Four details are load bearing. Agents default to read-only, because preparing a draft never needs to change files. Standard input is closed and the timeout is enforced by Loopable, so an agent that stops to ask a question fails instead of hanging a loop forever. An agent process never receives Loopable's credentials: `GITHUB_*`, `GH_*` and `LOOPABLE_*` are stripped from its environment, while its own model credentials are left alone. And each agent runs in its own process group, because these tools start helpers of their own and signalling just the process we launched leaves those behind, reparented to init and still working.
-
-Everything an agent prints is written to `agent.log` in its run directory while it prints it, and the task page tails it. Cursor Agent is asked for a stream of events rather than one block at the end, which is what makes that log arrive during the run instead of after it; the events are turned into ordinary lines, and the final answer is read from the field that carries it rather than from whatever reached standard output. Run directories are kept afterwards, since they are the first place to look when a run goes wrong, and swept after a week.
-
-Detection looks at `PATH`, then at the usual install directories, then asks the login shell where its tools are. That last step matters once Loopable is started by launchd or as a packaged app, where the inherited `PATH` is too small to find anything.
-
-## Layout
+`pnpm runner` is only for a second machine while `pnpm dev` is already running.
 
 | Path | Contents |
 | --- | --- |
-| `src/connectors/` | The connector contract and one folder per connector |
-| `src/agents/` | The agent contract and one folder per agent |
-| `src/server/` | Database, secret store, connections, the queue, server functions |
-| `src/engine/` | The engine process: poll, prepare, write back |
-| `src/runner/` | The runner process: heartbeat, claim a job, run the agent |
-| `src/routes/` | Pages, plus the OAuth endpoints under `api/` |
-| `src/components/` | Shell, shared pieces, and shadcn/ui in `ui/` |
-| `drizzle/` | Generated migrations |
+| `src/connectors/` | One folder per connector: `manifest.ts` (browser-safe) and `runtime.ts` (server) |
+| `src/agents/` | One folder per agent, same split |
+| `src/server/` | Database, secrets, queue, server functions |
+| `src/dispatcher/` | Dispatcher process |
+| `src/runner/` | Runner process |
+| `src/routes/` | Pages and `/api/` |
+| `drizzle/` | Migrations |
+
+A new connector is a folder plus one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. See [docs/connectors.md](docs/connectors.md).

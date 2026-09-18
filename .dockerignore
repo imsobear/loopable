@@ -1,0 +1,8 @@
+node_modules
+.output
+.wrangler
+.git
+.tanstack
+.nitro
+*.sqlite
+config/oauth-app.json

@@ -128,7 +128,7 @@ function Watching({
           <p className="text-muted-foreground">
             {poll.polledAt
               ? `Watching. Last looked ${when(poll.polledAt)}.`
-              : "Not looked yet. The engine checks every couple of minutes; the first look records what is already waiting without running it."}
+              : "Not looked yet. The dispatcher checks every couple of minutes; the first look records what is already waiting without running it."}
           </p>
         </div>
 

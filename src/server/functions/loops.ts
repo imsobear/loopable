@@ -20,42 +20,42 @@ import { loopPollState, runBacklog } from "../signals.ts";
 const edit = (data: LoopEdit) => data;
 
 export const getLoopsPage = createServerFn({ method: "GET" }).handler(async () => ({
-  loops: listLoops(),
+  loops: await listLoops(),
   readiness: await loopReadiness(),
 }));
 
-export const getLoopReadiness = createServerFn({ method: "GET" }).handler(() => loopReadiness());
+export const getLoopReadiness = createServerFn({ method: "GET" }).handler(async () => await loopReadiness());
 
 export const getLoopById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
-  .handler(({ data }) => getLoop(data.id));
+  .handler(async ({ data }) => await getLoop(data.id));
 
 export const saveLoop = createServerFn({ method: "POST" })
   .inputValidator(edit)
-  .handler(({ data }) => {
+  .handler(async ({ data }) => {
     const { id, ...values } = data;
-    return id ? updateLoop(id, values) : createLoop(values);
+    return id ? await updateLoop(id, values) : await createLoop(values);
   });
 
 export const toggleLoop = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; enabled: boolean }) => data)
-  .handler(({ data }) => setLoopEnabled(data.id, data.enabled));
+  .handler(async ({ data }) => await setLoopEnabled(data.id, data.enabled));
 
 export const removeLoop = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
-  .handler(({ data }) => {
-    deleteLoop(data.id);
-    return listLoops();
+  .handler(async ({ data }) => {
+    await deleteLoop(data.id);
+    return await listLoops();
   });
 
 export const reorderLoop = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; direction: "up" | "down" }) => data)
-  .handler(({ data }) => moveLoop(data.id, data.direction));
+  .handler(async ({ data }) => await moveLoop(data.id, data.direction));
 
 export const getLoopPollState = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
-  .handler(({ data }) => loopPollState(data.id));
+  .handler(async ({ data }) => await loopPollState(data.id));
 
 export const runLoopBacklog = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
-  .handler(({ data }) => ({ queued: runBacklog(data.id) }));
+  .handler(async ({ data }) => ({ queued: await runBacklog(data.id) }));

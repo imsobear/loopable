@@ -1,53 +1,52 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import { migrate } from "drizzle-orm/libsql/migrator";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dbPath } from "../paths.ts";
 import * as schema from "./schema.ts";
 
 type Db = ReturnType<typeof create>;
 
+function databaseUrl(): string {
+  if (process.env.LOOPABLE_DATABASE_URL) return process.env.LOOPABLE_DATABASE_URL;
+  return pathToFileURL(dbPath()).href;
+}
+
 function create() {
-  const sqlite = new Database(dbPath());
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  // The app and the engine are separate processes on one file. WAL lets them
-  // read while the other writes; this is how the writer waits its turn instead
-  // of failing outright.
-  sqlite.pragma("busy_timeout = 5000");
-  const db = drizzle(sqlite, { schema });
-  runMigrations(db);
-  return db;
+  const client = createClient({
+    url: databaseUrl(),
+    authToken: process.env.LOOPABLE_DATABASE_AUTH_TOKEN,
+  });
+  return drizzle(client, { schema });
 }
 
-/**
- * The app and the engine can both start on a fresh database at the same time.
- * Whoever loses the race sees the tables appear underneath it, and by the time
- * it looks again the journal says there is nothing left to do.
- */
-function runMigrations(db: ReturnType<typeof drizzle>): void {
-  try {
-    migrate(db, { migrationsFolder: migrationsFolder() });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/already exists|locked|busy/i.test(message)) throw error;
-    migrate(db, { migrationsFolder: migrationsFolder() });
-  }
-}
-
-/**
- * Resolved from this file rather than the working directory, because the
- * engine is started from wherever the user happens to be.
- */
 function migrationsFolder(): string {
-  const beside = fileURLToPath(new URL("../../../drizzle", import.meta.url));
-  return existsSync(beside) ? beside : join(process.cwd(), "drizzle");
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  const candidates = [
+    join(here, "../drizzle"),
+    join(here, "../../../drizzle"),
+    join(process.cwd(), "drizzle"),
+  ];
+  return candidates.find((folder) => existsSync(folder)) ?? join(process.cwd(), "drizzle");
 }
 
-// Vite reloads server modules on edit, and each reload would otherwise open a
-// new handle to the same file and re-run migrations.
+/**
+ * The dispatcher applies migrations. The App Worker has no drizzle folder on disk
+ * in production, and must not race the dispatcher on a fresh database.
+ */
+export async function migrateIfNeeded(): Promise<void> {
+  if (process.env.LOOPABLE_SKIP_MIGRATE === "1") return;
+  const folder = migrationsFolder();
+  if (!existsSync(folder)) return;
+  await migrate(db(), { migrationsFolder: folder });
+}
+
+export function rowsChanged(result: { rowsAffected?: number; changes?: number }): number {
+  return Number(result.rowsAffected ?? result.changes ?? 0);
+}
+
 const cache = globalThis as typeof globalThis & { __loopableDb?: Db };
 
 export function db(): Db {

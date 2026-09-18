@@ -26,29 +26,24 @@ function toView(row: Connection): ConnectionView {
   };
 }
 
-export function listConnections(): ConnectionView[] {
-  return db()
-    .select()
-    .from(connections)
-    .orderBy(asc(connections.createdAt))
-    .all()
-    .map(toView);
+export async function listConnections(): Promise<ConnectionView[]> {
+  return (await db().select().from(connections).orderBy(asc(connections.createdAt)).all()).map(toView);
 }
 
-export function getConnection(id: string): Connection | undefined {
-  return db().select().from(connections).where(eq(connections.id, id)).get();
+export async function getConnection(id: string): Promise<Connection | undefined> {
+  return await db().select().from(connections).where(eq(connections.id, id)).get();
 }
 
-export function startAuthAttempt(input: {
+export async function startAuthAttempt(input: {
   connectorId: ConnectorId;
   state: string;
   verifier: string;
   redirectUri: string;
   returnTo?: string;
-}): void {
+}): Promise<void> {
   const now = Date.now();
-  db().delete(authAttempts).where(lt(authAttempts.expiresAt, new Date(now))).run();
-  db()
+  await db().delete(authAttempts).where(lt(authAttempts.expiresAt, new Date(now))).run();
+  await db()
     .insert(authAttempts)
     .values({
       state: input.state,
@@ -62,9 +57,9 @@ export function startAuthAttempt(input: {
 }
 
 /** Consumes the attempt: a state value is only ever valid once. */
-export function takeAuthAttempt(state: string) {
-  const attempt = db().select().from(authAttempts).where(eq(authAttempts.state, state)).get();
-  if (attempt) db().delete(authAttempts).where(eq(authAttempts.state, state)).run();
+export async function takeAuthAttempt(state: string) {
+  const attempt = await db().select().from(authAttempts).where(eq(authAttempts.state, state)).get();
+  if (attempt) await db().delete(authAttempts).where(eq(authAttempts.state, state)).run();
   if (!attempt) throw new Error("This authorization link is no longer valid. Start again.");
   if (attempt.expiresAt.getTime() < Date.now()) {
     throw new Error("The authorization took too long. Start again.");
@@ -84,7 +79,7 @@ export async function saveAuthorizedConnection(
   connectorId: ConnectorId,
   result: AuthResult,
 ): Promise<ConnectionView> {
-  const existing = db()
+  const existing = await db()
     .select()
     .from(connections)
     .where(and(eq(connections.connectorId, connectorId), eq(connections.accountId, result.account.id)))
@@ -106,17 +101,17 @@ export async function saveAuthorizedConnection(
   };
 
   if (existing) {
-    db().update(connections).set(values).where(eq(connections.id, id)).run();
+    await db().update(connections).set(values).where(eq(connections.id, id)).run();
   } else {
-    db().insert(connections).values({ id, ...values }).run();
+    await db().insert(connections).values({ id, ...values }).run();
   }
-  const row = getConnection(id);
+  const row = await getConnection(id);
   if (!row) throw new Error("Failed to persist the connection");
   return toView(row);
 }
 
 export async function removeConnection(id: string): Promise<void> {
-  const row = getConnection(id);
+  const row = await getConnection(id);
   if (!row) return;
   const runtime = connectorRuntime(row.connectorId);
   if (runtime.auth.revoke) {
@@ -130,19 +125,19 @@ export async function removeConnection(id: string): Promise<void> {
     }
   }
   await deleteCredential(id);
-  db().delete(connections).where(eq(connections.id, id)).run();
+  await db().delete(connections).where(eq(connections.id, id)).run();
 }
 
-export function updateConnectionSettings(
+export async function updateConnectionSettings(
   id: string,
   settings: ConnectionSettings,
-): ConnectionView {
-  db()
+): Promise<ConnectionView> {
+  await db()
     .update(connections)
     .set({ settings, updatedAt: new Date() })
     .where(eq(connections.id, id))
     .run();
-  const row = getConnection(id);
+  const row = await getConnection(id);
   if (!row) throw new Error("Connection not found");
   return toView(row);
 }
@@ -159,7 +154,7 @@ export async function credentialForConnector(
   // A clock has nothing to sign in to, so there is nothing to fetch or check.
   if (!needsAccount(connectorId)) return { credential: null };
 
-  const row = db()
+  const row = await db()
     .select()
     .from(connections)
     .where(eq(connections.connectorId, connectorId))
@@ -178,12 +173,12 @@ export async function credentialForConnector(
 
 /** Proves the stored credential still works and refreshes the shown account. */
 export async function checkConnection(id: string): Promise<ConnectionView> {
-  const row = getConnection(id);
+  const row = await getConnection(id);
   if (!row) throw new Error("Connection not found");
   const runtime = connectorRuntime(row.connectorId);
   const credential = await readCredential<unknown>(id);
   if (!credential) {
-    db()
+    await db()
       .update(connections)
       .set({
         status: "needs_reauth",
@@ -192,12 +187,12 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
       })
       .where(eq(connections.id, id))
       .run();
-    return toView(getConnection(id)!);
+    return toView((await getConnection(id))!);
   }
   try {
     const { account, renewedCredential } = await runtime.auth.identity(credential);
     if (renewedCredential) await writeCredential(id, renewedCredential);
-    db()
+    await db()
       .update(connections)
       .set({
         status: "connected",
@@ -212,7 +207,7 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
       .where(eq(connections.id, id))
       .run();
   } catch (error) {
-    db()
+    await db()
       .update(connections)
       .set({
         status: "needs_reauth",
@@ -222,5 +217,5 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
       .where(eq(connections.id, id))
       .run();
   }
-  return toView(getConnection(id)!);
+  return toView((await getConnection(id))!);
 }

@@ -2,7 +2,10 @@ import { defineConfig } from "drizzle-kit";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const file = process.env.LOOPABLE_DB ?? join(homedir(), ".loopable", "loopable.sqlite");
+const home =
+  process.env.LOOPABLE_HOME ??
+  join(homedir(), process.env.LOOPABLE_DEV === "1" ? ".loopable-dev" : ".loopable");
+const file = process.env.LOOPABLE_DB ?? join(home, "loopable.sqlite");
 
 export default defineConfig({
   dialect: "sqlite",

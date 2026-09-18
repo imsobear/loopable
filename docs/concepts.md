@@ -6,13 +6,13 @@ Personal use and team use are the same product. A laptop is the first runner. A 
 
 ```text
 Signal → Loop → Task
-              → Engine prepares context, picks a Runner
+              → Dispatcher prepares context, picks a Runner
               → Runner runs the Agent
-              → Engine writes back
+              → Dispatcher writes back
               → Task is recorded
 ```
 
-There is no second path where “the local engine runs the agent.” The agent always runs on a Runner.
+There is no second path where “the local dispatcher runs the agent.” The agent always runs on a Runner.
 
 ## What you configure
 
@@ -26,9 +26,11 @@ A workflow is not a loop template. Creating a loop copies the prompt onto the lo
 
 The UI does not need to say “workflow.” New loop is choosing a job by the name the connector gave it. In code and in this document the word is workflow, and the column is `workflowId`.
 
-**Loop.** One instance of a workflow: your repositories, your notes, which agent. This is what people edit. Loops run by themselves. A loop names an agent, not a runner. The engine picks an online runner that has that agent signed in. If none does, the loop is saved anyway and the page says it cannot run yet.
+**Loop.** One instance of a workflow: your repositories, your notes, which agent. This is what people edit. Loops run by themselves. A loop names an agent, not a runner. The dispatcher picks an online runner that has that agent signed in. If none does, the loop is saved anyway and the page says it cannot run yet.
 
 **Signal.** One thing a loop noticed. The connector’s key on a signal has to change exactly when there is something new to do. Same signal does not run twice.
+
+The first look never acts. Whatever is already waiting when a loop is created is that loop’s backlog, recorded rather than run.
 
 **Task.** One run of one loop against one signal: fetch the context, let the agent work, write the result back. The inbox is the list of tasks. A task is kept whether it wrote anything or not.
 
@@ -38,7 +40,7 @@ The UI does not need to say “workflow.” New loop is choosing a job by the na
 
 **Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub or Slack. Agent login is Codex or Claude. They live in different places and must not be merged into one “account.”
 
-**Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, does not clone repositories, and does not write back to GitHub or Slack. The command is `pnpm runner`. The join token lives on the Runners page.
+**Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, does not clone repositories, and does not write back to GitHub or Slack. The command is `loopable runner`. The join token lives on the Runners page.
 
 ## What you install
 
@@ -47,9 +49,9 @@ The UI does not need to say “workflow.” New loop is choosing a job by the na
 | Role | Does |
 | --- | --- |
 | **App** | The UI, the HTTP API, OAuth callbacks, and the interface runners pull from |
-| **Engine** | Watches for signals, moves tasks, writes back through Connections |
+| **Dispatcher** | Watches for signals, moves tasks, writes back through Connections |
 
-They share one data directory. They are not two products. They need not be two services. Today `pnpm dev` and `pnpm engine` are two processes so a loop keeps running when nobody has the window open.
+They share one database. They are not two products. They need not be two services. `loopable start` runs App and Dispatcher on the same host so a loop keeps running when nobody has the window open. How to start each is in [deploy.md](deploy.md). Changing this repo is `pnpm dev`, not a deploy.
 
 Do not call this a management platform. The product is Loopable. The console is for writing loops and seeing what ran, not for operating a fleet.
 
@@ -57,7 +59,7 @@ Do not call this a management platform. The product is Loopable. The console is 
 
 ```text
 Loopable  ──HTTP──  Runner  ──  Agent CLI
-(App + Engine)
+(App + Dispatcher)
 ```
 
 The path does not change with how many runners you have. One runner on the same host as Loopable, or several on other hosts: each one joins the same way.
@@ -68,7 +70,7 @@ The path does not change with how many runners you have. One runner on the same 
 | --- | --- | --- | --- |
 | What | GitHub, Slack, Gmail | git / `gh` on the runner | Codex, Claude Code |
 | Where | Loopable’s secret store | That host’s home directory | That host’s home directory |
-| Who uses it | App and Engine, to read signals and write back | The agent, via git on that host | Only the agent process |
+| Who uses it | App and Dispatcher, to read signals and write back | The agent, via git on that host | Only the agent process |
 
 They stay apart even when two of them are GitHub. The Connection is the bot that watches and writes through the API. Runtime auth is git on that host, used by the agent when the prompt asks it to clone. Loopable does not copy the Connection token onto a runner or into an agent.
 
@@ -78,11 +80,12 @@ The agent’s environment never contains Loopable’s service credentials. When 
 
 | Avoid | Use instead |
 | --- | --- |
-| Daemon | Engine |
+| Daemon | Dispatcher |
+| Engine | Dispatcher |
 | Worker | Runner |
 | Machine | Runner |
 | Management platform / control plane (in UI and README) | Loopable |
 | Loop template | Workflow |
 | Account (when it could mean either) | Connection or agent login |
 
-“Worker” remains an internal name for the code inside the Engine that claims queued tasks. It is not a product word and not a command.
+“Worker” remains an internal name for the code inside the Dispatcher that claims queued tasks. It is not a product word and not a command.

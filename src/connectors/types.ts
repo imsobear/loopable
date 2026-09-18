@@ -168,7 +168,7 @@ export type WorkflowDescriptor = {
   actionTarget?: ConnectionSettings;
   /**
    * How long a new loop should leave between looks, when looking as often as
-   * the engine does is the wrong pace for this workflow. A starting point like
+   * the dispatcher does is the wrong pace for this workflow. A starting point like
    * the rest of these, and the loop's own once it exists.
    *
    * Worth setting where arriving one at a time is the problem rather than the
@@ -307,7 +307,7 @@ export type ActionOutcome = {
 /**
  * Work an agent has done in a clone, committed and pushed, ready for an action
  * that opens a pull request. `repo` is `owner/name` on the service, not a path
- * on disk. The agent already pushed; the Engine only writes through the API.
+ * on disk. The agent already pushed; the Dispatcher only writes through the API.
  */
 export type Changes = {
   branch: string;

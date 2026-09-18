@@ -26,7 +26,8 @@ export function readAppToken(request: Request): string | null {
 }
 
 export function appAccessCookie(token: string): string {
-  return `${APP_ACCESS_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax`;
+  const secure = process.env.LOOPABLE_BASE_URL?.startsWith("https:") ? "; Secure" : "";
+  return `${APP_ACCESS_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${secure}`;
 }
 
 /**

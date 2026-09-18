@@ -162,6 +162,13 @@
       "when": 1789100000007,
       "tag": "0022_drop_loop_runner",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1789100000008,
+      "tag": "0023_shared_host",
+      "breakpoints": true
     }
   ]
 }

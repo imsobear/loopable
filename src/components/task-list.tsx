@@ -145,7 +145,7 @@ export function TaskList({
 
 /**
  * What ran, and what it ran through. Which agent wrote the words matters when
- * two loops disagree, and it is only known once the engine has picked the task
+ * two loops disagree, and it is only known once the dispatcher has picked the task
  * up, so it is absent rather than wrong while a task is queued.
  */
 function TaskMeta({ task, showLoop }: { task: TaskView; showLoop: boolean }) {

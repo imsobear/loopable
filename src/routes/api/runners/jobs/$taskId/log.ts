@@ -11,7 +11,7 @@ export const Route = createFileRoute("/api/runners/jobs/$taskId/log")({
         if (!runnerId) return Response.json({ error: "Unknown runner." }, { status: 401 });
         const body = (await request.json()) as { chunk?: string };
         try {
-          appendAgentLog(params.taskId, runnerId, body.chunk ?? "");
+          await appendAgentLog(params.taskId, runnerId, body.chunk ?? "");
           return Response.json({ ok: true });
         } catch (error) {
           return Response.json(

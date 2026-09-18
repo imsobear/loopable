@@ -128,7 +128,7 @@ export async function triage(input: {
   const result = await agentRuntime(input.agentId).run({
     prompt: promptFor(input.signals, input.guidance),
     cwd: input.cwd,
-    settings: settingsFor(input.agentId),
+    settings: await settingsFor(input.agentId),
     signal: input.signal,
   });
   if (!result.ok || result.aborted) return held;

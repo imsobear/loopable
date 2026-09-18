@@ -5,9 +5,17 @@ import {
   isPublicApiPath,
   readAppToken,
 } from "#/server/access.ts";
+import { migrateIfNeeded } from "#/server/db/client.ts";
 import { createMiddleware, createStart } from "@tanstack/react-start";
 
+let migrated: Promise<void> | null = null;
+function ensureMigrated() {
+  migrated ??= migrateIfNeeded();
+  return migrated;
+}
+
 const appAccess = createMiddleware({ type: "request" }).server(async ({ next, request, pathname }) => {
+  await ensureMigrated();
   if (isPublicApiPath(pathname)) return next();
   try {
     assertAppAccess(request);

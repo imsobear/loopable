@@ -84,7 +84,7 @@ export const tasks = sqliteTable(
     sourcePayload: text("source_payload", { mode: "json" }).$type<JsonValue>(),
     /**
      * Identifying a link needs no network, but the title does, so it arrives
-     * when the engine fetches rather than when the task is queued.
+     * when the dispatcher fetches rather than when the task is queued.
      */
     sourceTitle: text("source_title"),
     /** Set when a run was asked to stop before writing anything. */
@@ -117,9 +117,11 @@ export const tasks = sqliteTable(
     error: text("error"),
     /** Everything the agent printed, streamed to disk while it runs. */
     logPath: text("log_path"),
+    /** Same log, kept in the database so the App Worker can read it. */
+    logText: text("log_text").notNull().default(""),
 
     // Queue bookkeeping. The work happens in another process, so a task has to
-    // carry enough state for the engine to be interrupted at any moment.
+    // carry enough state for the dispatcher to be interrupted at any moment.
     attempts: integer("attempts").notNull().default(0),
     /** Not claimable before this: how a retry backs off. */
     runAfter: integer("run_after", { mode: "timestamp_ms" })
@@ -127,7 +129,7 @@ export const tasks = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
     /**
      * A claim that expires. Whoever holds it renews it while working, so a
-     * task whose engine died can be told apart from one still being worked on.
+     * task whose dispatcher died can be told apart from one still being worked on.
      */
     leaseUntil: integer("lease_until", { mode: "timestamp_ms" }),
     cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
@@ -149,7 +151,7 @@ export const tasks = sqliteTable(
   (table) => [
     index("tasks_loop_idx").on(table.loopId),
     index("tasks_created_idx").on(table.createdAt),
-    /** The engine's only question: what can I claim right now? */
+    /** The dispatcher's only question: what can I claim right now? */
     index("tasks_claim_idx").on(table.state, table.runAfter),
     uniqueIndex("tasks_dedupe_idx").on(table.dedupeKey),
   ],
@@ -213,7 +215,7 @@ export const loops = sqliteTable(
      */
     polledAt: integer("polled_at", { mode: "timestamp_ms" }),
     /**
-     * How long to leave between looks, or null to look every time the engine
+     * How long to leave between looks, or null to look every time the dispatcher
      * does.
      *
      * Worth having because looking often and acting cheaply pull in opposite
@@ -308,6 +310,18 @@ export const appSettings = sqliteTable("app_settings", {
 /**
  * A joined runner that can run agents.
  */
+/**
+ * Credentials when App and Dispatcher do not share a keychain. Encrypted with
+ * LOOPABLE_MASTER_KEY. Local laptop installs keep using the OS store.
+ */
+export const secrets = sqliteTable("secrets", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export const runners = sqliteTable("runners", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

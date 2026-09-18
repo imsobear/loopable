@@ -29,9 +29,9 @@ import { saveLoop } from "@/server/functions/loops.ts";
 
 const DEFAULT_AGENT = "__default";
 
-/** Zero is stored as null: "as often as the engine does" is not a duration. */
+/** Zero is stored as null: "as often as the dispatcher does" is not a duration. */
 const POLL_CHOICES = [
-  { value: "0", label: "Every time the engine looks" },
+  { value: "0", label: "Every time the dispatcher looks" },
   { value: String(10 * 60_000), label: "Every 10 minutes" },
   { value: String(30 * 60_000), label: "Every 30 minutes" },
   { value: String(60 * 60_000), label: "Every hour" },
@@ -422,7 +422,7 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              The engine picks an online runner that has this agent signed in.
+              The dispatcher picks an online runner that has this agent signed in.
             </p>
           </div>
 

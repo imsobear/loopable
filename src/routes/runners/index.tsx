@@ -48,10 +48,11 @@ function RunnersPage() {
         <CardHeader className="text-base font-medium">Join a runner</CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
           <p className="text-muted-foreground">
-            Install a coding agent and sign in on that host, then start a runner with this token.
+            Install the CLI once (<code className="text-xs">npm install -g loopable-cli</code>),
+            sign in a coding agent on that host, then start a runner with this token.
           </p>
           <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
-            {`LOOPABLE_URL=${origin} LOOPABLE_RUNNER_TOKEN=${joinToken} pnpm runner`}
+            {`loopable runner --url ${origin} --token ${joinToken}`}
           </pre>
           <div>
             <Button

@@ -2,28 +2,28 @@ import { CircleAlert, CirclePause, CirclePlay } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getEngineState, pauseEngine } from "@/server/functions/tasks.ts";
+import { getDispatcherState, pauseDispatcher } from "@/server/functions/tasks.ts";
 import { cn } from "@/lib/utils";
 
-export type EngineState = {
-  enginePid: number | null;
+export type DispatcherState = {
+  alive: boolean;
   paused: boolean;
   maxConcurrentRuns: number;
   onlineRunners: number;
 };
 
 /**
- * The engine can stop between two page loads and nothing on a page would
+ * The dispatcher can stop between two page loads and nothing on a page would
  * change, so this asks rather than waiting to be told.
  */
-function useEngineState(everyMs = 10_000) {
-  const [engine, setEngine] = useState<EngineState | null>(null);
+function useDispatcherState(everyMs = 10_000) {
+  const [dispatcher, setDispatcher] = useState<DispatcherState | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      setEngine(await getEngineState());
+      setDispatcher(await getDispatcherState());
     } catch {
-      // A failed poll says nothing about the engine, only about this request.
+      // A failed poll says nothing about the dispatcher, only about this request.
     }
   }, []);
 
@@ -33,32 +33,32 @@ function useEngineState(everyMs = 10_000) {
     return () => clearInterval(timer);
   }, [everyMs, refresh]);
 
-  return { engine, refresh };
+  return { dispatcher, refresh };
 }
 
 /**
- * Runs happen in the engine, so a queued task that never moves usually means
- * the engine is not there. Saying so is the difference between a queue and a
- * thing that quietly swallows work.
+ * Runs are dispatched from this process, so a queued task that never moves
+ * usually means it is not there. Saying so is the difference between a queue
+ * and a thing that quietly swallows work.
  *
  * It lives in the sidebar because it is true of the whole app rather than of
  * whichever page is open, and because a page is the wrong place to learn that
  * nothing you do on it will happen.
  */
-export function EngineStatus() {
-  const { engine, refresh } = useEngineState();
+export function DispatcherStatus() {
+  const { dispatcher, refresh } = useDispatcherState();
   const [busy, setBusy] = useState(false);
 
   // Nothing is known yet on the first paint. A dot that guesses green would be
   // worse than no dot at all.
-  if (!engine) return null;
+  if (!dispatcher) return null;
 
-  const down = engine.enginePid === null;
+  const down = !dispatcher.alive;
 
   const toggle = async () => {
     setBusy(true);
     try {
-      await pauseEngine({ data: { paused: !engine.paused } });
+      await pauseDispatcher({ data: { paused: !dispatcher.paused } });
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -73,7 +73,7 @@ export function EngineStatus() {
         "flex flex-col gap-1.5 rounded-md px-2 py-1.5 text-xs",
         // Collapsed to icons there is room for the dot and nothing else.
         "group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0",
-        !down && !engine.paused
+        !down && !dispatcher.paused
           ? "text-muted-foreground"
           : "bg-amber-500/10 text-amber-700 dark:text-amber-500",
       )}
@@ -85,12 +85,12 @@ export function EngineStatus() {
           <span
             className={cn(
               "size-2 shrink-0 rounded-full",
-              engine.paused ? "bg-amber-500" : "bg-emerald-500",
+              dispatcher.paused ? "bg-amber-500" : "bg-emerald-500",
             )}
           />
         )}
         <span className="flex-1 truncate group-data-[collapsible=icon]:hidden">
-          {down ? "Engine not running" : engine.paused ? "Paused" : "Engine running"}
+          {down ? "Dispatcher not running" : dispatcher.paused ? "Paused" : "Dispatcher running"}
         </span>
         {down ? null : (
           <Button
@@ -98,26 +98,25 @@ export function EngineStatus() {
             variant="ghost"
             onClick={toggle}
             disabled={busy}
-            title={engine.paused ? "Resume" : "Pause"}
+            title={dispatcher.paused ? "Resume" : "Pause"}
             className="size-6 shrink-0 group-data-[collapsible=icon]:hidden"
           >
-            {engine.paused ? <CirclePlay /> : <CirclePause />}
-            <span className="sr-only">{engine.paused ? "Resume" : "Pause"}</span>
+            {dispatcher.paused ? <CirclePlay /> : <CirclePause />}
+            <span className="sr-only">{dispatcher.paused ? "Resume" : "Pause"}</span>
           </Button>
         )}
       </div>
       <p className="text-[11px] leading-snug opacity-80 group-data-[collapsible=icon]:hidden">
         {down ? (
           <>
-            Queued tasks will wait. Start it with{" "}
-            <code className="rounded bg-muted px-1 py-0.5">pnpm engine</code>.
+            Queued tasks will wait until the dispatcher is running.
           </>
-        ) : engine.paused ? (
+        ) : dispatcher.paused ? (
           "Nothing will run until you start it again."
         ) : (
-          `${engine.maxConcurrentRuns} run${engine.maxConcurrentRuns === 1 ? "" : "s"} at a time${
-            engine.onlineRunners > 0
-              ? ` · ${engine.onlineRunners} runner${engine.onlineRunners === 1 ? "" : "s"} online`
+          `${dispatcher.maxConcurrentRuns} run${dispatcher.maxConcurrentRuns === 1 ? "" : "s"} at a time${
+            dispatcher.onlineRunners > 0
+              ? ` · ${dispatcher.onlineRunners} runner${dispatcher.onlineRunners === 1 ? "" : "s"} online`
               : ""
           }.`
         )}

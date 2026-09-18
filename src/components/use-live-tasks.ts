@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { isTaskActive, type TaskState } from "@/lib/domain.ts";
 
 /**
- * The work happens in the engine, so the page has to go and look. Polling only
+ * The work happens in the dispatcher, so the page has to go and look. Polling only
  * while something is actually running keeps an idle inbox quiet.
  */
 export function useLiveTasks(states: Array<{ state: TaskState }>, everyMs = 2_000): void {

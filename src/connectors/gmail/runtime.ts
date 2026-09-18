@@ -68,8 +68,7 @@ export const gmailRuntime = defineRuntime({
     return {
       ready: false,
       reason: "This build has no Google app registration.",
-      fixHint:
-        'Add a "gmail" entry to config/oauth-app.json, or set LOOPABLE_GMAIL_CLIENT_ID and LOOPABLE_GMAIL_CLIENT_SECRET.',
+      fixHint: "Set LOOPABLE_GMAIL_CLIENT_ID and LOOPABLE_GMAIL_CLIENT_SECRET to use your own OAuth app.",
     };
   },
 

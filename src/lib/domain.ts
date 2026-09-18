@@ -79,7 +79,7 @@ export type TaskView = {
   cancelRequested: boolean;
   durationMs: number | null;
   createdAt: string;
-  /** When the engine picked it up, so the pages can count the minutes. */
+  /** When the dispatcher picked it up, so the pages can count the minutes. */
   startedAt: string | null;
   updatedAt: string;
 };
@@ -105,7 +105,7 @@ export type LoopView = {
   actionId: string;
   /** Keys are declared by the action, not by the workflow. Empty is the norm. */
   actionTarget: ConnectionSettings;
-  /** How long to leave between looks. Null is every time the engine looks. */
+  /** How long to leave between looks. Null is every time the dispatcher looks. */
   pollEveryMs: number | null;
   createdAt: string;
   updatedAt: string;

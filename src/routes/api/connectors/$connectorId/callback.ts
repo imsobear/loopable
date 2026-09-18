@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/connectors/$connectorId/callback")({
         if (!code || !state) return failed("No authorization code came back.");
 
         try {
-          const attempt = takeAuthAttempt(state);
+          const attempt = await takeAuthAttempt(state);
           if (attempt.connectorId !== params.connectorId) {
             return failed("This authorization belongs to a different connector.");
           }

@@ -56,7 +56,7 @@ export type AgentRunInput = {
   settings: AgentSettingsValues;
   /** Where the agent should write its final message, when it supports that. */
   outputFile?: string;
-  /** Stops the agent: a person pressed Stop, or the engine is shutting down. */
+  /** Stops the agent: a person pressed Stop, or the dispatcher is shutting down. */
   signal?: AbortSignal;
   /** Where to write everything the agent prints, while it prints it. */
   logFile?: string;

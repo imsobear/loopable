@@ -104,7 +104,7 @@ export const githubRuntime = defineRuntime({
       ready: false,
       reason: "This build has no GitHub app registration.",
       fixHint:
-        "Add config/oauth-app.json, or set LOOPABLE_GITHUB_CLIENT_ID and LOOPABLE_GITHUB_CLIENT_SECRET.",
+        "Set LOOPABLE_GITHUB_CLIENT_ID and LOOPABLE_GITHUB_CLIENT_SECRET to use your own OAuth app.",
     };
   },
   identifyLink(url) {

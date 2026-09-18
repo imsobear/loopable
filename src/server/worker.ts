@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { isTransient } from "#/connectors/errors.ts";
-import { db } from "./db/client.ts";
+import { db, rowsChanged } from "./db/client.ts";
 import { tasks } from "./db/schema.ts";
-import { engineSettings } from "./settings.ts";
+import { dispatcherSettings } from "./settings.ts";
 import { isCancellation, runTask, updateTask } from "./tasks.ts";
 
 const CLAIMED_STATES = ["preparing", "applying"] as const;
@@ -37,23 +37,24 @@ export function createWorker(options: WorkerOptions = {}) {
    * longer alive, so the task is nobody's and has to be picked up again.
    * Attempts are what keep a task that kills its worker from doing it forever.
    */
-  function reap(): number {
-    const abandoned = db()
-      .select()
-      .from(tasks)
-      .where(
-        and(
-          inArray(tasks.state, [...CLAIMED_STATES]),
-          lte(tasks.leaseUntil, new Date(now())),
-        ),
-      )
-      .all()
-      .filter((task) => !inFlight.has(task.id));
+  async function reap(): Promise<number> {
+    const abandoned = (
+      await db()
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            inArray(tasks.state, [...CLAIMED_STATES]),
+            lte(tasks.leaseUntil, new Date(now())),
+          ),
+        )
+        .all()
+    ).filter((task) => !inFlight.has(task.id));
 
     for (const task of abandoned) {
       if (task.attempts < maxAttempts) {
         log(`requeue ${task.id}: its worker went away`);
-        updateTask(task.id, {
+        await updateTask(task.id, {
           state: "queued",
           leaseUntil: null,
           runAfter: new Date(now()),
@@ -61,14 +62,14 @@ export function createWorker(options: WorkerOptions = {}) {
         });
       } else {
         log(`fail ${task.id}: abandoned after ${task.attempts} attempts`);
-        updateTask(task.id, {
+        await updateTask(task.id, {
           state: "failed",
           leaseUntil: null,
           error: "Loopable stopped while this was running, and it had run out of attempts.",
         });
       }
     }
-    const abandonedAgent = db()
+    const abandonedAgent = await db()
       .select()
       .from(tasks)
       .where(
@@ -82,13 +83,13 @@ export function createWorker(options: WorkerOptions = {}) {
     for (const task of abandonedAgent) {
       if (task.attempts < maxAttempts) {
         log(`runner lost ${task.id}: queued for another claim`);
-        updateTask(task.id, {
+        await updateTask(task.id, {
           leaseUntil: null,
           error: "The runner stopped while this was running, so it was offered again.",
         });
       } else {
         log(`fail ${task.id}: runner lost after ${task.attempts} attempts`);
-        updateTask(task.id, {
+        await updateTask(task.id, {
           state: "failed",
           leaseUntil: null,
           error: "The runner stopped while this was running, and it had run out of attempts.",
@@ -97,9 +98,9 @@ export function createWorker(options: WorkerOptions = {}) {
     }
     return abandoned.length + abandonedAgent.length;
   }
-  function claimQueued(id: string): boolean {
+  async function claimQueued(id: string): Promise<boolean> {
     const at = now();
-    const result = db()
+    const result = await db()
       .update(tasks)
       .set({
         state: "preparing",
@@ -110,12 +111,12 @@ export function createWorker(options: WorkerOptions = {}) {
       })
       .where(and(eq(tasks.id, id), eq(tasks.state, "queued")))
       .run();
-    return result.changes === 1;
+    return rowsChanged(result) === 1;
   }
 
-  function claimApplying(id: string): boolean {
+  async function claimApplying(id: string): Promise<boolean> {
     const at = now();
-    const result = db()
+    const result = await db()
       .update(tasks)
       .set({
         leaseUntil: new Date(at + leaseMs),
@@ -123,44 +124,44 @@ export function createWorker(options: WorkerOptions = {}) {
       })
       .where(and(eq(tasks.id, id), eq(tasks.state, "applying")))
       .run();
-    return result.changes === 1;
+    return rowsChanged(result) === 1;
   }
 
   /**
    * Renewing is also when a stop request is noticed: the person asking is in
    * the other process, so the database is where they leave the message.
    */
-  function renew(id: string, abort: AbortController): void {
-    const task = db().select().from(tasks).where(eq(tasks.id, id)).get();
+  async function renew(id: string, abort: AbortController): Promise<void> {
+    const task = await db().select().from(tasks).where(eq(tasks.id, id)).get();
     if (task?.cancelRequested) {
       abort.abort();
       return;
     }
-    updateTask(id, { leaseUntil: new Date(now() + leaseMs) });
+    await updateTask(id, { leaseUntil: new Date(now() + leaseMs) });
   }
 
   function backoffMs(attempts: number): number {
     return Math.min(60_000, 5_000 * 2 ** Math.max(0, attempts - 1));
   }
 
-  function settle(id: string, error: unknown): void {
+  async function settle(id: string, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
-    const task = db().select().from(tasks).where(eq(tasks.id, id)).get();
+    const task = await db().select().from(tasks).where(eq(tasks.id, id)).get();
     const attempts = task?.attempts ?? maxAttempts;
     const started = task?.startedAt?.getTime() ?? task?.createdAt.getTime() ?? now();
     /** How long it went on for, which a person wants to know most when it did not work. */
     const durationMs = now() - started;
 
     if (isCancellation(error)) {
-      // A run is also aborted when the engine is shutting down, which is not
+      // A run is also aborted when the dispatcher is shutting down, which is not
       // the same as a person stopping it: nobody asked for it to end, so it
       // goes back in the queue instead of being recorded as cancelled.
       if (task?.cancelRequested) {
         log(`cancelled ${id}`);
-        updateTask(id, { state: "cancelled", error: message, leaseUntil: null, durationMs });
+        await updateTask(id, { state: "cancelled", error: message, leaseUntil: null, durationMs });
       } else {
         log(`requeue ${id}: stopped while shutting down`);
-        updateTask(id, {
+        await updateTask(id, {
           state: "queued",
           leaseUntil: null,
           runAfter: new Date(now()),
@@ -172,7 +173,7 @@ export function createWorker(options: WorkerOptions = {}) {
     if (isTransient(error) && attempts < maxAttempts) {
       const wait = backoffMs(attempts);
       log(`retry ${id} in ${Math.round(wait / 1000)}s: ${message}`);
-      updateTask(id, {
+      await updateTask(id, {
         state: "queued",
         leaseUntil: null,
         runAfter: new Date(now() + wait),
@@ -181,7 +182,7 @@ export function createWorker(options: WorkerOptions = {}) {
       return;
     }
     log(`failed ${id}: ${message}`);
-    updateTask(id, { state: "failed", error: message, leaseUntil: null, durationMs });
+    await updateTask(id, { state: "failed", error: message, leaseUntil: null, durationMs });
   }
 
   function launch(id: string): void {
@@ -189,11 +190,11 @@ export function createWorker(options: WorkerOptions = {}) {
     // Fast enough that Stop feels like a button, rather than as slow as the
     // lease it also renews. A one-row update every couple of seconds is
     // nothing next to what the agent is doing.
-    const heartbeat = setInterval(() => renew(id, abort), Math.min(2_000, leaseMs / 3));
+    const heartbeat = setInterval(() => void renew(id, abort), Math.min(2_000, leaseMs / 3));
 
     const done = execute(id, abort.signal)
-      .then(() => {
-        const row = db().select().from(tasks).where(eq(tasks.id, id)).get();
+      .then(async () => {
+        const row = await db().select().from(tasks).where(eq(tasks.id, id)).get();
         if (row?.state === "awaiting_agent") log(`waiting for runner ${id}`);
         else log(`finished ${id}`);
       })
@@ -208,15 +209,15 @@ export function createWorker(options: WorkerOptions = {}) {
 
   /** One pass: clean up after the dead, then start what there is room for. */
   async function tick(): Promise<number> {
-    reap();
+    await reap();
     if (stopping) return 0;
 
-    const { paused, maxConcurrentRuns } = engineSettings();
+    const { paused, maxConcurrentRuns } = await dispatcherSettings();
     if (paused) return 0;
     const capacity = maxConcurrentRuns - inFlight.size;
     if (capacity <= 0) return 0;
 
-    const queued = db()
+    const queued = await db()
       .select({ id: tasks.id })
       .from(tasks)
       .where(and(eq(tasks.state, "queued"), lte(tasks.runAfter, new Date(now()))))
@@ -224,7 +225,7 @@ export function createWorker(options: WorkerOptions = {}) {
       .limit(capacity)
       .all();
 
-    const applying = db()
+    const applying = await db()
       .select({ id: tasks.id })
       .from(tasks)
       .where(
@@ -239,14 +240,14 @@ export function createWorker(options: WorkerOptions = {}) {
 
     let started = 0;
     for (const task of queued) {
-      if (!claimQueued(task.id)) continue;
+      if (!(await claimQueued(task.id))) continue;
       log(`started ${task.id}`);
       launch(task.id);
       started += 1;
     }
     for (const task of applying) {
       if (inFlight.has(task.id)) continue;
-      if (!claimApplying(task.id)) continue;
+      if (!(await claimApplying(task.id))) continue;
       log(`applying ${task.id}`);
       launch(task.id);
       started += 1;

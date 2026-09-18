@@ -7,32 +7,49 @@ export type OAuthAppRegistration = {
 };
 
 /**
- * The OAuth app registrations that ship with Loopable, one per connector.
- *
- * Users never see these; the maintainer registers each provider once. Both
- * GitHub and Google still want a client_secret at the token endpoint even with
- * PKCE, and a client on someone's laptop cannot hide one, which both accept
- * for public clients. PKCE is what actually secures the exchange, and the
- * secret is documented as public rather than pretended to be a secret.
+ * App registrations Loopable ships. End users never set these; they only click
+ * Connect. A client on the user's machine cannot keep clientSecret confidential,
+ * which both GitHub and Google accept for public clients. PKCE is what secures
+ * the exchange. Env or config/oauth-app.json override this for GitHub Enterprise
+ * or a private registration.
  */
-export function oauthAppRegistration(connectorId: string): OAuthAppRegistration | null {
-  return fromEnv(connectorId) ?? fromFile(connectorId);
+const SHIPPED: Record<string, OAuthAppRegistration> = {
+  github: {
+    clientId: "Ov23lilxTpmZdHyRCH5f",
+    clientSecret: "478c0e954e7c573763f128ba80054aca3fe5724e",
+  },
+  gmail: {
+    clientId: "477908327191-4juu8vo8bffs63hoqlul1u2fqdch27i7.apps.googleusercontent.com",
+    clientSecret: "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",
+  },
+};
+
+export function shippedOAuthApp(connectorId: string): OAuthAppRegistration | null {
+  return SHIPPED[connectorId] ?? null;
 }
 
-/** LOOPABLE_GITHUB_CLIENT_ID and friends, which is how CI and one-offs set it. */
+export function oauthAppRegistration(connectorId: string): OAuthAppRegistration | null {
+  return fromEnv(connectorId) ?? fromFile(connectorId) ?? shippedOAuthApp(connectorId);
+}
+
+/** LOOPABLE_GITHUB_CLIENT_ID and friends, for a private or Enterprise app. */
 function fromEnv(connectorId: string): OAuthAppRegistration | null {
   const prefix = `LOOPABLE_${connectorId.toUpperCase()}_CLIENT_`;
   return pick(process.env[`${prefix}ID`], process.env[`${prefix}SECRET`]);
 }
 
 /**
- * config/oauth-app.json, either as an object per connector or, for GitHub
- * alone, as the two keys at the top level. The flat shape came first and is
- * still read, because the file is gitignored and on somebody's machine.
+ * Optional override in config/oauth-app.json. Gitignored. Either an object per
+ * connector or, for GitHub alone, the two keys at the top level.
  */
 function fromFile(connectorId: string): OAuthAppRegistration | null {
-  const file = join(process.cwd(), "config", "oauth-app.json");
-  if (!existsSync(file)) return null;
+  let file: string;
+  try {
+    file = join(process.cwd(), "config", "oauth-app.json");
+    if (!existsSync(file)) return null;
+  } catch {
+    return null;
+  }
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;

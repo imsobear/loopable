@@ -37,7 +37,7 @@ export type QrPollView =
  */
 export const getConnectorOverview = createServerFn({ method: "GET" }).handler(
   async (): Promise<ConnectorOverview[]> => {
-    const all = listConnections();
+    const all = await listConnections();
     return Promise.all(
       CONNECTOR_MANIFESTS.map(async (manifest) => ({
         connectorId: manifest.id,
@@ -97,8 +97,8 @@ export const disconnectConnection = createServerFn({ method: "POST" })
 
 export const verifyConnection = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
-  .handler(({ data }) => checkConnection(data.id));
+  .handler(async ({ data }) => await checkConnection(data.id));
 
 export const saveConnectionSettings = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; settings: ConnectionSettings }) => data)
-  .handler(({ data }) => updateConnectionSettings(data.id, data.settings));
+  .handler(async ({ data }) => await updateConnectionSettings(data.id, data.settings));

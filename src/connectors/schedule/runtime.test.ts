@@ -67,7 +67,7 @@ describe("looking at the clock", () => {
     const first = await look(daily, at("2026-03-09 09:00").toISOString());
     const moved = first.cursor as string;
 
-    // Every look for the rest of the day, at the pace the engine keeps.
+    // Every look for the rest of the day, at the pace the dispatcher keeps.
     clockAt("2026-03-10 09:02");
     expect((await look(daily, moved)).signals).toEqual([]);
     clockAt("2026-03-10 23:59");

@@ -4,9 +4,9 @@ import type { AgentOnRunner, AgentView } from "#/lib/domain.ts";
 import { listAgents, saveAgentSettings, setDefaultAgent, testAgent } from "../agents.ts";
 import { availableAgentIds, listRunners } from "../runners.ts";
 
-function withRunners(agents: AgentView[]): AgentView[] {
-  const runners = listRunners();
-  const available = availableAgentIds();
+async function withRunners(agents: AgentView[]): Promise<AgentView[]> {
+  const runners = await listRunners();
+  const available = await availableAgentIds();
   const stored = agents.find((agent) => agent.isDefault)?.agentId ?? null;
   const implicit = !stored && available.length === 1 ? available[0]! : null;
   return agents.map((agent) => {
@@ -34,7 +34,7 @@ function withRunners(agents: AgentView[]): AgentView[] {
 }
 
 export const getAgentsPage = createServerFn({ method: "GET" }).handler(async () => ({
-  agents: withRunners(await listAgents()),
+  agents: await withRunners(await listAgents()),
 }));
 
 export const saveAgent = createServerFn({ method: "POST" })
@@ -47,19 +47,19 @@ export const saveAgent = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    saveAgentSettings(data.agentId, {
+    await saveAgentSettings(data.agentId, {
       permissionMode: data.permissionMode,
       model: data.model,
       timeoutMs: data.timeoutMs,
     });
-    return withRunners(await listAgents());
+    return await withRunners(await listAgents());
   });
 
 export const chooseDefaultAgent = createServerFn({ method: "POST" })
   .inputValidator((data: { agentId: string }) => data)
   .handler(async ({ data }) => {
-    setDefaultAgent(data.agentId);
-    return withRunners(await listAgents());
+    await setDefaultAgent(data.agentId);
+    return await withRunners(await listAgents());
   });
 
 export const runAgentTest = createServerFn({ method: "POST" })

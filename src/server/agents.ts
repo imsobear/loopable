@@ -6,20 +6,21 @@ import { AGENT_MANIFESTS, agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
 import type { AgentRunResult, AgentSettingsValues } from "#/agents/types.ts";
 import type { AgentView } from "#/lib/domain.ts";
+import { isHosted } from "#/lib/hosted.ts";
 import { db } from "./db/client.ts";
 import { agentSettings, appSettings } from "./db/schema.ts";
 
 const DEFAULT_AGENT_KEY = "defaultAgentId";
 
-function storedSetting(key: string): string | null {
-  const row = db().select().from(appSettings).where(eq(appSettings.key, key)).get();
+async function storedSetting(key: string): Promise<string | null> {
+  const row = await db().select().from(appSettings).where(eq(appSettings.key, key)).get();
   return typeof row?.value === "string" ? row.value : null;
 }
 
-export function settingsFor(agentId: string): AgentSettingsValues {
+export async function settingsFor(agentId: string): Promise<AgentSettingsValues> {
   const manifest = agentManifest(agentId);
   if (!manifest) throw new Error(`Unknown agent: ${agentId}`);
-  const row = db().select().from(agentSettings).where(eq(agentSettings.agentId, agentId)).get();
+  const row = await db().select().from(agentSettings).where(eq(agentSettings.agentId, agentId)).get();
   if (!row) return manifest.defaults;
   return { permissionMode: row.permissionMode, model: row.model, timeoutMs: row.timeoutMs };
 }
@@ -30,19 +31,35 @@ export function settingsFor(agentId: string): AgentSettingsValues {
  * without anyone pressing refresh.
  */
 export async function listAgents(): Promise<AgentView[]> {
-  const chosen = storedSetting(DEFAULT_AGENT_KEY);
+  const chosen = await storedSetting(DEFAULT_AGENT_KEY);
+  const hosted = isHosted();
 
   const views = await Promise.all(
     AGENT_MANIFESTS.map(async (manifest) => {
       const runtime = agentRuntime(manifest.id);
-      const detection = await runtime.detect();
-      const settings = settingsFor(manifest.id);
-      const auth = detection.installed ? await runtime.authStatus() : null;
+      const settings = await settingsFor(manifest.id);
       const preview = runtime.invocation({
         prompt: "<prompt>",
         cwd: "<workspace>",
         settings,
       });
+      if (hosted) {
+        return {
+          agentId: manifest.id,
+          installed: false,
+          binaryPath: "",
+          version: null,
+          auth: null,
+          settings,
+          isDefault: false,
+          defaultIsImplicit: false,
+          commandPreview: `${preview.bin} ${preview.args.join(" ")}`,
+          onRunners: [],
+        } satisfies AgentView;
+      }
+
+      const detection = await runtime.detect();
+      const auth = detection.installed ? await runtime.authStatus() : null;
       return {
         agentId: manifest.id,
         installed: detection.installed,
@@ -63,7 +80,7 @@ export async function listAgents(): Promise<AgentView[]> {
   );
 }
 
-export function saveAgentSettings(agentId: string, values: AgentSettingsValues): void {
+export async function saveAgentSettings(agentId: string, values: AgentSettingsValues): Promise<void> {
   const manifest = agentManifest(agentId);
   if (!manifest) throw new Error(`Unknown agent: ${agentId}`);
   if (!manifest.permissionModes.includes(values.permissionMode)) {
@@ -73,7 +90,7 @@ export function saveAgentSettings(agentId: string, values: AgentSettingsValues):
     throw new Error("The timeout must be between 10 seconds and one hour.");
   }
   const model = values.model?.trim() ? values.model.trim() : null;
-  db()
+  await db()
     .insert(agentSettings)
     .values({ agentId, permissionMode: values.permissionMode, model, timeoutMs: values.timeoutMs })
     .onConflictDoUpdate({
@@ -88,9 +105,9 @@ export function saveAgentSettings(agentId: string, values: AgentSettingsValues):
     .run();
 }
 
-export function setDefaultAgent(agentId: string): void {
+export async function setDefaultAgent(agentId: string): Promise<void> {
   if (!agentManifest(agentId)) throw new Error(`Unknown agent: ${agentId}`);
-  db()
+  await db()
     .insert(appSettings)
     .values({ key: DEFAULT_AGENT_KEY, value: agentId })
     .onConflictDoUpdate({
@@ -107,8 +124,9 @@ const TEST_WORD = "loopable-ok";
  * reach a model. It stays deliberately tiny: read one file, say one word.
  */
 export async function testAgent(agentId: string): Promise<AgentRunResult & { passed: boolean }> {
+  if (isHosted()) throw new Error("Test an agent on a runner.");
   const runtime = agentRuntime(agentId);
-  const settings = settingsFor(agentId);
+  const settings = await settingsFor(agentId);
   const cwd = mkdtempSync(join(tmpdir(), "loopable-agent-test-"));
   writeFileSync(join(cwd, "NOTE.md"), `${TEST_WORD}\n`);
 

@@ -1,6 +1,6 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules", "src/worker.ts"],
   "compilerOptions": {
     "target": "ES2023",
     "jsx": "react-jsx",

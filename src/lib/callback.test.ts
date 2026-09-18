@@ -28,4 +28,17 @@ describe("callback URLs", () => {
     expect(loopableOrigin()).toBe("https://loopable.example");
     delete process.env.LOOPABLE_BASE_URL;
   });
+
+  it("keeps OAuth on loopback when BASE_URL is a LAN address", () => {
+    process.env.LOOPABLE_BASE_URL = "http://192.168.1.10:4321";
+    expect(callbackUrl("http://192.168.1.10:4321/connectors", "github")).toBe(
+      "http://127.0.0.1:4321/api/connectors/github/callback",
+    );
+    expect(appOrigin("http://192.168.1.10:4321/x")).toBe("http://127.0.0.1:4321");
+    expect(registrableCallbackUrl("github")).toBe(
+      "http://127.0.0.1/api/connectors/github/callback",
+    );
+    expect(loopableOrigin()).toBe("http://192.168.1.10:4321");
+    delete process.env.LOOPABLE_BASE_URL;
+  });
 });
