@@ -1,10 +1,12 @@
 # Loopable
 
-Loopable watches the tools a team already uses and finishes the work with a coding agent. It picks up a signal, does what the loop says, and writes the result back. Loops run on their own. Every run is recorded.
+Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors — jobs that should not wait on someone’s laptop. People keep working in Slack and GitHub. Codex and Claude do the work on shared runners.
 
-Connect GitHub or Gmail, write a loop, leave a runner on. Pull requests get reviewed, mail gets triaged, assigned issues get a draft. You see what happened in the inbox.
+It picks up a signal, does what the loop says, and writes the result back. Loops run on their own. Every run is recorded in the inbox.
 
-The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
+Connect GitHub (Gmail and WeChat also work today). Write a loop. Leave the machine on. Pull requests get reviewed, assigned issues get a draft, a scheduled job runs at 9am. The team does not have to open Codex.
+
+The story is in [docs/narrative.md](docs/narrative.md). The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
 
 ## Architecture
 
@@ -28,18 +30,20 @@ Loopable  ──HTTP──  Runner  ──  Agent CLI
 | **Dispatcher** | Watches for signals, prepares tasks, writes back |
 | **Runner** | Runs the agent CLI |
 
-App and Dispatcher share one database and stay on the same host. Only one Dispatcher may run against that database. Runners join over HTTP: this machine, or others. Extra machines are in [docs/deploy.md](docs/deploy.md).
+App and Dispatcher share one database and stay on the same host. Only one Dispatcher may run against that database. Runners join over HTTP from that host or other machines. Extra runners are in [docs/deploy.md](docs/deploy.md).
 
-## Use it locally
+## Run it
 
-You need Node 22+ and an agent CLI signed in on the runner host (Codex or Cursor Agent).
+The usual setup is one computer that stays on — a Mac in the office is enough. App, Dispatcher, and a Runner all live there. It looks like a spare machine on a desk. For a small team, that is the product.
+
+You need Node 22+ and an agent CLI signed in on that machine (Codex or Claude / Cursor Agent).
 
 ```bash
 npm install -g loopable-cli
 loopable start                # App + Dispatcher, bound on all interfaces
 ```
 
-Open `http://127.0.0.1:4321`. Connect an account. Write a loop. On Runners, copy the join command (LAN IP, not 127.0.0.1):
+On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address. Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
 
 ```bash
 loopable runner --url http://<LAN-IP>:4321 --token <from Runners>
@@ -47,13 +51,13 @@ loopable runner --url http://<LAN-IP>:4321 --token <from Runners>
 
 If the dispatcher is not running, the app says so. If no runner has joined, tasks wait.
 
-Connect GitHub from `http://127.0.0.1:4321` on this machine. Extra runners on other machines are in [docs/deploy.md](docs/deploy.md).
-
 State lives in `~/.loopable/`. Credentials stay in the OS keychain.
+
+Another always-on runner, or opening the UI from a second computer, is in [docs/deploy.md](docs/deploy.md). A company VM is optional later, only if this box is not enough.
 
 ## Develop
 
-This section is only for working on the code. Running Loopable as a product is the CLI above, not pnpm. Dev uses `~/.loopable-dev/` and a separate keychain namespace, so it does not touch the local deploy database.
+This section is only for working on the code. Running Loopable as a product is the CLI above, not pnpm. Dev uses `~/.loopable-dev/` and a separate keychain namespace, so it does not touch the team database.
 
 TanStack Start (React + Vite), SQLite, Tailwind. Tests are Vitest.
 
@@ -67,6 +71,8 @@ pnpm db:studio
 ```
 
 `pnpm runner` is only for a second machine while `pnpm dev` is already running.
+
+The public site is `site/` (static HTML, Vite). `pnpm site:dev` to preview. `pnpm site:build` writes `site/dist` for a Cloudflare Worker with assets only. `pnpm site:deploy` when you are ready to publish it.
 
 | Path | Contents |
 | --- | --- |

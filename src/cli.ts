@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -27,7 +27,18 @@ function usage(): string {
 
   loopable dispatcher
       Dispatcher only.
+
+  loopable --version
 `;
+}
+
+function cliVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
+    return pkg.version;
+  } catch {
+    return "unknown";
+  }
 }
 
 function fail(message: string): never {
@@ -49,6 +60,7 @@ function parse(argv: string[]): { command: string; flags: Flags } {
       return value;
     };
     if (arg === "-h" || arg === "--help") return { command: "help", flags };
+    if (arg === "-v" || arg === "--version") return { command: "version", flags };
     if (arg === "--host") flags.host = next();
     else if (arg === "--port") flags.port = next();
     else if (arg === "--url") flags.url = next();
@@ -171,6 +183,11 @@ async function main(): Promise<void> {
 
   if (command === "help") {
     process.stdout.write(usage());
+    return;
+  }
+
+  if (command === "version") {
+    process.stdout.write(`${cliVersion()}\n`);
     return;
   }
 
