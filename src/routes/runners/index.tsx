@@ -49,7 +49,8 @@ function RunnersPage() {
         <CardContent className="flex flex-col gap-3 text-sm">
           <p className="text-muted-foreground">
             Install the CLI once (<code className="text-xs">npm install -g loopable-cli</code>),
-            sign in a coding agent on that host, then start a runner with this token.
+            sign in a coding agent on that host, then start a runner. Use this LAN IP so
+            other machines can reach the App.
           </p>
           <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
             {`loopable runner --url ${origin} --token ${joinToken}`}

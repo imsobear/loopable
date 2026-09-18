@@ -1,5 +1,27 @@
+import type { NetworkInterfaceInfo } from "node:os";
 import { describe, expect, it } from "vitest";
-import { appOrigin, callbackUrl, loopableOrigin, registrableCallbackUrl } from "./callback.ts";
+import {
+  appOrigin,
+  callbackUrl,
+  lanIPv4,
+  loopableOrigin,
+  registrableCallbackUrl,
+} from "./callback.ts";
+
+function nics(address: string): NodeJS.Dict<NetworkInterfaceInfo[]> {
+  return {
+    en0: [
+      {
+        address,
+        netmask: "255.255.255.0",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: false,
+        cidr: `${address}/24`,
+      },
+    ],
+  };
+}
 
 describe("callback URLs", () => {
   it("keeps loopback when BASE_URL is unset", () => {
@@ -21,11 +43,14 @@ describe("callback URLs", () => {
     delete process.env.LOOPABLE_BASE_URL;
   });
 
-  it("names the origin runners join", () => {
+  it("picks a private IPv4 for the runner join URL", () => {
+    expect(lanIPv4(nics("10.0.0.8"))).toBe("10.0.0.8");
+    expect(lanIPv4(nics("192.168.1.10"))).toBe("192.168.1.10");
     delete process.env.LOOPABLE_BASE_URL;
-    expect(loopableOrigin()).toBe("http://127.0.0.1:4321");
+    delete process.env.PORT;
+    expect(loopableOrigin(nics("192.168.1.10"))).toBe("http://192.168.1.10:4321");
     process.env.LOOPABLE_BASE_URL = "https://loopable.example/";
-    expect(loopableOrigin()).toBe("https://loopable.example");
+    expect(loopableOrigin(nics("192.168.1.10"))).toBe("https://loopable.example");
     delete process.env.LOOPABLE_BASE_URL;
   });
 

@@ -18,7 +18,7 @@ type Flags = {
 
 function usage(): string {
   return `Usage:
-  loopable start [--host 127.0.0.1] [--port 4321]
+  loopable start [--host 0.0.0.0] [--port 4321]
       App and Dispatcher (production build).
 
   loopable runner [--url URL] [--token TOKEN]
@@ -37,7 +37,7 @@ function fail(message: string): never {
 
 function parse(argv: string[]): { command: string; flags: Flags } {
   const flags: Flags = {
-    host: process.env.HOST ?? "127.0.0.1",
+    host: process.env.HOST ?? "0.0.0.0",
     port: process.env.PORT ?? "4321",
   };
   const rest: string[] = [];
@@ -131,6 +131,41 @@ async function waitFor(child: ChildProcess): Promise<number> {
   });
 }
 
+async function waitForApp(port: string): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(`http://127.0.0.1:${port}`, { redirect: "manual" });
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+}
+
+async function printRunnerHint(flags: Flags): Promise<void> {
+  await waitForApp(flags.port);
+  const { lanIPv4 } = await import("./lib/callback.ts");
+  const { getJoinToken } = await import("./server/runners.ts");
+  const ip = lanIPv4() ?? "127.0.0.1";
+  const url = `http://${ip}:${flags.port}`;
+  let token = "<from Runners>";
+  for (let i = 0; i < 40; i++) {
+    try {
+      token = await getJoinToken();
+      break;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+  process.stdout.write(
+    `\nLoopable is at http://127.0.0.1:${flags.port}\n` +
+      `Start a runner (this machine or another on the LAN):\n\n` +
+      `  loopable runner --url ${url} --token ${token}\n\n` +
+      `Connect GitHub from http://127.0.0.1:${flags.port} on this computer.\n\n`,
+  );
+}
+
 async function main(): Promise<void> {
   const { command, flags } = parse(process.argv.slice(2));
 
@@ -166,7 +201,7 @@ async function main(): Promise<void> {
   }
 
   if (command === "start") {
-    await supervise([
+    const children = [
       run("app", node, [appEntry()], {
         PORT: flags.port,
         HOST: flags.host,
@@ -175,7 +210,13 @@ async function main(): Promise<void> {
         LOOPABLE_SKIP_MIGRATE: "1",
       }),
       dispatcher(),
-    ]);
+    ];
+    void printRunnerHint(flags).catch((error) => {
+      process.stderr.write(
+        `Could not print runner hint: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    });
+    await supervise(children);
     return;
   }
 

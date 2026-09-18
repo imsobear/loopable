@@ -20,25 +20,25 @@ Install the CLI once. Node 22+ is required.
 
 ```bash
 npm install -g loopable-cli
-loopable start                # http://127.0.0.1:4321
+loopable start                # bound on 0.0.0.0:4321; open http://127.0.0.1:4321
 ```
 
 `start` runs App and Dispatcher together. State lives in `~/.loopable/loopable.sqlite` (override with `LOOPABLE_HOME` or `LOOPABLE_DB`). Credentials stay in the OS keychain. If a second dispatcher is started against the same database, it exits. `pnpm dev` uses `~/.loopable-dev/` instead, so developing the repo does not share this database.
 
 ## Runners
 
-Open the App, go to Runners, copy the join command. On this machine:
+Open the App, go to Runners, copy the join command. It uses this machine's LAN IP. On this machine or another host:
 
 ```bash
-loopable runner --url http://127.0.0.1:4321 --token <from Runners>
+loopable runner --url http://<LAN-IP>:4321 --token <from Runners>
 ```
 
-On another machine, the App has to be reachable. Bind a LAN address and set a token so the UI is not open to the network. GitHub and Gmail login still happen on this laptop at `http://127.0.0.1:4321` — do not point OAuth at the LAN IP.
+`start` already binds `0.0.0.0` so other machines can reach `/api/runners`. GitHub and Gmail login still happen on this laptop at `http://127.0.0.1:4321` — do not point OAuth at the LAN IP. If you open the UI from another machine, set a token so it is not open to the network:
 
 ```bash
 export LOOPABLE_APP_TOKEN=<long random string>
 export LOOPABLE_BASE_URL=http://192.168.1.10:4321   # join URL for runners only
-loopable start --host 0.0.0.0
+loopable start
 ```
 
 Then on each runner host, install the CLI once and join:

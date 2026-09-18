@@ -36,13 +36,13 @@ You need Node 22+ and an agent CLI signed in on the runner host (Codex or Cursor
 
 ```bash
 npm install -g loopable-cli
-loopable start                # App + Dispatcher at http://127.0.0.1:4321
+loopable start                # App + Dispatcher, bound on all interfaces
 ```
 
-Open the app. Connect an account. Write a loop. On Runners, copy the join command:
+Open `http://127.0.0.1:4321`. Connect an account. Write a loop. On Runners, copy the join command (LAN IP, not 127.0.0.1):
 
 ```bash
-loopable runner --url http://127.0.0.1:4321 --token <from Runners>
+loopable runner --url http://<LAN-IP>:4321 --token <from Runners>
 ```
 
 If the dispatcher is not running, the app says so. If no runner has joined, tasks wait.
