@@ -1,7 +1,13 @@
 import { startFlow } from "./flow.ts";
+import { startFooter } from "./footer.ts";
 
 const flow = document.getElementById("flow");
 if (flow) startFlow(flow);
+
+const stage = document.getElementById("foot-stage");
+const canvas = document.getElementById("loop-canvas");
+const count = document.getElementById("run-count");
+if (stage && canvas instanceof HTMLCanvasElement && count) startFooter(stage, canvas, count);
 
 async function copyText(text: string): Promise<boolean> {
   try {

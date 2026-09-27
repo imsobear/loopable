@@ -68,10 +68,13 @@
         Loopable
       </a>
       <nav>
-        <a href="#why">Why</a>
-        <a href="#how">How</a>
-        <a href="#run">Run it</a>
-        <a href="https://github.com/imsobear/loopable">GitHub</a>
+        <a href="#why"><i>01</i>Why</a>
+        <a href="#how"><i>02</i>How</a>
+        <a href="#run"><i>03</i>Run it</a>
+        <a class="nav-gh" href="https://github.com/imsobear/loopable">
+          <svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>
+          GitHub
+        </a>
       </nav>
     </header>
 
@@ -354,34 +357,6 @@
         </div>
       </section>
 
-      <section class="band" id="safe">
-        <p class="kicker">Safe to leave on</p>
-        <h2>Boring by default.</h2>
-        <p class="lead">An agent that runs with nobody watching should not surprise anyone.</p>
-        <ul class="facts">
-          <li>
-            <h3>Read-only to start</h3>
-            <p>Agents start read-only in your folders. GitHub jobs use a fresh checkout.</p>
-          </li>
-          <li>
-            <h3>Credentials stay put</h3>
-            <p>Service tokens stay in Loopable. The agent never sees them.</p>
-          </li>
-          <li>
-            <h3>Nothing merges</h3>
-            <p>Reviews are comments, not approvals. Code lands as a draft pull request.</p>
-          </li>
-          <li>
-            <h3>No backlog surprise</h3>
-            <p>A new loop records what is already waiting. It does not run it.</p>
-          </li>
-          <li>
-            <h3>No public URL</h3>
-            <p>Nothing on the internet has to reach your office Mac.</p>
-          </li>
-        </ul>
-      </section>
-
       <section class="host" id="run">
         <p class="kicker">Run it</p>
         <h2>One computer that stays on.</h2>
@@ -408,9 +383,51 @@ loopable start</pre>
     </main>
 
     <footer class="foot">
-      <span>Loopable</span>
-      <a href="https://github.com/imsobear/loopable/blob/main/docs/narrative.md">The story</a>
-      <a href="https://github.com/imsobear/loopable">Source</a>
+      <div class="foot-top">
+        <div class="foot-brand">
+          <a class="brand" href="/">
+            <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M17.14 5.87A8 8 0 1 1 12 4" stroke="currentColor" stroke-width="2.6" />
+              <path d="M15.4 4 10.8 5.9 10.8 2.1Z" fill="currentColor" />
+              <circle cx="12" cy="12" r="2.1" fill="currentColor" />
+            </svg>
+            Loopable
+          </a>
+          <p>Your team’s own agent. It runs on your machine, and you decide what it can do.</p>
+        </div>
+        <nav class="foot-cols" aria-label="Footer">
+          <div>
+            <span>Product</span>
+            <a href="#why">Why</a>
+            <a href="#how">How it works</a>
+            <a href="#run">Run it</a>
+          </div>
+          <div>
+            <span>Docs</span>
+            <a href="https://github.com/imsobear/loopable/blob/main/docs/narrative.md">The story</a>
+            <a href="https://github.com/imsobear/loopable/blob/main/docs/concepts.md">Concepts</a>
+            <a href="https://github.com/imsobear/loopable/blob/main/docs/deploy.md">Deploy</a>
+            <a href="https://github.com/imsobear/loopable/blob/main/docs/connectors.md">Connectors</a>
+          </div>
+          <div>
+            <span>Source</span>
+            <a href="https://github.com/imsobear/loopable">GitHub</a>
+            <a href="https://www.npmjs.com/package/loopable-cli">npm</a>
+          </div>
+        </nav>
+      </div>
+
+      <div class="foot-stage" id="foot-stage">
+        <canvas id="loop-canvas" aria-hidden="true"></canvas>
+        <p class="foot-hint">Click anywhere to send a signal</p>
+        <p class="foot-count"><b id="run-count">0</b> runs recorded</p>
+        <div class="foot-word" aria-hidden="true">Loopable</div>
+      </div>
+
+      <div class="foot-base">
+        <span>MIT licensed</span>
+        <span>Signal → Loop → Runner → Write back</span>
+      </div>
     </footer>
 
     <script type="module" src="/src/main.ts"></script>
