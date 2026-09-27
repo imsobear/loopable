@@ -1,12 +1,30 @@
 # Loopable
 
-Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. A lot of work should not depend on one person. People assign work in Slack, GitHub, and on a schedule. Codex and Claude finish it on a shared computer.
+Your team’s own agent. It runs on your machine, and you decide what it can do.
 
-It picks up a signal, does what the loop says, and writes the result back. Loops run on their own. Every run is recorded in the inbox.
+A lot of team work waits on one person: a review request, a question in #oncall, a morning check. Someone has to copy it into their own Codex, and if they are busy, it stops. Hosted team agents help, but they run in a cloud sandbox that cannot reach your internal network, logs, or services.
 
-Connect GitHub, a Slack bot, a Feishu / Lark bot, Gmail, or WeChat. Write a loop. Leave the machine on. Pull requests get reviewed, assigned issues get a draft, a scheduled job runs at 9am. The team does not have to open Codex.
+Loopable is a shared agent for small and mid-size teams.
+
+- **Shared.** Work comes in from Slack, Lark, GitHub, or a schedule. A loop says what to do. Nobody has to be there. Every run is recorded in the inbox.
+- **Yours.** Codex or Cursor Agent runs on a machine the team owns. It reaches what that machine reaches, uses the MCP servers and skills you install, and keeps data in-house.
 
 The story is in [docs/narrative.md](docs/narrative.md). The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
+
+## Loops you can run today
+
+| Comes in from | Loop | Writes back |
+| --- | --- | --- |
+| GitHub | Review pull requests I am asked to review | A review, as a comment |
+| GitHub | Plan issues assigned to me | A comment with a plan |
+| GitHub | Implement issues assigned to me | A draft pull request |
+| Slack bot | Do what I ask the bot (@mention or DM) | A reply in the thread |
+| Feishu / Lark bot | Do what I ask the bot (@mention in a group) | A reply in the thread |
+| Schedule | Do something on a schedule | The log, or a Slack or Lark channel |
+| Gmail | Tell me about new mail | A short note wherever you look |
+| WeChat | Do what I ask the bot | A reply in the chat |
+
+A loop’s answer can go to any connector that accepts it, so a scheduled check can post to #oncall.
 
 ## Architecture
 
@@ -16,7 +34,7 @@ Three processes. The agent always runs on a Runner, never on the App or Dispatch
   <img src="docs/architecture.svg" alt="Slack bot, GitHub, and Lark bot into Loopable. A runner pulls the job. Loopable writes back to the same three." width="920" />
 </p>
 
-Slack bot, GitHub, and Lark bot send work in. Loopable watches, matches a loop, and queues the job. A Runner pulls it, runs Codex or Claude, and Loopable writes the result back.
+Slack bot, GitHub, and Lark bot send work in. Loopable watches, matches a loop, and queues the job. A Runner pulls it, runs Codex or Cursor Agent, and Loopable writes the result back.
 
 ```text
 Loopable  ──HTTP pull──  Runner  ──  Agent CLI
@@ -35,7 +53,7 @@ App and Dispatcher share one database and stay on the same host. Only one Dispat
 
 The usual setup is one computer that stays on — a Mac in the office is enough. App, Dispatcher, and a Runner all live there. It looks like a spare machine on a desk. For a small team, that is the product.
 
-You need Node 22+ and an agent CLI signed in on that machine (Codex or Cursor Agent / Claude).
+You need Node 22+ and an agent CLI signed in on that machine (Codex or Cursor Agent).
 
 ```bash
 npm install -g loopable-cli

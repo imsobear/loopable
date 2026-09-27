@@ -1,8 +1,8 @@
 # Loopable
 
-Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. A lot of work should not depend on one person.
+Loopable is your team’s own agent. It runs on a machine the team owns, and the team decides what it can do.
 
-It watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Loops run on their own, and every run is recorded so you can see what happened.
+Work comes in from Slack, Lark, GitHub, or a schedule. A loop says what to do. Codex or Cursor Agent does it on a runner, and the answer is written back where it was asked. Every run is recorded. The story is in `docs/narrative.md`.
 
 ## Stack
 

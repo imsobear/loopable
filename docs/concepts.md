@@ -1,6 +1,6 @@
 # Concepts
 
-Loopable is the team’s always-on agent for shared-knowledge work — review, cases, monitors. It watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded.
+Loopable is your team’s own agent, running on a machine the team owns. It watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded. Why it exists is in [narrative.md](narrative.md).
 
 The usual install is one computer that stays on. Extra runners join the same way. The path a task takes does not change.
 
@@ -36,7 +36,7 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 ## What does the work
 
-**Agent.** A coding CLI Loopable knows how to invoke: Codex, Cursor Agent (Claude). The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
+**Agent.** A coding CLI Loopable knows how to invoke: Codex, Cursor Agent. The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
 
 **Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub, a Slack bot, a Feishu bot, Gmail, or WeChat. Agent login is Codex or Cursor Agent. They live in different places and must not be merged into one “account.”
 
