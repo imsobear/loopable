@@ -1,12 +1,14 @@
+type Kind = "slack" | "lark" | "github" | "clock";
+
 export type Beat = {
-  kind: "slack" | "github" | "clock" | "monitor";
+  kind: Kind;
   askPlace: string;
   askVia: string;
   askWho: string;
   askMsg: string;
   agent: string;
   runLine: string;
-  backKind: "slack" | "github" | "clock" | "monitor";
+  backKind: Kind;
   backPlace: string;
   backVia: string;
   backWho: string;
@@ -19,9 +21,9 @@ export const beats: Beat[] = [
     askPlace: "#oncall",
     askVia: "Slack bot",
     askWho: "Maya",
-    askMsg: "@loopable checkout 5xx since 4pm",
+    askMsg: "@loopable checkout 5xx since 4pm?",
     agent: "Codex",
-    runLine: "Reading checkout logs",
+    runLine: "Reading logs on prod-api-2",
     backKind: "slack",
     backPlace: "#oncall",
     backVia: "Slack bot",
@@ -32,43 +34,57 @@ export const beats: Beat[] = [
     kind: "github",
     askPlace: "acme/api#412",
     askVia: "GitHub",
-    askWho: "Assigned you",
-    askMsg: "Please review this pull request",
-    agent: "Claude",
+    askWho: "Review requested",
+    askMsg: "Add retry to the payments client",
+    agent: "Cursor Agent",
     runLine: "Walking the diff",
     backKind: "github",
     backPlace: "acme/api#412",
     backVia: "GitHub",
-    backWho: "Review",
-    backMsg: "LGTM with two notes",
+    backWho: "Review comment",
+    backMsg: "Looks right, two notes on timeouts",
   },
   {
-    kind: "monitor",
-    askPlace: "checkout p95",
-    askVia: "Monitor",
-    askWho: "Alert",
-    askMsg: "Latency 420ms → 2.1s",
+    kind: "lark",
+    askPlace: "payments-oncall",
+    askVia: "Lark bot",
+    askWho: "Wei",
+    askMsg: "@Loopable why did last night’s refund job fail?",
     agent: "Codex",
-    runLine: "Tailing the checkout logs",
-    backKind: "slack",
-    backPlace: "#oncall",
-    backVia: "Slack bot",
+    runLine: "Querying the ledger service",
+    backKind: "lark",
+    backPlace: "payments-oncall",
+    backVia: "Lark bot",
     backWho: "Loopable",
-    backMsg: "Cause: lock on payments DB",
+    backMsg: "Token for the ledger API expired at 02:10",
+  },
+  {
+    kind: "github",
+    askPlace: "acme/web#88",
+    askVia: "GitHub",
+    askWho: "Assigned",
+    askMsg: "Empty cart shows a blank page",
+    agent: "Codex",
+    runLine: "Writing the fix, running tests",
+    backKind: "github",
+    backPlace: "acme/web#91",
+    backVia: "GitHub",
+    backWho: "Draft pull request",
+    backMsg: "Show an empty state, with a test",
   },
   {
     kind: "clock",
     askPlace: "09:00 weekdays",
     askVia: "Schedule",
     askWho: "Clock",
-    askMsg: "Sweep issues with no comment",
+    askMsg: "Check overnight error rates",
     agent: "Codex",
-    runLine: "Checking open issues",
-    backKind: "github",
-    backPlace: "3 issues",
-    backVia: "GitHub",
-    backWho: "Note",
-    backMsg: "Status posted on each",
+    runLine: "Reading last night’s metrics",
+    backKind: "slack",
+    backPlace: "#oncall",
+    backVia: "Slack bot",
+    backWho: "Loopable",
+    backMsg: "All normal. 2 slow queries on search",
   },
 ];
 
@@ -80,7 +96,7 @@ function setText(id: string, value: string) {
 }
 
 function iconHref(kind: string) {
-  return `#i-${kind}`;
+  return `#i-${kind === "lark" ? "feishu" : kind}`;
 }
 
 function setIcon(root: Element | null, kind: string) {
@@ -91,7 +107,7 @@ function setIcon(root: Element | null, kind: string) {
   node.setAttribute("xlink:href", href);
 }
 
-function setSource(id: string, kind: Beat["kind"] | Beat["backKind"], label: string) {
+function setSource(id: string, kind: Kind, label: string) {
   const el = document.getElementById(id);
   if (!el) return;
   el.dataset.source = kind;
@@ -101,7 +117,7 @@ function setSource(id: string, kind: Beat["kind"] | Beat["backKind"], label: str
 }
 
 function agentKind(name: string) {
-  return name.toLowerCase().includes("claude") ? "claude" : "codex";
+  return name.toLowerCase().includes("cursor") ? "cursor" : "codex";
 }
 
 function paintAsk(beat: Beat) {

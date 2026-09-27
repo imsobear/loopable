@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Loopable — the team’s always-on agent</title>
+    <title>Loopable — your team’s own agent</title>
     <meta
       name="description"
-      content="Work comes in from Slack, GitHub, or a schedule. Codex and Claude run it on a shared computer."
+      content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on a machine you own and writes the answer back."
     />
-    <meta property="og:title" content="Loopable — the team’s always-on agent" />
+    <meta property="og:title" content="Loopable — your team’s own agent" />
     <meta
       property="og:description"
-      content="A lot of work should not depend on one person. Review, cases, monitors — Loopable runs them on a shared agent."
+      content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on a machine you own and writes the answer back."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://loopable-web.sobear-me.workers.dev/" />
@@ -20,8 +20,8 @@
     <meta property="og:image:height" content="1260" />
     <meta property="og:image:alt" content="Loopable — a lot of work should not depend on one person." />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Loopable — the team’s always-on agent" />
-    <meta name="twitter:description" content="Work comes in from Slack, GitHub, or a schedule. Codex and Claude run it on a shared computer." />
+    <meta name="twitter:title" content="Loopable — your team’s own agent" />
+    <meta name="twitter:description" content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on a machine you own and writes the answer back." />
     <meta name="twitter:image" content="https://loopable-web.sobear-me.workers.dev/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/src/styles.css" />
@@ -43,11 +43,8 @@
         <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 21.2a9.2 9.2 0 1 0 0-18.4 9.2 9.2 0 0 0 0 18.4Z"/>
         <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 7.2V12l3.2 2"/>
       </symbol>
-      <symbol id="i-monitor" viewBox="0 0 24 24">
-        <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3.5 12h3.2l2.2-5.2 3.2 10.4 2.4-5.2H20.5"/>
-      </symbol>
-      <symbol id="i-claude" viewBox="0 0 24 24">
-        <path d="M12 1.8 13.2 8.5 19.4 5.1 15.5 10.5 22.2 12 15.5 13.5 19.4 18.9 13.2 15.5 12 22.2 10.8 15.5 4.6 18.9 8.5 13.5 1.8 12 8.5 10.5 4.6 5.1 10.8 8.5Z"/>
+      <symbol id="i-cursor" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M5.5 3.8 18.6 11l-5.9 1.6-2.9 5.6Z"/>
       </symbol>
       <symbol id="i-gmail" viewBox="0 0 24 24">
         <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-.904.732-1.636 1.636-1.636h.749L12 10.907l9.615-7.086h.749c.904 0 1.636.732 1.636 1.636Z"/>
@@ -73,17 +70,19 @@
       <nav>
         <a href="#why">Why</a>
         <a href="#how">How</a>
+        <a href="#run">Run it</a>
         <a href="https://github.com/imsobear/loopable">GitHub</a>
       </nav>
     </header>
 
     <main>
       <section class="hero">
-        <p class="kicker">Shared agents · always on · for the team</p>
+        <p class="kicker">A shared agent for your team</p>
         <h1>A lot of work should not depend on one person.</h1>
         <p class="hero-lede">
-          Work comes in from Slack, GitHub, or a schedule. Codex and Claude run it
-          on a shared computer.
+          Loopable is your team’s own agent. Work comes in from Slack, Lark, GitHub, or a
+          schedule. Codex or Cursor Agent does it on a machine you own, and the answer goes back
+          where it was asked.
         </p>
 
         <div class="flow" id="flow" data-index="0">
@@ -97,7 +96,7 @@
                 </span>
               </header>
               <p class="who" id="ask-who">Maya</p>
-              <p class="msg" id="ask-msg">@loopable checkout 5xx since 4pm</p>
+              <p class="msg" id="ask-msg">@loopable checkout 5xx since 4pm?</p>
             </div>
           </article>
 
@@ -143,29 +142,134 @@
         <div class="hero-actions">
           <code class="install" id="install">npm install -g loopable-cli && loopable start</code>
           <button type="button" class="ghost" id="copy-install">Copy</button>
+          <a class="text-link" href="#run">What you need →</a>
         </div>
       </section>
 
       <section class="band" id="why">
-        <p class="kicker">What it is</p>
-        <h2>Agents that work for the whole team.</h2>
+        <p class="kicker">The problem</p>
+        <h2>Team work still waits on one person.</h2>
         <ul class="cards">
           <li>
             <span class="n">01</span>
-            <h3>Code review</h3>
-            <p>GitHub assigns it. The agent writes the review.</p>
+            <h3>Someone has to be there</h3>
+            <p>
+              A review request, a question in #oncall, a morning check. Someone copies it into
+              their own Codex. If they are busy or away, it stops.
+            </p>
           </li>
           <li>
             <span class="n">02</span>
-            <h3>Investigate</h3>
-            <p>Ask in Slack. The agent investigates the logs.</p>
+            <h3>Know-how lives on laptops</h3>
+            <p>
+              Everyone has their own prompts, skills, and config. The answer depends on who
+              asked. Nothing is reused, and nothing is recorded.
+            </p>
           </li>
           <li>
             <span class="n">03</span>
-            <h3>Monitors</h3>
-            <p>A clock or an alert. Same agent.</p>
+            <h3>Hosted agents can’t reach in</h3>
+            <p>
+              A cloud sandbox can’t see your internal network, logs, or services. You get one
+              vendor, and usually one chat tool.
+            </p>
           </li>
         </ul>
+      </section>
+
+      <section class="band" id="shared">
+        <p class="kicker">Shared</p>
+        <h2>One agent the whole team hands work to.</h2>
+        <p class="lead">
+          The team leaves Loopable running. A signal comes in, a loop matches, the agent runs, and
+          the answer is written back.
+        </p>
+        <ul class="points">
+          <li>
+            <h3>No one has to be there</h3>
+            <p>A loop runs when a review is requested, when the bot is mentioned, or when the clock says so.</p>
+          </li>
+          <li>
+            <h3>One way to do each job</h3>
+            <p>A loop says what to watch, what to ask, and where to answer. Anyone on the team can read it and change it.</p>
+          </li>
+          <li>
+            <h3>Know-how in the repo</h3>
+            <p>A loop works in your repository. The <code>AGENTS.md</code> and skills there are what the agent knows.</p>
+          </li>
+          <li>
+            <h3>Every run on the record</h3>
+            <p>The inbox shows what came in, what the agent did, and what it wrote back.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="band" id="yours">
+        <p class="kicker">Yours</p>
+        <h2>It runs on your machine. You decide what it can do.</h2>
+        <p class="lead">
+          The agent runs on a computer the team owns. A Mac in the office is enough.
+        </p>
+        <ul class="cards cards-4">
+          <li>
+            <span class="n">Reach</span>
+            <p>Whatever that machine can reach: the internal network, logs, databases, internal services.</p>
+            <p class="vs">Hosted: an allowlist out of a cloud sandbox.</p>
+          </li>
+          <li>
+            <span class="n">Extend</span>
+            <p>Any MCP server, CLI, or internal login you set up on it.</p>
+            <p class="vs">Hosted: the connectors the platform ships.</p>
+          </li>
+          <li>
+            <span class="n">Choose</span>
+            <p>Codex or Cursor Agent, and the model you want.</p>
+            <p class="vs">Hosted: one vendor.</p>
+          </li>
+          <li>
+            <span class="n">Keep local</span>
+            <p>Code, logs, and credentials stay in-house. It uses the CLI plan you already pay for.</p>
+            <p class="vs">Hosted: your work runs in their cloud.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="band" id="jobs">
+        <p class="kicker">What it does today</p>
+        <h2>Loops you can turn on now.</h2>
+        <ul class="loops">
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>GitHub</span>
+            <span class="loop-name">Review pull requests I am asked to review</span>
+            <span class="loop-out">A review, as a comment</span>
+          </li>
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>GitHub</span>
+            <span class="loop-name">Plan issues assigned to me</span>
+            <span class="loop-out">A comment with a plan</span>
+          </li>
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>GitHub</span>
+            <span class="loop-name">Implement issues assigned to me</span>
+            <span class="loop-out">A draft pull request</span>
+          </li>
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-slack"></use></svg>Slack bot</span>
+            <span class="loop-name">Do what I ask the bot</span>
+            <span class="loop-out">A reply in the thread</span>
+          </li>
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-feishu"></use></svg>Lark bot</span>
+            <span class="loop-name">Do what I ask the bot</span>
+            <span class="loop-out">A reply in the thread</span>
+          </li>
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-clock"></use></svg>Schedule</span>
+            <span class="loop-name">Do something on a schedule</span>
+            <span class="loop-out">The log, or a Slack or Lark channel</span>
+          </li>
+        </ul>
+        <p class="note">Also Gmail and WeChat, for one person’s mail and chat.</p>
       </section>
 
       <section class="band" id="how">
@@ -178,12 +282,16 @@
               Slack bot
             </span>
             <span class="sys-chip">
+              <svg class="ico" aria-hidden="true"><use href="#i-feishu"></use></svg>
+              Lark bot
+            </span>
+            <span class="sys-chip">
               <svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>
               GitHub
             </span>
             <span class="sys-chip">
-              <svg class="ico" aria-hidden="true"><use href="#i-feishu"></use></svg>
-              Lark bot
+              <svg class="ico" aria-hidden="true"><use href="#i-clock"></use></svg>
+              Schedule
             </span>
           </div>
           <div class="sys-spine"></div>
@@ -195,21 +303,17 @@
             <ol class="sys-pipe">
               <li>
                 <span class="sys-pipe-k">Watch</span>
-                <p>From Slack, GitHub, Lark.</p>
-                <p class="sys-pipe-sub">The tools the team already uses.</p>
+                <p>Polls Slack, Lark, and GitHub.</p>
+                <p class="sys-pipe-sub">No public URL needed.</p>
               </li>
               <li>
                 <span class="sys-pipe-k">Match</span>
                 <p>Pick the loop.</p>
-                <div class="sys-mini tags">
-                  <span>Review</span>
-                  <span>Cases</span>
-                  <span>Monitors</span>
-                </div>
+                <p class="sys-pipe-sub">Each signal runs once.</p>
               </li>
               <li>
-                <span class="sys-pipe-k">Dispatch</span>
-                <p>Queue the job.</p>
+                <span class="sys-pipe-k">Queue</span>
+                <p>Hold the job.</p>
                 <p class="sys-pipe-sub">A runner pulls it.</p>
               </li>
             </ol>
@@ -218,17 +322,17 @@
           <div class="sys-box">
             <header>
               <span class="sys-name">Runner</span>
-              <span class="sys-tag">Shared computer</span>
+              <span class="sys-tag">Your machine</span>
             </header>
-            <p>Pulls the job. Codex or Claude run on that machine. Loopable writes the result back.</p>
+            <p>Pulls the job and runs the agent there, with that machine’s network, tools, and logins.</p>
             <div class="sys-agents">
               <span class="sys-chip">
                 <svg class="ico" aria-hidden="true"><use href="#i-codex"></use></svg>
                 Codex
               </span>
               <span class="sys-chip">
-                <svg class="ico" aria-hidden="true"><use href="#i-claude"></use></svg>
-                Claude
+                <svg class="ico" aria-hidden="true"><use href="#i-cursor"></use></svg>
+                Cursor Agent
               </span>
             </div>
           </div>
@@ -236,32 +340,76 @@
           <div class="sys-sources">
             <span class="sys-chip">
               <svg class="ico" aria-hidden="true"><use href="#i-slack"></use></svg>
-              Slack bot
-            </span>
-            <span class="sys-chip">
-              <svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>
-              GitHub
+              Slack thread
             </span>
             <span class="sys-chip">
               <svg class="ico" aria-hidden="true"><use href="#i-feishu"></use></svg>
-              Lark bot
+              Lark thread
+            </span>
+            <span class="sys-chip">
+              <svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>
+              Review or PR
             </span>
           </div>
         </div>
       </section>
 
-      <section class="host">
+      <section class="band" id="safe">
+        <p class="kicker">Safe to leave on</p>
+        <h2>Boring by default.</h2>
+        <p class="lead">An agent that runs with nobody watching should not surprise anyone.</p>
+        <ul class="facts">
+          <li>
+            <h3>Read-only to start</h3>
+            <p>Agents start read-only in your folders. GitHub jobs use a fresh checkout.</p>
+          </li>
+          <li>
+            <h3>Credentials stay put</h3>
+            <p>Service tokens stay in Loopable. The agent never sees them.</p>
+          </li>
+          <li>
+            <h3>Nothing merges</h3>
+            <p>Reviews are comments, not approvals. Code lands as a draft pull request.</p>
+          </li>
+          <li>
+            <h3>No backlog surprise</h3>
+            <p>A new loop records what is already waiting. It does not run it.</p>
+          </li>
+          <li>
+            <h3>No public URL</h3>
+            <p>Nothing on the internet has to reach your office Mac.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="host" id="run">
         <p class="kicker">Run it</p>
         <h2>One computer that stays on.</h2>
-        <p>A Mac in the office. App, Dispatcher, Runner.</p>
-        <pre class="install-block">npm install -g loopable-cli
-loopable start
-loopable runner --url http://&lt;LAN-IP&gt;:4321 --token &lt;from Runners&gt;</pre>
+        <p>A Mac in the office is enough. It needs Node 22+ and Codex or Cursor Agent signed in.</p>
+        <ol class="steps">
+          <li>
+            <span>1 · Start</span>
+            <pre class="install-block">npm install -g loopable-cli
+loopable start</pre>
+          </li>
+          <li>
+            <span>2 · Write a loop</span>
+            Open <code>http://127.0.0.1:4321</code> on that machine. Connect GitHub, a Slack bot, or a
+            Lark bot, and pick a loop.
+          </li>
+          <li>
+            <span>3 · Join a runner</span>
+            <pre class="install-block">loopable runner \
+  --url http://&lt;LAN-IP&gt;:4321 \
+  --token &lt;from Runners&gt;</pre>
+          </li>
+        </ol>
       </section>
     </main>
 
     <footer class="foot">
       <span>Loopable</span>
+      <a href="https://github.com/imsobear/loopable/blob/main/docs/narrative.md">The story</a>
       <a href="https://github.com/imsobear/loopable">Source</a>
     </footer>
 

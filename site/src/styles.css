@@ -14,7 +14,7 @@
   --slack: #ecb3c8;
   --github: #c9d4e8;
   --clock: #d4ff3f;
-  --monitor: #f0c27a;
+  --lark: #9fd3f0;
   --font: "Geist Variable", Geist, ui-sans-serif, system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, monospace;
 }
@@ -213,8 +213,8 @@ em {
   box-shadow: inset 3px 0 0 var(--github);
 }
 
-.artifact[data-kind="monitor"] {
-  box-shadow: inset 3px 0 0 var(--monitor);
+.artifact[data-kind="lark"] {
+  box-shadow: inset 3px 0 0 var(--lark);
 }
 
 .artifact[data-kind="clock"] {
@@ -318,9 +318,9 @@ em {
   color: var(--live);
 }
 
-.source[data-source="monitor"] {
-  background: rgba(240, 194, 122, 0.14);
-  color: var(--monitor);
+.source[data-source="lark"] {
+  background: rgba(159, 211, 240, 0.13);
+  color: var(--lark);
 }
 
 .source.idle {
@@ -740,6 +740,148 @@ em {
   color: var(--ink);
 }
 
+
+.text-link {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.text-link:hover {
+  color: var(--ink);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  color: var(--ink);
+}
+
+.band p.lead {
+  margin-top: 0.2rem;
+}
+
+.cards p + p {
+  margin-top: 0.6rem;
+}
+
+.cards-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.cards-4 .n {
+  display: block;
+  margin-bottom: 0.8rem;
+  text-transform: uppercase;
+}
+
+.cards .vs {
+  margin-top: 1rem !important;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.82rem;
+  color: var(--dim);
+}
+
+.points,
+.facts {
+  list-style: none;
+  margin: 2.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 1.6rem 3rem;
+}
+
+.points {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 60rem;
+}
+
+.facts {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.6rem 2rem;
+}
+
+.points li,
+.facts li {
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.points h3,
+.facts h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 520;
+  letter-spacing: -0.03em;
+}
+
+.points p,
+.facts p {
+  font-size: 0.92rem;
+}
+
+.loops {
+  list-style: none;
+  margin: 2.2rem 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.loops li {
+  display: grid;
+  grid-template-columns: 9rem 1fr 16rem;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  background: var(--panel);
+}
+
+.loops li + li {
+  border-top: 1px solid var(--line);
+}
+
+.loop-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.loop-name {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.loop-out {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.steps li {
+  min-width: 0;
+}
+
+.steps .install-block {
+  margin-top: 0;
+  color: var(--ink);
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .cards-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .facts {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 900px) {
   .flow {
     grid-template-columns: 1fr;
@@ -759,6 +901,8 @@ em {
 
   .split,
   .cards,
+  .points,
+  .facts,
   .steps,
   .sys-pipe {
     grid-template-columns: 1fr;
@@ -784,6 +928,11 @@ em {
 
   .cards li {
     min-height: 0;
+  }
+
+  .loops li {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
   }
 
   .hero h1 {
