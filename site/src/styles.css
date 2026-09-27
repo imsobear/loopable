@@ -816,27 +816,6 @@ section[id] {
   line-height: 1.5;
 }
 
-.foot-cols {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(7rem, auto));
-  gap: 3rem;
-}
-
-.foot-cols div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-.foot-cols span {
-  margin-bottom: 0.3rem;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
-
 .foot a:hover {
   color: var(--ink);
 }
@@ -1105,11 +1084,6 @@ code {
   .foot-top {
     flex-direction: column;
     gap: 2rem;
-  }
-
-  .foot-cols {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.6rem;
   }
 
   .foot-hint {
