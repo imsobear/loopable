@@ -800,22 +800,6 @@ section[id] {
   overflow: hidden;
 }
 
-.foot-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 3rem;
-  padding: 3.2rem 6vw 0;
-}
-
-.foot-brand {
-  max-width: 20rem;
-}
-
-.foot-brand p {
-  margin: 0.9rem 0 0;
-  line-height: 1.5;
-}
-
 .foot a:hover {
   color: var(--ink);
 }
@@ -823,7 +807,7 @@ section[id] {
 .foot-stage {
   position: relative;
   height: clamp(26rem, 72vh, 44rem);
-  margin-top: 2rem;
+  margin-top: 1rem;
   cursor: crosshair;
   user-select: none;
 }
@@ -1079,11 +1063,6 @@ code {
   .loops li {
     grid-template-columns: 1fr;
     gap: 0.25rem;
-  }
-
-  .foot-top {
-    flex-direction: column;
-    gap: 2rem;
   }
 
   .foot-hint {
