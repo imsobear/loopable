@@ -20,9 +20,15 @@ There is no second path where “the local dispatcher runs the agent.” The age
 
 **Connection.** One credential of a connector — the team's shared GitHub account, a Slack bot, a Feishu bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
 
-**Workflow.** A whole job a connector already knows how to do, named the way a person would name it: “Review pull requests sent to the shared account.” It owns what to watch for, what to ask the agent, and where the answer is written. A loop is one instance of a workflow with its knobs set.
+A connector registers three lists:
 
-A workflow is not a loop template. Creating a loop copies the prompt onto the loop, and the loop owns that copy from then on. The loop still points at the workflow for the rest: the query, how the answer is parsed, whether the agent gets a checkout. If a connector stops offering a workflow, existing loops remain readable and deletable but not runnable.
+- **Trigger** (“Starts when” in the UI). Something it can watch for: “A GitHub review is requested”, “An email arrives”. It owns the query, where the agent runs, and how the answer is read.
+- **Workflow.** A ready-made job on one trigger, named the way a person would name it: “Review pull requests”. It adds a prompt and where the answer goes by default.
+- **Action** (“Send to” in the UI). Somewhere an answer can go: “Submit a review”, “Reply in Slack”, “Email this account”.
+
+A loop is a workflow with its knobs set, or, for a custom loop, a trigger with your own prompt. Either way it can send its answer to any connector's action.
+
+A workflow is not a loop template. Creating a loop copies the prompt onto the loop, and the loop owns that copy from then on. The loop still points at the trigger for the rest: the query, how the answer is parsed, whether the agent gets a checkout. If a connector stops offering a trigger, existing loops remain readable and deletable but not runnable.
 
 The UI does not need to say “workflow.” New loop is choosing a job by the name the connector gave it. In code and in this document the word is workflow, and the column is `workflowId`.
 

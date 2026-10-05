@@ -15,12 +15,13 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 | Comes in from | Loop | Writes back |
 | --- | --- | --- |
-| Schedule | Do something on a schedule | The log, or a Slack, Lark, or GitHub thread |
-| GitHub | Review pull requests sent to the shared account | A review, as a comment |
-| GitHub | Reply to issues assigned to the shared account | A comment on the issue |
+| Schedule | Do something on a schedule | Inbox, or a Slack, Lark, or GitHub thread |
+| GitHub | Review pull requests | A review, as a comment |
+| GitHub | Reply to issues | A comment on the issue |
 | Slack bot | Do what I ask the Slack bot (@mention or DM) | A reply in the thread |
 | Feishu / Lark bot | Do what I ask the Feishu / Lark bot (@mention in a group) | A reply in the thread |
 | WeChat | Do what I ask the WeChat bot | A reply in the chat |
+| Gmail | Custom loop: “An email arrives” | Anywhere, such as an email back to the same inbox |
 
 A loop’s answer can go to any connector that accepts it, so a scheduled check can post to #oncall.
 
