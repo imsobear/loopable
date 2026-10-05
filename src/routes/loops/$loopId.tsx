@@ -1,7 +1,7 @@
 import { createFileRoute, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CircleAlert, Play, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronRight, CircleAlert, Play, RefreshCw, Trash2 } from "lucide-react";
 import { ConnectorIcon } from "@/components/connector-icon";
 import { LoopForm } from "@/components/loop-form";
 import { LinkTabs, List, PageHeader, Section } from "@/components/page";
@@ -138,8 +138,8 @@ function LoopPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <Backlog loop={loop} poll={poll} />
           <TryOnLink loop={loop} />
+          <NotRun loop={loop} poll={poll} />
           <TaskList tasks={tasks} showLoop={false} empty="No runs yet." />
         </div>
       )}
@@ -219,17 +219,29 @@ function HeaderActions({ loop }: { loop: LoopView }) {
   );
 }
 
-/** What matched but was not run: already there when the loop was made, or held back. */
-function Backlog({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
+/**
+ * What matched but was never run: open before the loop existed, or held back
+ * by one of its rules. Neither runs by itself, so it stays folded into one
+ * line, with the reason said in the line.
+ */
+function NotRun({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
   const { busy, run } = useAction();
   if (poll.backlog.length === 0) return null;
 
+  const held = poll.backlog.filter((item) => item.hold).length;
+  const before = poll.backlog.length - held;
+  const reasons = [
+    before > 0 ? `${before} ${before === 1 ? "was" : "were"} open before this loop` : null,
+    held > 0 ? `${held} held back by a rule` : null,
+  ].filter(Boolean);
+
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">
-        Waiting <span className="font-normal text-muted-foreground">· matched, not run</span>
-      </p>
-      <List>
+    <details className="group">
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+        {poll.backlog.length} not run · {reasons.join(", ")}
+      </summary>
+      <List className="mt-2">
         {poll.backlog.map((item) => (
           <div key={item.key} className="flex items-center gap-3 px-4 py-2">
             <div className="min-w-0 flex-1 truncate text-sm">
@@ -255,7 +267,7 @@ function Backlog({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
           </div>
         ))}
       </List>
-    </div>
+    </details>
   );
 }
 
