@@ -88,6 +88,7 @@ export const wechatManifest: ConnectorManifest = {
       name: "Do what I ask the WeChat bot",
       summary: "Runs the agent when someone messages the WeChat bot, and answers in the chat.",
       trigger: "someone sends the WeChat bot a message",
+      when: "The WeChat bot gets a message",
       // No query to show: messages arrive on a stream rather than being found
       // by asking, so there is nothing here that could be checked.
       writes: "a reply in the chat",

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { agentManifest } from "@/agents/manifests.ts";
-import { connectorAction, connectorManifest } from "@/connectors/manifests.ts";
+import { connectorManifest, destinationLabel } from "@/connectors/manifests.ts";
 import type { LoopPollState, LoopView } from "@/lib/domain.ts";
 import { issuesFor } from "@/lib/gaps.ts";
 import { ago } from "@/lib/time.ts";
@@ -149,11 +149,9 @@ function LoopPage() {
 
 /** One line under the title: where it answers, with what, and when it last looked. */
 function Summary({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
-  const action = connectorAction(loop.actionConnectorId, loop.actionId);
-  const writer = connectorManifest(loop.actionConnectorId);
   const agent = loop.agentId ? agentManifest(loop.agentId) : undefined;
   const parts = [
-    action ? `${writer?.name ?? loop.actionConnectorId} · ${action.name}` : null,
+    destinationLabel(loop.actionConnectorId, loop.actionId),
     agent?.name ?? "Default agent",
     loop.enabled ? (poll.polledAt ? `Checked ${ago(poll.polledAt)}` : "Not checked yet") : null,
   ].filter(Boolean);

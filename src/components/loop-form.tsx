@@ -10,19 +10,19 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_MANIFESTS } from "@/agents/manifests.ts";
 import {
-  CONNECTOR_MANIFESTS,
   connectorAction,
   connectorManifest,
   connectorWorkflow,
+  isInboxOnly,
+  writerName,
+  writers,
 } from "@/connectors/manifests.ts";
 import type { WorkflowDescriptor } from "@/connectors/types.ts";
 import type { ConnectionSettings, LoopEdit } from "@/lib/domain.ts";
@@ -33,17 +33,12 @@ const DEFAULT_AGENT = "__default";
 /** Zero is stored as null: "as often as the dispatcher does" is not a duration. */
 const POLL_CHOICES = [
   { value: "0", label: "Every couple of minutes" },
+  { value: String(60_000), label: "Every minute" },
   { value: String(10 * 60_000), label: "Every 10 minutes" },
   { value: String(30 * 60_000), label: "Every 30 minutes" },
   { value: String(60 * 60_000), label: "Every hour" },
   { value: String(4 * 60 * 60_000), label: "Every 4 hours" },
 ];
-
-/** Connectors that can write at all, for the question of where the answer goes. */
-const WRITERS = CONNECTOR_MANIFESTS.filter((entry) => entry.actions.length > 0);
-
-/** One select value for a connector and one of its actions. */
-const destination = (connectorId: string, actionId: string) => `${connectorId}::${actionId}`;
 
 const RUNS_IN: Record<NonNullable<WorkflowDescriptor["runsIn"]>, string> = {
   checkout: "A fresh clone of the repository",
@@ -96,7 +91,7 @@ function WorkflowDetails({ workflow }: { workflow: WorkflowDescriptor }) {
  * Serves a loop that exists and one that does not. A loop with no id has been
  * chosen and not saved, so leaving this page is the end of it.
  */
-export function LoopForm({ loop }: { loop: LoopEdit }) {
+export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.ReactNode }) {
   const navigate = useNavigate();
   const fresh = loop.id === null;
   const connector = connectorManifest(loop.connectorId);
@@ -119,12 +114,13 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
     ),
   );
   const [saving, setSaving] = useState(false);
+  // A custom loop starts with no prompt, so there is nothing to say it came from.
+  const [written] = useState(loop.prompt.trim() !== "");
 
   const action = connectorAction(actionConnectorId, actionId);
   const sourceName = connector?.name ?? loop.connectorId;
 
-  const chooseDestination = (value: string) => {
-    const [connectorId, id] = value.split("::") as [string, string];
+  const chooseDestination = (connectorId: string, id: string) => {
     setActionConnectorId(connectorId);
     setActionId(id);
     setActionTarget(initialFieldValues(connectorAction(connectorId, id)?.target ?? [], {}));
@@ -182,6 +178,7 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
   return (
     <div className="flex flex-col">
       <Section title="When" description={`When ${workflow.trigger}.`}>
+        {trigger}
         <Field label="Name" htmlFor="loop-name">
           <Input id="loop-name" value={name} onChange={(event) => setName(event.target.value)} />
         </Field>
@@ -200,7 +197,8 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
               <SelectTrigger id="loop-every" className="w-full">
                 <SelectValue>
                   {(value: string) =>
-                    POLL_CHOICES.find((choice) => choice.value === value)?.label ?? value
+                    POLL_CHOICES.find((choice) => choice.value === value)?.label ??
+                    `Every ${Math.round(Number(value) / 60_000)} minutes`
                   }
                 </SelectValue>
               </SelectTrigger>
@@ -244,12 +242,13 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
         <Field
           label="Prompt"
           htmlFor="loop-prompt"
-          hint={`Starts as “${workflow.name}”. Changes stay on this loop.`}
+          hint={written ? `Starts as “${workflow.name}”. Changes stay on this loop.` : undefined}
         >
           <Textarea
             id="loop-prompt"
             rows={10}
             className="font-mono text-xs"
+            placeholder="What should the agent do?"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
           />
@@ -267,44 +266,59 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
       </Section>
 
       <Section title="Answer">
-        <Field
-          label="Send to"
-          htmlFor="loop-destination"
-          hint={
-            crosses
-              ? `${sourceName} and ${connectorManifest(actionConnectorId)?.name ?? actionConnectorId} both need a connection.`
-              : flattens
-                ? "Line comments arrive as text, with file and line written in."
-                : undefined
-          }
-        >
-          <Select
-            value={destination(actionConnectorId, actionId)}
-            onValueChange={(value) => value && chooseDestination(value)}
-          >
-            <SelectTrigger id="loop-destination" className="w-full sm:max-w-sm">
-              <SelectValue>
-                {() =>
-                  action
-                    ? `${connectorManifest(actionConnectorId)?.name ?? actionConnectorId} · ${action.name}`
-                    : "Choose where the answer goes"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {WRITERS.map((writer) => (
-                <SelectGroup key={writer.id}>
-                  <SelectLabel>{writer.name}</SelectLabel>
-                  {writer.actions.map((entry) => (
-                    <SelectItem key={entry.id} value={destination(writer.id, entry.id)}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Send to" htmlFor="loop-writer">
+            <Select
+              value={actionConnectorId}
+              onValueChange={(value) =>
+                value && chooseDestination(value, connectorManifest(value)!.actions[0]!.id)
+              }
+            >
+              <SelectTrigger id="loop-writer" className="w-full">
+                <SelectValue>{(value: string) => writerName(value)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {writers().map((writer) => (
+                  <SelectItem key={writer.id} value={writer.id}>
+                    {writerName(writer.id)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {isInboxOnly(actionConnectorId, actionId) ? null : (
+            <Field label="As" htmlFor="loop-action">
+              <Select
+                value={actionId}
+                onValueChange={(value) => value && chooseDestination(actionConnectorId, value)}
+              >
+                <SelectTrigger id="loop-action" className="w-full">
+                  <SelectValue>
+                    {(value: string) => connectorAction(actionConnectorId, value)?.name ?? value}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(connectorManifest(actionConnectorId)?.actions ?? []).map((entry) => (
+                    <SelectItem key={entry.id} value={entry.id}>
                       {entry.name}
                     </SelectItem>
                   ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+        </div>
+
+        {crosses && !isInboxOnly(actionConnectorId, actionId) ? (
+          <p className="-mt-2 text-xs text-muted-foreground">
+            {sourceName} and {writerName(actionConnectorId)} both need a connection.
+          </p>
+        ) : flattens ? (
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Line comments arrive as text, with file and line written in.
+          </p>
+        ) : null}
 
         {action && action.target.length > 0 ? (
           <SettingFieldInputs

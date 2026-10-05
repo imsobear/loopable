@@ -123,6 +123,8 @@ export type WorkflowDescriptor = {
   summary: string;
   /** What arrives, as a sentence a loop card can read back. */
   trigger: string;
+  /** The same in a few words, for choosing a trigger: "A review is requested". */
+  when?: string;
   /**
    * The same thing exactly, in whatever the service itself understands. Shown
    * so that "when your review is requested" can be checked rather than taken

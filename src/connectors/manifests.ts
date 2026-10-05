@@ -62,6 +62,39 @@ export function connectorAction(
 }
 
 /**
+ * Keeping the answer in Inbox is the clock's action, because the clock is the
+ * one connector with nowhere of its own to write. To a person it is not a
+ * Schedule thing at all, so it is named for where the answer stays.
+ */
+const INBOX_ONLY = { connectorId: "schedule", actionId: "schedule.record" } as const;
+
+export function isInboxOnly(connectorId: string, actionId: string): boolean {
+  return connectorId === INBOX_ONLY.connectorId && actionId === INBOX_ONLY.actionId;
+}
+
+/** What to call a connector as a place answers go. */
+export function writerName(connectorId: ConnectorId): string {
+  if (connectorId === INBOX_ONLY.connectorId) return "Inbox";
+  return connectorManifest(connectorId)?.name ?? connectorId;
+}
+
+/** Where a loop's answer goes, in a few words: "GitHub · Submit a review", or "Inbox only". */
+export function destinationLabel(connectorId: ConnectorId, actionId: string): string {
+  if (isInboxOnly(connectorId, actionId)) return "Inbox only";
+  const action = connectorAction(connectorId, actionId);
+  return action ? `${writerName(connectorId)} · ${action.name}` : "No destination";
+}
+
+/** Connectors that can write, Inbox first, for the question of where an answer goes. */
+export function writers(): ConnectorManifest[] {
+  const all = CONNECTOR_MANIFESTS.filter((entry) => entry.actions.length > 0);
+  return [
+    ...all.filter((entry) => entry.id === INBOX_ONLY.connectorId),
+    ...all.filter((entry) => entry.id !== INBOX_ONLY.connectorId),
+  ];
+}
+
+/**
  * Every workflow on offer, for the page that asks which one to turn on.
  *
  * The clock leads: it needs no account, and a scheduled job is the easiest

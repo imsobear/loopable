@@ -108,11 +108,12 @@ export const githubManifest = defineManifest({
   workflows: [
     {
       id: "github.review_requested",
-      name: "Review pull requests sent to the shared account",
-      summary: "Reads the change and posts a review when someone requests one from the shared account.",
+      name: "Review pull requests",
+      summary: "Posts a review when someone requests one from the connected account.",
       // Team requests matter more than they sound: in most repositories with a
       // CODEOWNERS file, review arrives addressed to a team rather than a person.
-      trigger: "someone requests a review from the shared account, directly or through a team it belongs to",
+      trigger: "someone requests a review from the connected account, directly or through its team",
+      when: "A GitHub review is requested",
       // review-requested covers teams; user-review-requested would not.
       watches: "is:open is:pr review-requested:@me",
       writes: "a review on the pull request, as a comment rather than an approval",
@@ -129,9 +130,10 @@ export const githubManifest = defineManifest({
       // kind of answer to an issue; replying covers it and the rest, and loops
       // made for planning keep the prompt they copied.
       id: "github.issue_assigned",
-      name: "Reply to issues assigned to the shared account",
-      summary: "Reads the issue and the code, and answers it in a comment.",
-      trigger: "an issue is assigned to the shared account",
+      name: "Reply to issues",
+      summary: "Answers an issue in a comment when it is assigned to the connected account.",
+      trigger: "an issue is assigned to the connected account",
+      when: "A GitHub issue is assigned",
       // is:issue matters: without it this would pick up pull requests too.
       watches: "is:open is:issue assignee:@me",
       writes: "a comment on the issue",

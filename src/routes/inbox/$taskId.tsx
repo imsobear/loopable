@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { agentManifest } from "@/agents/manifests.ts";
-import { connectorAction, connectorManifest } from "@/connectors/manifests.ts";
+import { connectorManifest, destinationLabel } from "@/connectors/manifests.ts";
 import { isTaskActive, type TaskView } from "@/lib/domain.ts";
 import type { Finding } from "@/lib/review.ts";
 import { ago } from "@/lib/time.ts";
@@ -29,7 +29,6 @@ function TaskPage() {
   const { task, log } = Route.useLoaderData();
   // The connector that writes, which is not always the one that was read.
   const writer = connectorManifest(task.actionConnectorId);
-  const action = connectorAction(task.actionConnectorId, task.actionId);
   const agent = task.agentId ? agentManifest(task.agentId) : undefined;
   const live = isTaskActive(task.state);
   useLiveTasks([task]);
@@ -115,12 +114,7 @@ function TaskPage() {
       <Fold title="Details">
         <dl className="grid grid-cols-[6rem_1fr] gap-x-4 gap-y-2 text-sm">
           {task.sourceKind === "prompt" ? null : (
-            <Row label="Writes">
-              {action?.name ?? task.actionId}
-              {task.actionConnectorId === task.connectorId
-                ? null
-                : ` on ${writer?.name ?? task.actionConnectorId}`}
-            </Row>
+            <Row label="Writes">{destinationLabel(task.actionConnectorId, task.actionId)}</Row>
           )}
           <Row label="Queued">{new Date(task.createdAt).toLocaleString()}</Row>
           {task.durationMs ? <Row label="Took">{(task.durationMs / 1000).toFixed(1)}s</Row> : null}

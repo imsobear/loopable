@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { agentManifest } from "@/agents/manifests.ts";
-import { connectorAction, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
+import { connectorManifest, connectorWorkflow, destinationLabel } from "@/connectors/manifests.ts";
 import type { LoopReadiness, LoopView } from "@/lib/domain.ts";
 import { gapsFor, issuesFor } from "@/lib/gaps.ts";
 import { useLiveRefresh } from "@/components/use-live-tasks.ts";
@@ -95,13 +95,10 @@ function Gaps({ readiness, loops }: { readiness: LoopReadiness; loops: LoopView[
 /** Where this loop answers and with what, in a few words. */
 function summaryOf(loop: LoopView): string {
   if (!connectorWorkflow(loop.connectorId, loop.workflowId)) return "Workflow no longer offered";
-  const action = connectorAction(loop.actionConnectorId, loop.actionId);
-  const writer = connectorManifest(loop.actionConnectorId);
   const agent = loop.agentId ? agentManifest(loop.agentId) : undefined;
-  return [
-    action ? `${writer?.name ?? loop.actionConnectorId} · ${action.name}` : "No destination",
-    agent?.name ?? "Default agent",
-  ].join(" · ");
+  return [destinationLabel(loop.actionConnectorId, loop.actionId), agent?.name ?? "Default agent"].join(
+    " · ",
+  );
 }
 
 function LoopRow({

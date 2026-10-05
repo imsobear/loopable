@@ -71,6 +71,7 @@ export const feishuManifest = defineManifest({
       summary:
         "Runs the agent when someone @mentions the Feishu / Lark bot in a group, and answers in the thread.",
       trigger: "someone @mentions the Feishu / Lark bot in a group it is in",
+      when: "The Feishu / Lark bot is mentioned",
       writes: "a reply in the thread",
       runsIn: "folder",
       settings: [folder],

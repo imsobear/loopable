@@ -84,8 +84,9 @@ export const scheduleManifest = defineManifest({
     {
       id: "schedule.recurring",
       name: "Do something on a schedule",
-      summary: "Runs the agent at the times you set, in a folder you name. The answer stays in the log, or goes to Slack, Lark, or GitHub.",
+      summary: "Runs the agent at the times you set, in a folder you name. The answer stays in Inbox, or goes to Slack, Lark, or GitHub.",
       trigger: "the time you set comes round",
+      when: "On a schedule",
       // No query to show. A clock is not something one can be written for,
       // and an invented one shown as if it were real is worse than nothing.
       writes: "a note in the log",
@@ -101,9 +102,9 @@ export const scheduleManifest = defineManifest({
   actions: [
     {
       id: "schedule.record",
-      name: "Keep it in the log",
+      name: "Keep in Inbox",
       summary:
-        "Leaves the answer here and sends it nowhere. Every run is recorded anyway, so this is what to use until it is worth pushing somewhere.",
+        "Keeps the answer in Inbox and sends it nowhere.",
       target: [],
       accepts: ["text", "review"],
     },
