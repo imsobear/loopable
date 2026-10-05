@@ -50,7 +50,7 @@ export const beats: Beat[] = [
     askVia: "Lark bot",
     askWho: "Wei",
     askMsg: "@Loopable why did last night’s refund job fail?",
-    agent: "Codex",
+    agent: "Claude Code",
     runLine: "Querying the ledger service",
     backKind: "lark",
     backPlace: "payments-oncall",
@@ -117,7 +117,10 @@ function setSource(id: string, kind: Kind, label: string) {
 }
 
 function agentKind(name: string) {
-  return name.toLowerCase().includes("cursor") ? "cursor" : "codex";
+  const lower = name.toLowerCase();
+  if (lower.includes("cursor")) return "cursor";
+  if (lower.includes("claude")) return "claude";
+  return "codex";
 }
 
 function paintAsk(beat: Beat) {

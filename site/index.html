@@ -6,12 +6,12 @@
     <title>Loopable — your team’s own agent</title>
     <meta
       name="description"
-      content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on a machine you own and writes the answer back."
+      content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex, Claude Code, or Cursor Agent does it on a machine you own and writes the answer back."
     />
     <meta property="og:title" content="Loopable — your team’s own agent" />
     <meta
       property="og:description"
-      content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on a machine you own and writes the answer back."
+      content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex, Claude Code, or Cursor Agent does it on a machine you own and writes the answer back."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://loopable-web.sobear-me.workers.dev/" />
@@ -21,7 +21,7 @@
     <meta property="og:image:alt" content="Loopable — a lot of work should not depend on one person." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Loopable — your team’s own agent" />
-    <meta name="twitter:description" content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on a machine you own and writes the answer back." />
+    <meta name="twitter:description" content="Your team’s own agent. Work comes in from Slack, Lark, GitHub, or a schedule. Codex, Claude Code, or Cursor Agent does it on a machine you own and writes the answer back." />
     <meta name="twitter:image" content="https://loopable-web.sobear-me.workers.dev/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/src/styles.css" />
@@ -42,6 +42,12 @@
       <symbol id="i-clock" viewBox="0 0 24 24">
         <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 21.2a9.2 9.2 0 1 0 0-18.4 9.2 9.2 0 0 0 0 18.4Z"/>
         <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 7.2V12l3.2 2"/>
+      </symbol>
+      <symbol id="i-claude" viewBox="0 0 24 24">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"/>
+      </symbol>
+      <symbol id="i-custom" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4ZM13.5 6.5l4 4"/>
       </symbol>
       <symbol id="i-cursor" viewBox="0 0 24 24">
         <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M5.5 3.8 18.6 11l-5.9 1.6-2.9 5.6Z"/>
@@ -84,7 +90,7 @@
         <h1>A lot of work should not depend on one person.</h1>
         <p class="hero-lede">
           Loopable is your team’s own agent. Work comes in from Slack, Lark, GitHub, or a
-          schedule. Codex or Cursor Agent does it on a machine you own, and the answer goes back
+          schedule. Codex, Claude Code, or Cursor Agent does it on a machine you own, and the answer goes back
           where it was asked.
         </p>
 
@@ -226,7 +232,7 @@
           </li>
           <li>
             <span class="n">Choose</span>
-            <p>Codex or Cursor Agent, and the model you want.</p>
+            <p>Codex, Claude Code, or Cursor Agent, and the model you want.</p>
             <p class="vs">Hosted: one vendor.</p>
           </li>
           <li>
@@ -242,9 +248,14 @@
         <h2>Loops you can turn on now.</h2>
         <ul class="loops">
           <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-custom"></use></svg>Any trigger</span>
+            <span class="loop-name">Custom loop: your own prompt</span>
+            <span class="loop-out">Anywhere, or Inbox only</span>
+          </li>
+          <li>
             <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-clock"></use></svg>Schedule</span>
             <span class="loop-name">Do something on a schedule</span>
-            <span class="loop-out">The log, or a Slack, Lark, or GitHub thread</span>
+            <span class="loop-out">Inbox, or a Slack, Lark, or GitHub thread</span>
           </li>
           <li>
             <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-github"></use></svg>GitHub</span>
@@ -270,6 +281,11 @@
             <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-wechat"></use></svg>WeChat</span>
             <span class="loop-name">Do what I ask the WeChat bot</span>
             <span class="loop-out">A reply in the chat</span>
+          </li>
+          <li>
+            <span class="loop-src"><svg class="ico" aria-hidden="true"><use href="#i-gmail"></use></svg>Gmail</span>
+            <span class="loop-name">When an email arrives</span>
+            <span class="loop-out">A reply in the same thread, or anywhere</span>
           </li>
         </ul>
       </section>
@@ -333,6 +349,10 @@
                 Codex
               </span>
               <span class="sys-chip">
+                <svg class="ico" aria-hidden="true"><use href="#i-claude"></use></svg>
+                Claude Code
+              </span>
+              <span class="sys-chip">
                 <svg class="ico" aria-hidden="true"><use href="#i-cursor"></use></svg>
                 Cursor Agent
               </span>
@@ -359,7 +379,7 @@
       <section class="host" id="run">
         <p class="kicker">Run it</p>
         <h2>One computer that stays on.</h2>
-        <p>A Mac in the office is enough. It needs Node 22+ and Codex or Cursor Agent signed in.</p>
+        <p>A Mac in the office is enough. It needs Node 22+ and Codex, Claude Code, or Cursor Agent signed in.</p>
         <ol class="steps">
           <li>
             <span>1 · Start</span>
