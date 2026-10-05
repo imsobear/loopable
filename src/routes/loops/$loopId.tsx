@@ -157,7 +157,7 @@ function Summary({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
   ].filter(Boolean);
 
   return (
-    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+    <p suppressHydrationWarning className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
       {loop.enabled ? null : <Badge variant="secondary">Off</Badge>}
       {parts.join(" · ")}
     </p>
@@ -236,7 +236,9 @@ function NotRun({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
   ].filter(Boolean);
 
   return (
-    <details className="group">
+    // The browser may restore a fold it remembers as open before React takes
+    // over, which is harmless and not worth a warning.
+    <details suppressHydrationWarning className="group">
       <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
         {poll.backlog.length} not run · {reasons.join(", ")}

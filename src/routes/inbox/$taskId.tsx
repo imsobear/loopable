@@ -65,7 +65,7 @@ function TaskPage() {
             </>
           ) : null}
           {agent ? <span>· {agent.name}</span> : null}
-          <span>· {ago(task.createdAt)}</span>
+          <span suppressHydrationWarning>· {ago(task.createdAt)}</span>
         </p>
       </PageHeader>
 
@@ -150,7 +150,7 @@ function Fold({
   children: React.ReactNode;
 }) {
   return (
-    <details open={open} className="group rounded-xl bg-card ring-1 ring-foreground/10">
+    <details open={open} suppressHydrationWarning className="group rounded-xl bg-card ring-1 ring-foreground/10">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium">
         <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="flex-1">{title}</span>

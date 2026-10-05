@@ -257,7 +257,7 @@ function ConnectionRow({
             <span className="truncate text-sm font-medium">{connection.accountLabel}</span>
             <ConnectionStatusBadge status={connection.status} />
           </div>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          <p suppressHydrationWarning className="mt-0.5 truncate text-xs text-muted-foreground">
             {[
               connection.lastSyncedAt ? `Checked ${ago(connection.lastSyncedAt)}` : "Not checked yet",
               connection.scopes.length > 0 ? connection.scopes.join(", ") : null,

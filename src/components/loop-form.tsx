@@ -66,7 +66,7 @@ function WorkflowDetails({ workflow }: { workflow: WorkflowDescriptor }) {
   rows.push(["Answer", ANSWER[workflow.answer]]);
 
   return (
-    <details className="group text-sm">
+    <details suppressHydrationWarning className="group text-sm">
       <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
         Fixed by the workflow

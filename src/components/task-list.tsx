@@ -130,5 +130,11 @@ function TaskMeta({ task, showLoop }: { task: TaskView; showLoop: boolean }) {
     agent?.name,
     ago(task.createdAt),
   ].filter(Boolean);
-  return <p className="mt-0.5 truncate text-xs text-muted-foreground">{parts.join(" · ")}</p>;
+  // "5m ago" is worked out on the server and again in the browser, and the
+  // two can land either side of a minute.
+  return (
+    <p suppressHydrationWarning className="mt-0.5 truncate text-xs text-muted-foreground">
+      {parts.join(" · ")}
+    </p>
+  );
 }
