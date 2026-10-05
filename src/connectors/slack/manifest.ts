@@ -53,9 +53,9 @@ export const slackManifest = defineManifest({
   workflows: [
     {
       id: "slack.ask",
-      name: "Do what I ask the bot",
-      summary: "Runs your agent when someone @mentions the bot or DMs it, and answers in the thread.",
-      trigger: "the bot is @mentioned, or someone DMs it",
+      name: "Do what I ask the Slack bot",
+      summary: "Runs the agent when someone @mentions the Slack bot or DMs it, and answers in the thread.",
+      trigger: "someone @mentions the Slack bot in a channel it is in, or DMs it",
       writes: "a reply in the Slack thread",
       runsIn: "folder",
       settings: [folder],

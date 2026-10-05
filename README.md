@@ -15,14 +15,12 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 | Comes in from | Loop | Writes back |
 | --- | --- | --- |
-| GitHub | Review pull requests the bot is asked to review | A review, as a comment |
-| GitHub | Plan issues assigned to the bot | A comment with a plan |
-| GitHub | Implement issues assigned to the bot | A draft pull request |
-| Slack bot | Do what I ask the bot (@mention or DM) | A reply in the thread |
-| Feishu / Lark bot | Do what I ask the bot (@mention in a group) | A reply in the thread |
-| Schedule | Do something on a schedule | The log, or a Slack or Lark channel |
-| Gmail | Tell me about new mail | A short note wherever you look |
-| WeChat | Do what I ask the bot | A reply in the chat |
+| Schedule | Do something on a schedule | The log, or a Slack, Lark, or GitHub thread |
+| GitHub | Review pull requests sent to the shared account | A review, as a comment |
+| GitHub | Reply to issues assigned to the shared account | A comment on the issue |
+| Slack bot | Do what I ask the Slack bot (@mention or DM) | A reply in the thread |
+| Feishu / Lark bot | Do what I ask the Feishu / Lark bot (@mention in a group) | A reply in the thread |
+| WeChat | Do what I ask the WeChat bot | A reply in the chat |
 
 A loop’s answer can go to any connector that accepts it, so a scheduled check can post to #oncall.
 
@@ -60,7 +58,7 @@ npm install -g loopable-cli
 loopable start                # App + Dispatcher, bound on all interfaces
 ```
 
-On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address, signed in as your team's GitHub bot account rather than your own (see [GitHub: a shared bot account](docs/connectors.md#github-a-shared-bot-account)). Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
+On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address, signed in as the account your team will send work to (see [GitHub: a shared account](docs/connectors.md#github-a-shared-account)). Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
 
 ```bash
 loopable runner --url http://<LAN-IP>:4321 --token <from Runners>

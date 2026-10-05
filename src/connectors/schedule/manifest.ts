@@ -84,7 +84,7 @@ export const scheduleManifest = defineManifest({
     {
       id: "schedule.recurring",
       name: "Do something on a schedule",
-      summary: "Runs an agent in a folder you name, and keeps what it says.",
+      summary: "Runs the agent at the times you set, in a folder you name. The answer stays in the log, or goes to Slack, Lark, or GitHub.",
       trigger: "the time you set comes round",
       // No query to show. A clock is not something one can be written for,
       // and an invented one shown as if it were real is worse than nothing.

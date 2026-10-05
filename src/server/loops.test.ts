@@ -97,22 +97,6 @@ describe("turning a workflow into a loop", () => {
     // write, and not with what the box on screen said.
     await expect(edited(id, { prompt: "   " })).rejects.toThrow(/what the agent should do/);
   });
-
-  /**
-   * A read-only connector has no action to fall back to, so a workflow on one
-   * has to name where its answer goes or be useless the moment it is turned
-   * on. It still only starts there; the loop can be pointed anywhere after.
-   */
-  it("starts on another connector when the workflow says so", async () => {
-    const loop = await added("gmail", "gmail.new_mail");
-
-    expect(loop.connectorId).toBe("gmail");
-    expect(loop.actionConnectorId).toBe("wechat");
-    expect(loop.actionId).toBe("wechat.reply");
-    // "Whoever asked" is the action's own default and means nothing here,
-    // since no person started this.
-    expect(loop.actionTarget).toEqual({ to: "me" });
-  });
 });
 
 /**
@@ -144,7 +128,7 @@ describe("a loop that has to work somewhere", () => {
   });
 
   it("does not ask for a local clone when the agent will clone the repository", async () => {
-    await expect(added("github", "github.issue_implement")).resolves.toBeTruthy();
+    await expect(added("github", "github.issue_assigned")).resolves.toBeTruthy();
   });
 });
 

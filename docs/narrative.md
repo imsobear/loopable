@@ -16,7 +16,7 @@ It is for small and mid-size teams. Work comes in from Slack, Lark, GitHub, or a
 
 The team leaves Loopable running. A signal comes in, a loop matches, the agent runs, the answer is written back.
 
-- **No one has to be there.** A loop runs when the review is requested, when the bot is mentioned, or when the clock says so.
+- **No one has to be there.** A loop runs when the review is requested, when a chat bot is mentioned, or when the clock says so.
 - **The process is shared.** A loop is one job done one way: what to watch, what to ask, where to answer. Anyone on the team can read it and change it.
 - **The knowledge is shared.** A loop works in a folder or a checkout of your repository. The `AGENTS.md` and skills there are what the agent knows, and they live in the team’s repository, not on someone’s laptop.
 - **Every run is recorded.** The inbox shows what came in, what the agent did, and what it wrote back, whether or not it wrote anything.
@@ -38,8 +38,8 @@ An agent that runs with nobody watching has to be boring by default.
 
 - Agents start read-only in your folders. GitHub jobs work in a fresh checkout, never in someone’s working copy.
 - Service credentials stay in Loopable. The agent never sees them.
-- GitHub is connected as a shared bot account the team owns, never someone’s own login. Its access is the repositories the team adds it to.
-- A review is posted as a comment, never an approval. Code goes into a draft pull request, never a merge.
+- GitHub is connected as one shared account the team sends work to. Its access is the repositories that account can reach.
+- On GitHub it reviews and comments. A review is a comment, never an approval, and it does not push code.
 - A new loop records what is already waiting. It does not run it.
 - Loopable needs no public URL. It polls Slack, Lark, and GitHub. Nothing on the internet has to reach the office Mac.
 

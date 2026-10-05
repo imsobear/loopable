@@ -61,12 +61,21 @@ export function connectorAction(
   return connectorManifest(connectorId)?.actions.find((entry) => entry.id === actionId);
 }
 
-/** Every workflow on offer, for the page that asks which one to turn on. */
+/**
+ * Every workflow on offer, for the page that asks which one to turn on.
+ *
+ * The clock leads: it needs no account, and a scheduled job is the easiest
+ * first loop to try. The rest follow the connectors' own order.
+ */
 export function allWorkflows(): Array<{
   connector: ConnectorManifest;
   workflow: WorkflowDescriptor;
 }> {
-  return CONNECTOR_MANIFESTS.flatMap((connector) =>
+  const ordered = [
+    ...CONNECTOR_MANIFESTS.filter((connector) => connector.id === "schedule"),
+    ...CONNECTOR_MANIFESTS.filter((connector) => connector.id !== "schedule"),
+  ];
+  return ordered.flatMap((connector) =>
     connector.workflows.map((workflow) => ({ connector, workflow })),
   );
 }

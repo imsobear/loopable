@@ -220,7 +220,7 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
             }
             help={
               workflow.runsIn === "checkout"
-                ? "The agent clones the repository with that machine's git. Loopable's GitHub bot account is not used to clone, and is only used afterwards to write the review or open the pull request. Sign that machine's git in as the same bot, so the branch and the pull request come from one name."
+                ? "The agent clones the repository with that machine's git. Loopable's shared GitHub account is not used to clone; it only writes the answer afterwards, as a review or a comment."
                 : workflow.runsIn === "folder"
                   ? "This job reads real code to do its work, so it runs in a real checkout. It does not write there: anything it changed would be sitting in your working copy."
                   : "The agent gets the files it was given and nothing else."

@@ -67,11 +67,11 @@ export const feishuManifest = defineManifest({
   workflows: [
     {
       id: "feishu.ask",
-      name: "Do what I ask the bot",
+      name: "Do what I ask the Feishu / Lark bot",
       summary:
-        "Runs your agent when someone @mentions the bot in a group it is in, and answers in the thread.",
-      trigger: "the bot is @mentioned in a group it is in",
-      writes: "a reply in the Feishu thread",
+        "Runs the agent when someone @mentions the Feishu / Lark bot in a group, and answers in the thread.",
+      trigger: "someone @mentions the Feishu / Lark bot in a group it is in",
+      writes: "a reply in the thread",
       runsIn: "folder",
       settings: [folder],
       prompt: ASK_PROMPT,
@@ -85,7 +85,7 @@ export const feishuManifest = defineManifest({
   actions: [
     {
       id: "feishu.reply",
-      name: "Reply in Feishu",
+      name: "Reply in Feishu / Lark",
       summary: "Post a message back to the thread that asked, or to a chat you name.",
       target: [chat],
       accepts: ["text"],

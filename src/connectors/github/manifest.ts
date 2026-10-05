@@ -76,37 +76,22 @@ const REVIEW_PROMPT = [
   "guessing.",
 ].join("\n");
 
-const PLAN_PROMPT = [
-  "Write a short implementation plan for this issue.",
+const REPLY_PROMPT = [
+  "Answer this issue in a comment, the way a teammate who knows this codebase would.",
   "",
-  "Say what should change, in which files where you can tell, and what to watch",
-  "out for. Stay inside what the issue actually supports: if it is too vague to",
-  "plan, say what is missing rather than inventing the requirements.",
+  "Work out what the issue is asking for. If it is a question, answer it from the",
+  "code rather than from memory. If it reports a bug, find the likely cause and",
+  "point at the files and lines involved. If it asks for a change, say how you",
+  "would make it, where, and what to watch out for.",
   "",
-  "Do not write the implementation.",
-].join("\n");
-
-const IMPLEMENT_PROMPT = [
-  "Implement this issue in the checkout you are in.",
-  "",
-  "Read enough of the surrounding code first that what you write looks like it",
-  "belongs: the same patterns, the same names, the same way of handling errors.",
-  "Where the project has tests for work like this, add one.",
-  "",
-  "Stay inside what the issue asks for. A change that also tidies three other",
-  "things is a change nobody can review. If the issue is too vague to implement,",
-  "or doing it properly needs a decision that is not yours to make, reply with",
-  "exactly NOTHING_TO_DO rather than guessing: an unwanted pull request costs",
-  "more attention than a missing one.",
-  "",
-  "Run the project's tests if you can work out how, and say in your description",
-  "whether you did and what happened.",
+  "Read the code; do not change it. If the issue is too vague to answer, say what",
+  "is missing rather than inventing it.",
 ].join("\n");
 
 export const githubManifest = defineManifest({
   id: "github",
   name: "GitHub",
-  tagline: "Pick up reviews and issues sent to your team's GitHub bot account.",
+  tagline: "Pick up reviews and issues sent to your team's shared GitHub account.",
   docsUrl: "https://docs.github.com/rest",
   icon: "Github",
   accent: "bg-neutral-900 text-white",
@@ -114,19 +99,20 @@ export const githubManifest = defineManifest({
     kind: "oauth_redirect",
     scopes: GITHUB_SCOPES,
     needsAppRegistration: true,
-    // The Connection is the team's agent on GitHub, not anyone's own login:
-    // whatever it writes appears under its name, and the work it picks up is
-    // whatever the team sends to it.
-    note: "Sign in as a shared bot account for your team, not your own. Reviews, comments and pull requests appear under its name, and it sees only the repositories you add it to. Sign in to GitHub as the bot first; GitHub authorizes whichever account the browser is signed in as.",
+    // The Connection is the team's agent on GitHub: whatever it writes appears
+    // under its name, and the work it picks up is whatever the team sends to
+    // it. An account made for this is cleanest, but a teammate's own works too
+    // if they are happy for it to be shared.
+    note: "Connect the account the team will send work to. An account made for this is cleanest, but your own works too if you are happy to share it. Reviews and comments appear under its name, and it sees only the repositories it can access. Sign in to GitHub as that account first; GitHub authorizes whichever account the browser is signed in as.",
   },
   workflows: [
     {
       id: "github.review_requested",
-      name: "Review pull requests the bot is asked to review",
-      summary: "Reads the change and posts a review whenever someone requests one from the bot account.",
+      name: "Review pull requests sent to the shared account",
+      summary: "Reads the change and posts a review when someone requests one from the shared account.",
       // Team requests matter more than they sound: in most repositories with a
       // CODEOWNERS file, review arrives addressed to a team rather than a person.
-      trigger: "someone requests a review from the bot account, directly or through a team it belongs to",
+      trigger: "someone requests a review from the shared account, directly or through a team it belongs to",
       // review-requested covers teams; user-review-requested would not.
       watches: "is:open is:pr review-requested:@me",
       writes: "a review on the pull request, as a comment rather than an approval",
@@ -139,39 +125,23 @@ export const githubManifest = defineManifest({
       actionId: "github.submit_review",
     },
     {
+      // The id is the one "Plan issues assigned to me" had. Planning was one
+      // kind of answer to an issue; replying covers it and the rest, and loops
+      // made for planning keep the prompt they copied.
       id: "github.issue_assigned",
-      name: "Plan issues assigned to the bot",
-      summary: "Posts a short implementation plan when an issue is assigned to the bot account.",
-      trigger: "an issue is assigned to the bot account",
-      // is:issue matters: without it this would pick up your own pull requests.
+      name: "Reply to issues assigned to the shared account",
+      summary: "Reads the issue and the code, and answers it in a comment.",
+      trigger: "an issue is assigned to the shared account",
+      // is:issue matters: without it this would pick up pull requests too.
       watches: "is:open is:issue assignee:@me",
       writes: "a comment on the issue",
       settings: [repositories],
-      prompt: PLAN_PROMPT,
-      guidancePlaceholder: "Anything specific to this codebase worth knowing before planning.",
+      prompt: REPLY_PROMPT,
+      guidancePlaceholder:
+        "Anything specific to this codebase worth knowing before answering. For example: questions about billing should point at docs/billing.md.",
       answer: "text",
       runsIn: "checkout",
       actionId: "github.post_issue_comment",
-    },
-    {
-      id: "github.issue_implement",
-      name: "Implement issues assigned to the bot",
-      summary: "Writes the change and opens a draft pull request.",
-      trigger: "an issue is assigned to the bot account",
-      watches: "is:open is:issue assignee:@me",
-      writes: "a draft pull request",
-      // The only workflow that writes code, and so the only one whose agent
-      // gets somewhere to write. Kept apart from "Plan issues assigned to the bot"
-      // rather than replacing it: asking for a plan and asking for the change
-      // are different jobs, and which one an issue deserves is a judgement
-      // about the issue.
-      runsIn: "checkout",
-      settings: [repositories],
-      prompt: IMPLEMENT_PROMPT,
-      guidancePlaceholder:
-        "How work is done here. For example: every new endpoint needs a test, and we do not add dependencies without asking.",
-      answer: "code",
-      actionId: "github.open_pull_request",
     },
   ],
   actions: [
@@ -195,20 +165,11 @@ export const githubManifest = defineManifest({
       // a review arrives here with its findings written into the prose.
       accepts: ["text"],
     },
-    {
-      id: "github.open_pull_request",
-      name: "Open a draft pull request",
-      summary: "Open a draft pull request for the branch the agent already pushed.",
-      // The agent cloned and pushed with the machine's git. This action only
-      // names the pull request through the Connection.
-      target: [],
-      accepts: ["code"],
-    },
   ],
   // Nothing to configure per account: what the account can see is what GitHub
   // decides, and every narrowing choice belongs to a loop.
   settings: [],
-  // One bot account per team. The redirect also authorizes whichever account
+  // One shared account per team. The redirect also authorizes whichever account
   // the browser is already signed in as, so a second one is out of reach
   // without signing out of GitHub first. Connections are still rows, so this
   // is a product decision only.

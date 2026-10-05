@@ -2,7 +2,6 @@ import { defineRuntime } from "../define.ts";
 import { oauthAppRegistration } from "../oauth-app.ts";
 import { getMessage, getProfile } from "./api.ts";
 import { mailContext, mailRef, permalink, summarise } from "./mail.ts";
-import { pollGmail, type MailPayload } from "./poll.ts";
 import {
   buildAuthorizeUrl,
   createPkce,
@@ -45,13 +44,16 @@ export async function usableToken(
   return { accessToken: refreshed.accessToken, refreshed };
 }
 
+/** What a task keeps about the mail it is for. */
+type MailPayload = { messageId: string };
+
 /** The mailbox, as a person would recognise it. */
 function accountOf(emailAddress: string) {
   return { id: emailAddress, label: emailAddress };
 }
 
 /**
- * Which message this task is about. The poll keeps the id, and a pasted link
+ * Which message this task is about. A task keeps the id, and a pasted link
  * carries one too, so either is enough to fetch the mail again.
  */
 function messageIdFrom(url: string, payload: unknown): string {
@@ -88,24 +90,6 @@ export const gmailRuntime = defineRuntime({
       title: summarise(message),
       url: permalink(message.id),
       context: [mailContext(message)],
-    };
-  },
-
-  async poll({ workflowId, settings, credential }) {
-    const { accessToken } = await usableToken(credential as GmailCredential);
-    // Which mailbox this is, so mail from yourself can be told apart. Cheap,
-    // and the alternative is storing it on the credential where it would go
-    // stale without anything noticing.
-    const profile = await getProfile(accessToken);
-    // No cursor: Gmail is asked what matches now and answers completely, so
-    // there is no position to keep.
-    return {
-      signals: await pollGmail({
-        workflowId,
-        settings,
-        accessToken,
-        emailAddress: profile.emailAddress,
-      }),
     };
   },
 

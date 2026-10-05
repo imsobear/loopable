@@ -67,6 +67,38 @@ vi.mock("#/connectors/runtimes.ts", () => ({
   }),
 }));
 
+// No shipped workflow writes code today, but the path that carries a pushed
+// branch to a pull request is still here. This gives the tests one to drive it.
+vi.mock("#/connectors/manifests.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("#/connectors/manifests.ts")>();
+  const writesCode = {
+    id: "github.test_write_code",
+    name: "Write code for an issue",
+    summary: "Test only.",
+    trigger: "an issue is assigned",
+    writes: "a draft pull request",
+    runsIn: "checkout" as const,
+    settings: [],
+    prompt: "Implement this issue.",
+    answer: "code" as const,
+    actionId: "github.open_pull_request",
+  };
+  const openPullRequest = {
+    id: "github.open_pull_request",
+    name: "Open a draft pull request",
+    summary: "Test only.",
+    target: [],
+    accepts: ["code" as const],
+  };
+  return {
+    ...actual,
+    connectorWorkflow: (connectorId: string, workflowId: string) =>
+      workflowId === writesCode.id ? writesCode : actual.connectorWorkflow(connectorId, workflowId),
+    connectorAction: (connectorId: string, actionId: string) =>
+      actionId === openPullRequest.id ? openPullRequest : actual.connectorAction(connectorId, actionId),
+  };
+});
+
 vi.mock("./connections.ts", () => ({
   credentialForConnector: async (id: string) => ({ credential: `credential for ${id}` }),
 }));
@@ -367,7 +399,7 @@ describe("a loop that writes code", () => {
         name: "Implement things",
         priority: 1,
         connectorId: "github",
-        workflowId: "github.issue_implement",
+        workflowId: "github.test_write_code",
         prompt: PROMPT,
         settings: {},
         actionConnectorId: "github",
