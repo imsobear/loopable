@@ -1,6 +1,6 @@
 # Loopable
 
-Your team’s own agent. It runs on your machine, and you decide what it can do.
+Your team’s own agent. It runs on your machine, and you decide what it can do. [loop.goodone.si](https://loop.goodone.si)
 
 A lot of team work waits on one person: a review request, a question in #oncall, a morning check. Someone has to copy it into their own Codex, and if they are busy, it stops. Hosted team agents help, but they run in a cloud sandbox that cannot reach your internal network, logs, or services.
 

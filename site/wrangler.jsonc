@@ -3,5 +3,12 @@
   "compatibility_date": "2026-09-17",
   "assets": {
     "directory": "./dist"
-  }
+  },
+  // The site's address. Kept here so a deploy keeps it, rather than relying on
+  // what was set in the dashboard. The workers.dev address still answers too.
+  "routes": [{ "pattern": "loop.goodone.si", "custom_domain": true }],
+  // Listing a route turns workers.dev off unless it is asked for. Links shared
+  // before the domain moved still point there.
+  "workers_dev": true,
+  "preview_urls": false
 }
