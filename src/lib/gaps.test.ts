@@ -7,6 +7,7 @@ const ready: LoopReadiness = {
   defaultAgentId: "cursor-agent",
   availableAgentIds: ["cursor-agent"],
   hostAgentIds: ["cursor-agent"],
+  folderAgentIds: ["cursor-agent"],
 };
 
 function loop(over: Partial<LoopView> = {}): LoopView {
@@ -131,6 +132,22 @@ describe("issuesFor", () => {
         }),
       ),
     ).toEqual(["Daily look needs a runner on this host with Cursor Agent signed in."]);
+  });
+
+  it("asks for an upgrade when only an older runner has the agent", () => {
+    expect(
+      issuesFor(
+        { ...ready, folderAgentIds: [] },
+        loop({
+          name: "Daily look",
+          connectorId: "schedule",
+          workflowId: "schedule.recurring",
+          settings: { folder: "code/web" },
+          actionConnectorId: "wechat",
+          actionId: "wechat.reply",
+        }),
+      ),
+    ).toEqual(["Daily look needs a newer runner. Upgrade the runners with npm install -g loopable-cli."]);
   });
 
   it("lets a loop with a relative folder run on any runner", () => {

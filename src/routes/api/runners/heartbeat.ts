@@ -10,8 +10,15 @@ export const Route = createFileRoute("/api/runners/heartbeat")({
       POST: async ({ request }) => {
         const runnerId = await runnerIdForToken(bearer(request));
         if (!runnerId) return Response.json({ error: "Unknown runner." }, { status: 401 });
-        const body = (await request.json()) as { inventory?: RunnerInventoryEntry[] };
-        const view = await touchRunner(runnerId, body.inventory ?? []);
+        const body = (await request.json()) as {
+          inventory?: RunnerInventoryEntry[];
+          version?: string;
+          protocol?: number;
+        };
+        const view = await touchRunner(runnerId, body.inventory ?? [], {
+          version: body.version,
+          protocol: body.protocol,
+        });
         return Response.json(view);
       },
     },

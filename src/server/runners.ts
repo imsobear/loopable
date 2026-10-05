@@ -2,11 +2,26 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { hostname as osHostname } from "node:os";
 import { eq } from "drizzle-orm";
 import type { RunnerInventoryEntry, RunnerView } from "#/lib/domain.ts";
+import { LEGACY_RUNNER_PROTOCOL, RUNNER_PROTOCOL, VERSION, olderThan } from "#/lib/version.ts";
 import { db } from "./db/client.ts";
 import { runners, tasks, type Runner } from "./db/schema.ts";
 import { joinTokenKey, runnerTokenKey, secretStore } from "./secrets.ts";
 
 const ONLINE_MS = 45_000;
+
+/** What a runner says it is, as it says it on joining and on every heartbeat. */
+export type RunnerBuild = { version?: string | null; protocol?: number | null };
+
+export function protocolOf(row: Pick<Runner, "protocol">): number {
+  return row.protocol ?? LEGACY_RUNNER_PROTOCOL;
+}
+
+function buildFields(build: RunnerBuild) {
+  return {
+    version: typeof build.version === "string" && build.version ? build.version : null,
+    protocol: typeof build.protocol === "number" ? build.protocol : null,
+  };
+}
 
 export function isRunnerOnline(row: Runner, now = Date.now()): boolean {
   if (row.status !== "online") return false;
@@ -23,6 +38,9 @@ function toView(row: Runner, now = Date.now()): RunnerView {
     status: online ? "online" : "offline",
     inventory: row.inventory,
     lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+    version: row.version,
+    protocol: protocolOf(row),
+    outdated: protocolOf(row) < RUNNER_PROTOCOL || olderThan(row.version, VERSION),
   };
 }
 
@@ -62,12 +80,17 @@ async function busyRunnerIds(): Promise<Set<string>> {
 }
 
 /** Agent ids signed in on an online runner. */
-export async function availableAgentIds(requiresHost = false): Promise<string[]> {
+export async function availableAgentIds(requiresHost = false, minProtocol = 0): Promise<string[]> {
   const local = osHostname();
   return [
     ...new Set(
       (await listRunners())
-        .filter((row) => row.status === "online" && (!requiresHost || row.hostname === local))
+        .filter(
+          (row) =>
+            row.status === "online" &&
+            (!requiresHost || row.hostname === local) &&
+            row.protocol >= minProtocol,
+        )
         .flatMap((row) =>
           row.inventory
             .filter((entry) => entry.installed && entry.signedIn)
@@ -79,14 +102,21 @@ export async function availableAgentIds(requiresHost = false): Promise<string[]>
 
 /**
  * Which runner should run this agent. Jobs that need a folder on Loopable's
- * disk only go to a runner whose hostname is this host.
+ * disk only go to a runner whose hostname is this host, and a job that needs
+ * something newer runners understand only goes to one that says it does.
  */
-export async function pickRunner(input: { agentId: string; requiresHost: boolean }): Promise<string> {
+export async function pickRunner(input: {
+  agentId: string;
+  requiresHost: boolean;
+  minProtocol?: number;
+}): Promise<string> {
   const now = Date.now();
   const local = osHostname();
-  let candidates = (await db().select().from(runners).all()).filter(
+  const minProtocol = input.minProtocol ?? 0;
+  const capable = (await db().select().from(runners).all()).filter(
     (row) => isRunnerOnline(row, now) && runnerCanRun(row, input.agentId),
   );
+  let candidates = capable.filter((row) => protocolOf(row) >= minProtocol);
   if (input.requiresHost) {
     candidates = candidates.filter((row) => row.hostname === local);
   }
@@ -97,6 +127,11 @@ export async function pickRunner(input: { agentId: string; requiresHost: boolean
   if (chosen) return chosen.id;
   if (input.requiresHost) {
     throw new Error("This job needs a runner on the same host as Loopable.");
+  }
+  if (capable.length > 0) {
+    throw new Error(
+      "Every runner with this agent is too old for this job. Upgrade them with npm install -g loopable-cli.",
+    );
   }
   throw new Error("No runner is online that can run this agent.");
 }
@@ -118,12 +153,13 @@ export async function rotateJoinToken(): Promise<string> {
 export async function heartbeatRunner(
   runnerId: string,
   inventory: RunnerInventoryEntry[],
+  build: RunnerBuild = {},
 ): Promise<RunnerView> {
   const row = await getRunner(runnerId);
   if (!row) throw new Error("Unknown runner.");
   await db()
     .update(runners)
-    .set({ status: "online", inventory, lastSeenAt: new Date() })
+    .set({ status: "online", inventory, lastSeenAt: new Date(), ...buildFields(build) })
     .where(eq(runners.id, runnerId))
     .run();
   return toView((await getRunner(runnerId))!);
@@ -133,7 +169,7 @@ export async function joinRunner(input: {
   joinToken: string;
   hostname: string;
   inventory: RunnerInventoryEntry[];
-}): Promise<{ runnerId: string; runnerToken: string; name: string }> {
+} & RunnerBuild): Promise<{ runnerId: string; runnerToken: string; name: string }> {
   const expected = await getJoinToken();
   if (!input.joinToken || input.joinToken !== expected) {
     throw new Error("That join token is not valid.");
@@ -152,6 +188,7 @@ export async function joinRunner(input: {
         inventory: input.inventory,
         lastSeenAt: now,
         hostname: input.hostname,
+        ...buildFields(input),
       })
       .where(eq(runners.id, id))
       .run();
@@ -165,6 +202,7 @@ export async function joinRunner(input: {
         status: "online",
         inventory: input.inventory,
         lastSeenAt: now,
+        ...buildFields(input),
       })
       .run();
   }

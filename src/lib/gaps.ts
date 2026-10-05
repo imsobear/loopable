@@ -10,11 +10,16 @@ function wantedAgent(loop: LoopView, readiness: LoopReadiness): string | null {
   return loop.agentId ?? readiness.defaultAgentId;
 }
 
-/** Only a folder saved as an absolute path, from before folders were relative, ties a loop to the host. */
-function needsHost(loop: LoopView): boolean {
+/**
+ * Which runners a loop can use. A folder saved as an absolute path, from
+ * before folders were relative, ties it to the host; a relative one needs a
+ * runner new enough to look for it under its own home.
+ */
+function runnersFor(loop: LoopView): "host" | "folder" | "any" {
   const runsIn = connectorWorkflow(loop.connectorId, loop.workflowId)?.runsIn;
+  if (runsIn !== "folder") return "any";
   const folder = loop.settings.folder;
-  return runsIn === "folder" && typeof folder === "string" && folder.trim().startsWith("/");
+  return typeof folder === "string" && folder.trim().startsWith("/") ? "host" : "folder";
 }
 
 /**
@@ -24,7 +29,13 @@ export function issuesFor(readiness: LoopReadiness, loop: LoopView): string[] {
   if (!loop.enabled) return [];
   const issues: string[] = [];
   const agentId = wantedAgent(loop, readiness);
-  const pool = needsHost(loop) ? readiness.hostAgentIds : readiness.availableAgentIds;
+  const needs = runnersFor(loop);
+  const pool =
+    needs === "host"
+      ? readiness.hostAgentIds
+      : needs === "folder"
+        ? readiness.folderAgentIds
+        : readiness.availableAgentIds;
   if (!agentId) {
     issues.push(
       loop.agentId
@@ -33,9 +44,11 @@ export function issuesFor(readiness: LoopReadiness, loop: LoopView): string[] {
     );
   } else if (!pool.includes(agentId)) {
     issues.push(
-      needsHost(loop)
+      needs === "host"
         ? `${loop.name} needs a runner on this host with ${agentName(agentId)} signed in.`
-        : `${loop.name} uses ${agentName(agentId)}, which no online runner has signed in.`,
+        : needs === "folder" && readiness.availableAgentIds.includes(agentId)
+          ? `${loop.name} needs a newer runner. Upgrade the runners with npm install -g loopable-cli.`
+          : `${loop.name} uses ${agentName(agentId)}, which no online runner has signed in.`,
     );
   }
   return issues;

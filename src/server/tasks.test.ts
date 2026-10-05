@@ -126,6 +126,7 @@ const { enqueuePrompt, enqueueTask, getTask, jobForTask, runAssignedAgent, runTa
 const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { branchFor } = await import("./checkout.ts");
 const { WORKSPACE } = await import("./agent-job.ts");
+const { RUNNER_PROTOCOL, VERSION } = await import("#/lib/version.ts");
 
 await migrateIfNeeded();
 
@@ -179,6 +180,8 @@ beforeEach(async () => {
     inventory: [
       { agentId: "cursor-agent", installed: true, version: "1", signedIn: true, detail: "ok" },
     ],
+    version: VERSION,
+    protocol: RUNNER_PROTOCOL,
   });
 });
 

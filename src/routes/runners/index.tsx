@@ -5,6 +5,7 @@ import { Empty, List, PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { agentManifest } from "@/agents/manifests.ts";
 import { cn } from "@/lib/utils";
+import { VERSION } from "@/lib/version.ts";
 import { useLiveRefresh } from "@/components/use-live-tasks.ts";
 import type { RunnerView } from "@/lib/domain.ts";
 import { getRunnersPage, removeRunner, rotateRunnerJoinToken } from "@/server/functions/runners.ts";
@@ -36,7 +37,10 @@ function RunnersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Runners" description="Machines that run agents for your loops." />
+      <PageHeader
+        title="Runners"
+        description={`Machines that run agents for your loops. This App is v${VERSION}.`}
+      />
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
@@ -102,8 +106,15 @@ function RunnersPage() {
                   </span>
                 </div>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {runner.hostname} · {agentsOn(runner)}
+                  {runner.hostname} · {runner.version ? `v${runner.version}` : "version unknown"} ·{" "}
+                  {agentsOn(runner)}
                 </p>
+                {runner.outdated ? (
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-500">
+                    Older than this App (v{VERSION}), so it may not take every job. On that machine,
+                    run <code>npm install -g loopable-cli</code> and restart the runner.
+                  </p>
+                ) : null}
               </div>
               <Button
                 variant="ghost"

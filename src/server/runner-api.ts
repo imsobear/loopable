@@ -3,10 +3,10 @@ import { appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { isHosted } from "#/lib/hosted.ts";
-import { jobRequiresHost, type AgentJob } from "./agent-job.ts";
+import { jobMinProtocol, jobRequiresHost, type AgentJob } from "./agent-job.ts";
 import { db, rowsChanged } from "./db/client.ts";
 import { tasks } from "./db/schema.ts";
-import { getRunner, heartbeatRunner, isRunnerOnline } from "./runners.ts";
+import { getRunner, heartbeatRunner, isRunnerOnline, protocolOf, type RunnerBuild } from "./runners.ts";
 import { runDir } from "./paths.ts";
 import { absorbAgentOutput, jobForTask, taskRow, updateTask } from "./tasks.ts";
 import type { RunnerInventoryEntry } from "#/lib/domain.ts";
@@ -38,6 +38,17 @@ export async function claimAgentJob(runnerId: string): Promise<AgentJob | null> 
     if (jobRequiresHost(job) && row.hostname !== osHostname()) {
       await updateTask(task.id, { leaseUntil: null });
       return null;
+    }
+    // Only reached when the job was given to this runner before it was known
+    // to be too old. Nothing else will claim it, so it fails and says why
+    // rather than waiting for a runner that is never coming.
+    if (jobMinProtocol(job) > protocolOf(row)) {
+      await updateTask(task.id, {
+        state: "failed",
+        error: `${row.name} is too old for this job. Upgrade it with npm install -g loopable-cli, then run this again.`,
+        leaseUntil: null,
+      });
+      continue;
     }
     return job;
   }
@@ -80,6 +91,6 @@ export async function completeAgentJob(
   await absorbAgentOutput(taskId, result.output);
 }
 
-export function touchRunner(runnerId: string, inventory: RunnerInventoryEntry[]) {
-  return heartbeatRunner(runnerId, inventory);
+export function touchRunner(runnerId: string, inventory: RunnerInventoryEntry[], build: RunnerBuild = {}) {
+  return heartbeatRunner(runnerId, inventory, build);
 }

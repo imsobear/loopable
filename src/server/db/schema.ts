@@ -329,6 +329,10 @@ export const runners = sqliteTable("runners", {
   status: text("status").$type<"online" | "offline">().notNull().default("offline"),
   inventory: text("inventory", { mode: "json" }).$type<RunnerInventoryEntry[]>().notNull().default([]),
   lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
+  /** The runner's loopable-cli version. Null for runners before 0.3. */
+  version: text("version"),
+  /** What jobs it understands; see RUNNER_PROTOCOL. Null means the first. */
+  protocol: integer("protocol"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -9,6 +9,7 @@ import { availableAgentIds } from "./runners.ts";
 import { db } from "./db/client.ts";
 import { connections, loops, type Loop } from "./db/schema.ts";
 import { folderIsLegacy, normalizeFolder } from "./agent-job.ts";
+import { FOLDER_JOB_PROTOCOL } from "#/lib/version.ts";
 
 const NAME_LIMIT = 80;
 const PROMPT_LIMIT = 8000;
@@ -237,6 +238,7 @@ export async function loopReadiness(): Promise<LoopReadiness> {
     .all();
   const available = await availableAgentIds();
   const host = await availableAgentIds(true);
+  const folder = await availableAgentIds(false, FOLDER_JOB_PROTOCOL);
   const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
   const defaultAgentId =
     (chosen && available.includes(chosen) ? chosen : null) ??
@@ -246,5 +248,6 @@ export async function loopReadiness(): Promise<LoopReadiness> {
     defaultAgentId,
     availableAgentIds: available,
     hostAgentIds: host,
+    folderAgentIds: folder,
   };
 }

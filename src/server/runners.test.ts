@@ -12,8 +12,9 @@ process.env.LOOPABLE_KEYCHAIN = "0";
 
 const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, tasks } = await import("./db/schema.ts");
-const { forgetRunner, getJoinToken, heartbeatRunner, joinRunner, pickRunner } =
+const { forgetRunner, getJoinToken, heartbeatRunner, joinRunner, listRunners, pickRunner } =
   await import("./runners.ts");
+const { FOLDER_JOB_PROTOCOL, RUNNER_PROTOCOL, VERSION } = await import("#/lib/version.ts");
 
 await migrateIfNeeded();
 
@@ -64,6 +65,38 @@ describe("pickRunner", () => {
     await expect(
       pickRunner({ agentId: "codex", requiresHost: false }),
     ).rejects.toThrow("No runner is online");
+  });
+});
+
+describe("runner versions", () => {
+  it("counts a runner that says nothing as the first protocol, and out of date", async () => {
+    await givenRunner("old-box");
+    const [view] = await listRunners();
+    expect(view).toMatchObject({ version: null, protocol: 1, outdated: true });
+  });
+
+  it("keeps what a runner says on every heartbeat", async () => {
+    const { runnerId } = await givenRunner("new-box");
+    await heartbeatRunner(runnerId, CODEX, { version: VERSION, protocol: RUNNER_PROTOCOL });
+    const [view] = await listRunners();
+    expect(view).toMatchObject({ version: VERSION, protocol: RUNNER_PROTOCOL, outdated: false });
+  });
+
+  it("sends a job needing a newer protocol only to a runner that has it", async () => {
+    const old = await givenRunner("old-box");
+    await expect(
+      pickRunner({ agentId: "codex", requiresHost: false, minProtocol: FOLDER_JOB_PROTOCOL }),
+    ).rejects.toThrow(/too old for this job/);
+
+    const fresh = await givenRunner("new-box");
+    await heartbeatRunner(fresh.runnerId, CODEX, { version: VERSION, protocol: RUNNER_PROTOCOL });
+    expect(
+      await pickRunner({ agentId: "codex", requiresHost: false, minProtocol: FOLDER_JOB_PROTOCOL }),
+    ).toBe(fresh.runnerId);
+    // Anything else still goes to either.
+    expect([old.runnerId, fresh.runnerId]).toContain(
+      await pickRunner({ agentId: "codex", requiresHost: false }),
+    );
   });
 });
 

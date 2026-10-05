@@ -169,6 +169,8 @@ export type LoopReadiness = {
   availableAgentIds: string[];
   /** The same, but only on a runner that shares Loopable's disk. */
   hostAgentIds: string[];
+  /** The same, but only on a runner new enough to take a folder job. */
+  folderAgentIds: string[];
 };
 
 export type RunnerInventoryEntry = {
@@ -194,6 +196,11 @@ export type RunnerView = {
   status: "online" | "offline";
   inventory: RunnerInventoryEntry[];
   lastSeenAt: string | null;
+  /** Its loopable-cli version, or null for a runner too old to say. */
+  version: string | null;
+  protocol: number;
+  /** Older than this App: it may not take every job, and should be upgraded. */
+  outdated: boolean;
 };
 
 /** An agent as the browser sees it: settings, plus which runners have it. */

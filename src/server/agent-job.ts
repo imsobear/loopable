@@ -1,4 +1,5 @@
 import { isAbsolute, join } from "node:path";
+import { FOLDER_JOB_PROTOCOL } from "#/lib/version.ts";
 import type { AgentSettingsValues } from "#/agents/types.ts";
 
 export type AgentJobFile = { name: string; body: string };
@@ -68,6 +69,15 @@ export function resolveFolder(folder: string, home: string): string {
  */
 export function jobRequiresHost(job: Pick<AgentJob, "cwd">): boolean {
   return Boolean(job.cwd && folderIsLegacy(job.cwd));
+}
+
+/**
+ * The oldest runner protocol that can do this job. A relative folder and the
+ * workspace placeholder are both protocol 2; an older runner would run the
+ * agent in the wrong place and hand it a path that does not exist.
+ */
+export function jobMinProtocol(job: Pick<AgentJob, "cwd">): number {
+  return job.cwd && !folderIsLegacy(job.cwd) ? FOLDER_JOB_PROTOCOL : 0;
 }
 
 export function filesFromWorkItem(item: { context: AgentJobFile[] }): AgentJobFile[] {

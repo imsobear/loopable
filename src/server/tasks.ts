@@ -24,6 +24,7 @@ import {
   normalizeFolder,
   type AgentJob,
 } from "./agent-job.ts";
+import { FOLDER_JOB_PROTOCOL } from "#/lib/version.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { branchFor } from "./checkout.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -557,12 +558,15 @@ async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> 
     logPath = join(workspace, "agent.log");
     writeFileSync(logPath, "", { flag: "a" });
   }
+  const folder =
+    workflow.runsIn === "folder" && typeof loop.settings.folder === "string"
+      ? loop.settings.folder
+      : null;
   const runnerId = await pickRunner({
     agentId,
-    requiresHost:
-      workflow.runsIn === "folder" &&
-      typeof loop.settings.folder === "string" &&
-      folderIsLegacy(loop.settings.folder),
+    requiresHost: folder !== null && folderIsLegacy(folder),
+    // A relative folder needs a runner that resolves it under its own home.
+    minProtocol: folder !== null && !folderIsLegacy(folder) ? FOLDER_JOB_PROTOCOL : 0,
   });
   await updateTask(id, {
     state: "awaiting_agent",

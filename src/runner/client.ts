@@ -5,8 +5,12 @@ import { join } from "node:path";
 import { detectAgents } from "#/agents/inventory.ts";
 import { runAgentJob } from "#/server/agent-runner.ts";
 import type { AgentJob } from "#/server/agent-job.ts";
+import { RUNNER_PROTOCOL, VERSION } from "#/lib/version.ts";
 
 type Hello = { runnerId: string; runnerToken: string; name: string };
+
+/** Said on joining and on every heartbeat, so the App knows which jobs this can take. */
+const BUILD = { version: VERSION, protocol: RUNNER_PROTOCOL };
 
 async function json(url: string, token: string, path: string, body: unknown) {
   const res = await fetch(`${url}${path}`, {
@@ -60,12 +64,13 @@ export async function runRemoteLoop(input: { url: string; joinToken: string; log
   const hello = (await json(url, input.joinToken, "/api/runners/hello", {
     hostname: osHostname(),
     inventory,
+    ...BUILD,
   })) as Hello;
   input.log(`joined as ${hello.name} (${hello.runnerId})`);
   const token = hello.runnerToken;
 
   async function heartbeat() {
-    await json(url, token, "/api/runners/heartbeat", { inventory: await detectAgents() });
+    await json(url, token, "/api/runners/heartbeat", { inventory: await detectAgents(), ...BUILD });
   }
 
   await heartbeat();

@@ -10,11 +10,15 @@ export const Route = createFileRoute("/api/runners/hello")({
           const body = (await request.json()) as {
             hostname?: string;
             inventory?: Parameters<typeof joinRunner>[0]["inventory"];
+            version?: string;
+            protocol?: number;
           };
           const result = await joinRunner({
             joinToken: bearer(request),
             hostname: body.hostname ?? "unknown",
             inventory: body.inventory ?? [],
+            version: body.version,
+            protocol: body.protocol,
           });
           return Response.json(result);
         } catch (error) {
