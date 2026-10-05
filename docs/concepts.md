@@ -18,9 +18,9 @@ There is no second path where “the local dispatcher runs the agent.” The age
 
 **Connector.** A kind of service: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account.
 
-**Connection.** One credential of a connector — a GitHub login, a Slack bot, a Feishu bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
+**Connection.** One credential of a connector — a GitHub bot account, a Slack bot, a Feishu bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
 
-**Workflow.** A whole job a connector already knows how to do, named the way a person would name it: “Review pull requests I am asked to review.” It owns what to watch for, what to ask the agent, and where the answer is written. A loop is one instance of a workflow with its knobs set.
+**Workflow.** A whole job a connector already knows how to do, named the way a person would name it: “Review pull requests the bot is asked to review.” It owns what to watch for, what to ask the agent, and where the answer is written. A loop is one instance of a workflow with its knobs set.
 
 A workflow is not a loop template. Creating a loop copies the prompt onto the loop, and the loop owns that copy from then on. The loop still points at the workflow for the rest: the query, how the answer is parsed, whether the agent gets a checkout. If a connector stops offering a workflow, existing loops remain readable and deletable but not runnable.
 
@@ -72,7 +72,7 @@ The path does not change with how many runners you have. One runner on the same 
 | Where | Loopable’s secret store | That host’s home directory | That host’s home directory |
 | Who uses it | App and Dispatcher, to read signals and write back | The agent, via git on that host | Only the agent process |
 
-They stay apart even when two of them are GitHub. The Connection is the bot that watches and writes through the API. Runtime auth is git on that host, used by the agent when the prompt asks it to clone. Loopable does not copy the Connection token onto a runner or into an agent.
+They stay apart even when two of them are GitHub. The Connection is the team's bot account, which watches and writes through the API. Runtime auth is git on that host, used by the agent when the prompt asks it to clone. Sign that git in as the same bot account, so a branch and its pull request come from one name. Loopable does not copy the Connection token onto a runner or into an agent.
 
 The agent’s environment never contains Loopable’s service credentials. When a job needs a repository, the prompt tells the agent to clone it. That uses the machine’s git, not the Connection.
 

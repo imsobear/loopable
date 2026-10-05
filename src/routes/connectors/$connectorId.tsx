@@ -78,6 +78,16 @@ function ConnectorDetailPage() {
         ) : null}
       </header>
 
+      {/* Before connecting and on every visit after: the account a redirect
+          signs in as is whichever one the browser already holds, so this is
+          the only place to say which one it should be. */}
+      {manifest.auth.kind === "oauth_redirect" && manifest.auth.note ? (
+        <Alert>
+          <AlertTitle>Which account to connect</AlertTitle>
+          <AlertDescription>{manifest.auth.note}</AlertDescription>
+        </Alert>
+      ) : null}
+
       {scanning && manifest.auth.kind === "qr_scan" ? (
         <QrConnect
           connectorId={connectorId}

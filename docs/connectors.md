@@ -11,6 +11,26 @@ Each connector is a folder under `src/connectors/`. It exports two halves, and t
 
 The pages render entirely from manifests. Adding a connector means adding a folder and one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. No page changes. The contract lives in `src/connectors/types.ts`.
 
+## GitHub: a shared bot account
+
+Connect GitHub as a bot account the team owns, such as `acme-loopable`, not as a person. Loopable is the team's agent, and on GitHub the bot account is that agent:
+
+- **People send it work the normal way.** Request a review from it, or assign it an issue. The workflows watch `review-requested:@me` and `assignee:@me`, and `@me` is the connected account. On a personal account they would pick up that person's own reviews and issues.
+- **What it writes appears under its name.** Reviews, comments, and draft pull requests come from the bot, not from a teammate who did not write them.
+- **Its access is the team's choice.** OAuth asks for the `repo` scope, but the bot can only reach repositories it has been added to. Add it to the repositories, or to a team that holds them, and nothing else.
+- **It does not leave with anyone.** A personal connection stops working when that person leaves or loses access.
+
+To set it up:
+
+1. Create a GitHub account for the bot, with an email address the team controls. Store its password and 2FA in the team's password manager, held by an admin.
+2. Add it to the repositories Loopable should work in, with write access. Write access is what lets it review, comment, and open pull requests. On paid org plans the bot takes a seat.
+3. Sign in to GitHub as the bot, then click Connect in Loopable. GitHub authorizes whichever account the browser is signed in as, so a private window that holds only the bot's session is the easiest way.
+4. Sign the runner's git and `gh` in as the same bot. The agent clones and pushes with them, so the branch and the pull request then come from one name.
+
+Loopable does not check that the account is a bot. It works with a personal account too, but the workflows will act on that person's reviews and issues and write as them.
+
+A GitHub App was considered and set aside for now. An App cannot be requested as a reviewer or assigned an issue, so the workflows would need labels or mentions instead. Its installation tokens also expire after an hour, which does not suit the runner's git.
+
 ## GitHub OAuth
 
 End users never register an OAuth app. They click Connect. Loopable ships one GitHub app (and one Google app) whose callback is loopback:

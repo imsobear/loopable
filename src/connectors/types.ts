@@ -24,6 +24,11 @@ export type AuthDescriptor =
       scopes: string[];
       /** This install needs an app registration before anyone can connect. */
       needsAppRegistration: boolean;
+      /**
+       * Which account to sign in as, since the redirect authorizes whoever the
+       * browser is already signed in as and the consent screen does not ask.
+       */
+      note?: string;
     }
   | {
       kind: "token";

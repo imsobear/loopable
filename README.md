@@ -15,9 +15,9 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 | Comes in from | Loop | Writes back |
 | --- | --- | --- |
-| GitHub | Review pull requests I am asked to review | A review, as a comment |
-| GitHub | Plan issues assigned to me | A comment with a plan |
-| GitHub | Implement issues assigned to me | A draft pull request |
+| GitHub | Review pull requests the bot is asked to review | A review, as a comment |
+| GitHub | Plan issues assigned to the bot | A comment with a plan |
+| GitHub | Implement issues assigned to the bot | A draft pull request |
 | Slack bot | Do what I ask the bot (@mention or DM) | A reply in the thread |
 | Feishu / Lark bot | Do what I ask the bot (@mention in a group) | A reply in the thread |
 | Schedule | Do something on a schedule | The log, or a Slack or Lark channel |
@@ -60,7 +60,7 @@ npm install -g loopable-cli
 loopable start                # App + Dispatcher, bound on all interfaces
 ```
 
-On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address. Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
+On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address, signed in as your team's GitHub bot account rather than your own (see [GitHub: a shared bot account](docs/connectors.md#github-a-shared-bot-account)). Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
 
 ```bash
 loopable runner --url http://<LAN-IP>:4321 --token <from Runners>

@@ -38,6 +38,7 @@ An agent that runs with nobody watching has to be boring by default.
 
 - Agents start read-only in your folders. GitHub jobs work in a fresh checkout, never in someone’s working copy.
 - Service credentials stay in Loopable. The agent never sees them.
+- GitHub is connected as a shared bot account the team owns, never someone’s own login. Its access is the repositories the team adds it to.
 - A review is posted as a comment, never an approval. Code goes into a draft pull request, never a merge.
 - A new loop records what is already waiting. It does not run it.
 - Loopable needs no public URL. It polls Slack, Lark, and GitHub. Nothing on the internet has to reach the office Mac.

@@ -106,7 +106,7 @@ const IMPLEMENT_PROMPT = [
 export const githubManifest = defineManifest({
   id: "github",
   name: "GitHub",
-  tagline: "Pick up review requests and assigned issues.",
+  tagline: "Pick up reviews and issues sent to your team's GitHub bot account.",
   docsUrl: "https://docs.github.com/rest",
   icon: "Github",
   accent: "bg-neutral-900 text-white",
@@ -114,15 +114,19 @@ export const githubManifest = defineManifest({
     kind: "oauth_redirect",
     scopes: GITHUB_SCOPES,
     needsAppRegistration: true,
+    // The Connection is the team's agent on GitHub, not anyone's own login:
+    // whatever it writes appears under its name, and the work it picks up is
+    // whatever the team sends to it.
+    note: "Sign in as a shared bot account for your team, not your own. Reviews, comments and pull requests appear under its name, and it sees only the repositories you add it to. Sign in to GitHub as the bot first; GitHub authorizes whichever account the browser is signed in as.",
   },
   workflows: [
     {
       id: "github.review_requested",
-      name: "Review pull requests I am asked to review",
-      summary: "Reads the change and posts a review whenever someone asks for yours.",
+      name: "Review pull requests the bot is asked to review",
+      summary: "Reads the change and posts a review whenever someone requests one from the bot account.",
       // Team requests matter more than they sound: in most repositories with a
       // CODEOWNERS file, review arrives addressed to a team rather than a person.
-      trigger: "your review is requested, either directly or through a team you belong to",
+      trigger: "someone requests a review from the bot account, directly or through a team it belongs to",
       // review-requested covers teams; user-review-requested would not.
       watches: "is:open is:pr review-requested:@me",
       writes: "a review on the pull request, as a comment rather than an approval",
@@ -136,9 +140,9 @@ export const githubManifest = defineManifest({
     },
     {
       id: "github.issue_assigned",
-      name: "Plan issues assigned to me",
-      summary: "Posts a short implementation plan when an issue lands on you.",
-      trigger: "an issue is assigned to you",
+      name: "Plan issues assigned to the bot",
+      summary: "Posts a short implementation plan when an issue is assigned to the bot account.",
+      trigger: "an issue is assigned to the bot account",
       // is:issue matters: without it this would pick up your own pull requests.
       watches: "is:open is:issue assignee:@me",
       writes: "a comment on the issue",
@@ -151,13 +155,13 @@ export const githubManifest = defineManifest({
     },
     {
       id: "github.issue_implement",
-      name: "Implement issues assigned to me",
+      name: "Implement issues assigned to the bot",
       summary: "Writes the change and opens a draft pull request.",
-      trigger: "an issue is assigned to you",
+      trigger: "an issue is assigned to the bot account",
       watches: "is:open is:issue assignee:@me",
       writes: "a draft pull request",
       // The only workflow that writes code, and so the only one whose agent
-      // gets somewhere to write. Kept apart from "Plan issues assigned to me"
+      // gets somewhere to write. Kept apart from "Plan issues assigned to the bot"
       // rather than replacing it: asking for a plan and asking for the change
       // are different jobs, and which one an issue deserves is a judgement
       // about the issue.
@@ -204,9 +208,10 @@ export const githubManifest = defineManifest({
   // Nothing to configure per account: what the account can see is what GitHub
   // decides, and every narrowing choice belongs to a loop.
   settings: [],
-  // The redirect authorizes whichever account the browser is already signed in
-  // as, so a second account is out of reach without signing out of GitHub
-  // first. Connections are still rows, so this is a product decision only.
+  // One bot account per team. The redirect also authorizes whichever account
+  // the browser is already signed in as, so a second one is out of reach
+  // without signing out of GitHub first. Connections are still rows, so this
+  // is a product decision only.
   allowsMultipleAccounts: false,
   byHand: { kind: "link", placeholder: "https://github.com/acme/web/pull/123" },
 });
