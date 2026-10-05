@@ -3,6 +3,7 @@ import {
   addressOf,
   attachmentNames,
   bodyText,
+  composeMail,
   headerOf,
   htmlToText,
   mailContext,
@@ -216,5 +217,26 @@ describe("mailContext", () => {
   it("says so rather than handing over an empty file", () => {
     const mail = message({ headers: headers({ From: "a@b.c", Subject: "Nothing" }) });
     expect(mailContext(mail).body).toContain("(this message has no readable text)");
+  });
+});
+
+describe("composeMail", () => {
+  const decode = (raw: string) =>
+    Buffer.from(raw.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+
+  it("writes a plain-text message Gmail can send", () => {
+    const text = decode(composeMail({ to: "team@example.com", subject: "Daily check", body: "All fine." }));
+    expect(text).toContain("To: team@example.com\r\n");
+    expect(text).toContain("Subject: Daily check\r\n");
+    expect(text).toContain('Content-Type: text/plain; charset="UTF-8"');
+    const body = text.split("\r\n\r\n")[1]!.replace(/\r\n/g, "");
+    expect(Buffer.from(body, "base64").toString("utf8")).toBe("All fine.");
+  });
+
+  it("encodes a subject and body that are not ASCII", () => {
+    const text = decode(composeMail({ to: "a@example.com", subject: "每日检查", body: "一切正常" }));
+    expect(text).toContain(`Subject: =?UTF-8?B?${Buffer.from("每日检查").toString("base64")}?=`);
+    const body = text.split("\r\n\r\n")[1]!.replace(/\r\n/g, "");
+    expect(Buffer.from(body, "base64").toString("utf8")).toBe("一切正常");
   });
 });

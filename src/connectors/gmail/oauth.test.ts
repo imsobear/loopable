@@ -34,9 +34,9 @@ describe("buildAuthorizeUrl", () => {
     expect(url().searchParams.get("prompt")).toBe("consent");
   });
 
-  it("asks only to read mail", () => {
+  it("asks to read and to send mail, and nothing more", () => {
     expect(url().searchParams.get("scope")).toBe(
-      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send",
     );
   });
 });

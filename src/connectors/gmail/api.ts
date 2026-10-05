@@ -2,11 +2,21 @@ import { TransientError } from "../errors.ts";
 
 const BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 
-async function request<T>(accessToken: string, path: string): Promise<T> {
+async function request<T>(
+  accessToken: string,
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      method: init.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
     });
   } catch (error) {
     throw new TransientError(
@@ -21,6 +31,10 @@ async function request<T>(accessToken: string, path: string): Promise<T> {
     // and "slow down", which will. Gmail says which in the body.
     const backoff = res.status === 403 && /rateLimitExceeded|userRateLimitExceeded/i.test(detail);
     if (res.status === 429 || res.status >= 500 || backoff) throw new TransientError(message);
+    // A connection made before sending was offered has no send scope.
+    if (res.status === 403 && /insufficient.*scope|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(detail)) {
+      throw new Error("This Gmail connection cannot send mail. Reconnect Gmail to allow it.");
+    }
     throw new Error(message);
   }
   return (await res.json()) as T;
@@ -90,4 +104,9 @@ export function getMessageHeaders(accessToken: string, id: string): Promise<Gmai
 
 export function getMessage(accessToken: string, id: string): Promise<GmailMessage> {
   return request<GmailMessage>(accessToken, `/messages/${id}?format=full`);
+}
+
+/** Send a message already written as RFC 2822 text. */
+export function sendMessage(accessToken: string, raw: string): Promise<{ id: string; threadId?: string }> {
+  return request(accessToken, "/messages/send", { method: "POST", body: { raw } });
 }

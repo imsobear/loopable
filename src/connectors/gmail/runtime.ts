@@ -1,7 +1,7 @@
 import { defineRuntime } from "../define.ts";
 import { oauthAppRegistration } from "../oauth-app.ts";
-import { getMessage, getProfile } from "./api.ts";
-import { mailContext, mailRef, permalink, summarise } from "./mail.ts";
+import { getMessage, getProfile, sendMessage } from "./api.ts";
+import { composeMail, mailContext, mailRef, permalink, summarise } from "./mail.ts";
 import {
   buildAuthorizeUrl,
   createPkce,
@@ -93,8 +93,18 @@ export const gmailRuntime = defineRuntime({
     };
   },
 
-  // No applyAction: this connector reads. A loop built on it answers through
-  // whichever connector it is pointed at.
+  async applyAction({ actionId, target, source, body, credential }) {
+    if (actionId !== "gmail.send") throw new Error(`Gmail cannot ${actionId}.`);
+    const to = typeof target.to === "string" ? target.to.trim() : "";
+    if (!to) throw new Error("This loop does not say who to email. Set To on the loop.");
+    const named = typeof target.subject === "string" ? target.subject.trim() : "";
+    const { accessToken } = await usableToken(credential as GmailCredential);
+    const sent = await sendMessage(
+      accessToken,
+      composeMail({ to, subject: named || source.title || "From Loopable", body }),
+    );
+    return { url: permalink(sent.id) };
+  },
 
   auth: {
     async startAuthorization({ redirectUri, state }) {

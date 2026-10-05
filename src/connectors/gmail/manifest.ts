@@ -1,16 +1,18 @@
 import { defineManifest } from "../define.ts";
 
 /**
- * Reading is the whole of it. Gmail has no send scope here on purpose: an
- * agent that can reply as you, to anyone, is a different and much larger thing
- * to agree to than one that reads your inbox and tells you about it.
+ * Read, and send. Sending is only ever to the address a loop names, and the
+ * agent never holds the token; Loopable sends what the agent wrote.
  */
-export const GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+export const GMAIL_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+];
 
 export const gmailManifest = defineManifest({
   id: "gmail",
   name: "Gmail",
-  tagline: "Connect an inbox. There are no Gmail workflows yet.",
+  tagline: "Send a loop's answer as an email from a connected account.",
   docsUrl: "https://developers.google.com/gmail/api/guides",
   icon: "Gmail",
   // Gmail's own red, now that the mark is Gmail's own too. A near miss on a
@@ -21,13 +23,34 @@ export const gmailManifest = defineManifest({
     scopes: GMAIL_SCOPES,
     needsAppRegistration: true,
   },
-  // No workflows for now. "Tell me about new mail" was one person's inbox,
-  // and Loopable is the team's agent. Connecting still works, so a workflow
-  // can come back without asking anyone to sign in again.
+  // Nothing to watch for now: "Tell me about new mail" was one person's
+  // inbox, and Loopable is the team's agent. Gmail is somewhere answers go.
   workflows: [],
-  // Read-only, so there is nothing to offer. A loop built on Gmail writes
-  // through whichever connector it picks.
-  actions: [],
+  actions: [
+    {
+      id: "gmail.send",
+      name: "Send an email",
+      summary: "Send the answer as an email from the connected account.",
+      target: [
+        {
+          key: "to",
+          kind: "text",
+          label: "To",
+          help: "One address, or several separated by commas.",
+          placeholder: "team@example.com",
+        },
+        {
+          key: "subject",
+          kind: "text",
+          label: "Subject",
+          help: "Empty uses what the run was about.",
+          placeholder: "Daily check",
+        },
+      ],
+      // A review sent here reads as prose, with file and line written in.
+      accepts: ["text"],
+    },
+  ],
   settings: [],
   // The redirect authorizes whichever account the browser is signed in as, so
   // reaching a second one means signing out of Google first.

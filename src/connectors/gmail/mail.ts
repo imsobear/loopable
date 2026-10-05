@@ -151,3 +151,30 @@ export function mailContext(message: GmailMessage): { name: string; body: string
     ].join("\n"),
   };
 }
+
+/** Base64url, as Gmail wants a raw message. */
+function base64url(text: string): string {
+  return Buffer.from(text, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** A header value that may hold any text, encoded so non-ASCII survives. */
+function encodedWord(text: string): string {
+  return /^[\x20-\x7e]*$/.test(text) ? text : `=?UTF-8?B?${Buffer.from(text, "utf8").toString("base64")}?=`;
+}
+
+/**
+ * A plain-text email as Gmail's `raw`. The body is base64 so any line length
+ * and any language go through untouched.
+ */
+export function composeMail(input: { to: string; subject: string; body: string }): string {
+  const lines = [
+    `To: ${input.to}`,
+    `Subject: ${encodedWord(input.subject)}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(input.body, "utf8").toString("base64").replace(/.{76}/g, "$&\r\n"),
+  ];
+  return base64url(lines.join("\r\n"));
+}
