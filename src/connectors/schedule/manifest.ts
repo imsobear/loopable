@@ -80,23 +80,29 @@ export const scheduleManifest = defineManifest({
   allowsMultipleAccounts: false,
   byHand: { kind: "now" },
   settings: [],
-  workflows: [
+  triggers: [
     {
       id: "schedule.recurring",
-      name: "Do something on a schedule",
-      summary: "Runs the agent at the times you set, in a folder you name. The answer stays in Inbox, or goes to Slack, Lark, or GitHub.",
-      trigger: "the time you set comes round",
       when: "On a schedule",
+      trigger: "the time you set comes round",
       // No query to show. A clock is not something one can be written for,
       // and an invented one shown as if it were real is worse than nothing.
-      writes: "a note in the log",
       runsIn: "folder",
       settings: [every, at, weekday, folder],
-      prompt: RECURRING_PROMPT,
       guidancePlaceholder:
         "Anything that holds every time this runs. For example: this repository releases on Thursdays, so say if anything is unmerged by Wednesday evening.",
       answer: "text",
       actionId: "schedule.record",
+    },
+  ],
+  workflows: [
+    {
+      id: "schedule.recurring",
+      name: "Do something on a schedule",
+      summary:
+        "Runs the agent at the times you set, in a folder you name. The answer stays in Inbox, or goes to Slack, Lark, or GitHub.",
+      triggerId: "schedule.recurring",
+      prompt: RECURRING_PROMPT,
     },
   ],
   actions: [

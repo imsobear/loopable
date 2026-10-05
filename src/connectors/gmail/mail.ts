@@ -166,10 +166,17 @@ function encodedWord(text: string): string {
  * A plain-text email as Gmail's `raw`. The body is base64 so any line length
  * and any language go through untouched.
  */
-export function composeMail(input: { to: string; subject: string; body: string }): string {
+export function composeMail(input: {
+  to: string;
+  subject: string;
+  body: string;
+  /** The Message-ID being answered, so mail clients thread it. */
+  inReplyTo?: string;
+}): string {
   const lines = [
     `To: ${input.to}`,
     `Subject: ${encodedWord(input.subject)}`,
+    ...(input.inReplyTo ? [`In-Reply-To: ${input.inReplyTo}`, `References: ${input.inReplyTo}`] : []),
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",

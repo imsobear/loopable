@@ -108,36 +108,35 @@ export type SettingField =
     };
 
 /**
- * A whole job, named the way a person would name it: watch for this, ask an
- * agent that, write the answer there. A loop is one instance of a workflow
- * with its knobs set.
+ * Something a connector can watch for: what starts a loop. "Starts when" in
+ * the UI.
  *
- * The prompt lives here rather than on the loop because "review a pull
- * request" is a problem the connector should solve once and get right, instead
- * of every person rediscovering it in an empty box. A loop may add to it, and
- * most never will.
+ * It owns everything about the run that only makes sense alongside the code
+ * that watches and reads: the query, where the agent runs, what shape the
+ * answer must take. A custom loop is a trigger and nothing else; a workflow
+ * is a trigger with a prompt somebody already got right.
  */
-export type WorkflowDescriptor = {
+export type TriggerDescriptor = {
+  /**
+   * The same id the poll is asked about. A workflow on this trigger shares it
+   * when there is exactly one, which is what keeps loops made before triggers
+   * were their own thing pointing at something that still exists.
+   */
   id: string;
-  name: string;
-  summary: string;
-  /** What arrives, as a sentence a loop card can read back. */
+  /** In a few words, for choosing a trigger: "A review is requested". */
+  when: string;
+  /** What arrives, as a sentence a loop can read back. */
   trigger: string;
-  /** The same in a few words, for choosing a trigger: "A review is requested". */
-  when?: string;
   /**
    * The same thing exactly, in whatever the service itself understands. Shown
-   * so that "when your review is requested" can be checked rather than taken
-   * on trust, and read by the connector when it polls, so what a loop says it
-   * watches for cannot drift from what it asks.
+   * so that it can be checked rather than taken on trust, and read by the
+   * connector when it polls, so what a loop says it watches for cannot drift
+   * from what it asks.
    *
    * Absent when there is no query to show: a stream of messages is not
-   * something one can be written for, and an invented one shown as if it were
-   * real is worse than saying nothing.
+   * something one can be written for.
    */
   watches?: string;
-  /** What gets written, as a sentence. */
-  writes: string;
   /**
    * Where the agent runs. "temp" is a scratch directory holding the context
    * files and nothing else. "folder" is a directory the loop names, for work
@@ -148,43 +147,65 @@ export type WorkflowDescriptor = {
   runsIn?: "temp" | "folder" | "checkout";
   /** The knobs a loop may set, in the connector's own words. */
   settings: SettingField[];
-  /** Owned here. A loop's guidance is appended, never substituted. */
-  prompt: string;
-  guidancePlaceholder?: string;
   /**
    * What shape the answer takes. "text" is one block of prose to post;
    * "review" is a summary plus findings that get attached to lines.
    */
   answer: AnswerShape;
-  /** Which action a loop starts out carrying the answer with. */
+  guidancePlaceholder?: string;
+  /** Where an answer goes until a loop says otherwise. */
   actionId: string;
   /**
-   * Which connector that action belongs to, when it is not this one.
-   *
-   * Most workflows answer where they read, and leave this alone. Some cannot:
-   * a connector that only reads has nowhere to put an answer, and a workflow
-   * whose entire point is to tell you about something somewhere you are
-   * actually looking has to name that somewhere to be any use on the day it
-   * is turned on. It is still only a starting point, and a loop may point
-   * anywhere once it exists.
+   * Which connector that action belongs to, when it is not this one: a
+   * connector that only reads, or a trigger whose answer belongs elsewhere.
    */
   actionConnectorId?: ConnectorId;
   /**
-   * What that action should be told about where to write. Against the
-   * action's own `target` fields, and needed when the action's default cannot
-   * apply: "whoever asked" means nothing to a loop that no person started.
+   * What that action should be told about where to write, when its default
+   * cannot apply: "whoever asked" means nothing to a loop no person started.
    */
   actionTarget?: ConnectionSettings;
   /**
    * How long a new loop should leave between looks, when looking as often as
-   * the dispatcher does is the wrong pace for this workflow. A starting point like
-   * the rest of these, and the loop's own once it exists.
-   *
-   * Worth setting where arriving one at a time is the problem rather than the
-   * point: a workflow that weighs a batch to decide what deserves an agent has
-   * no batch to weigh if it is handed each item the moment it lands.
+   * the dispatcher does is the wrong pace. A starting point, and the loop's
+   * own once it exists.
    */
   pollEveryMs?: number;
+};
+
+/**
+ * A whole job, named the way a person would name it: one trigger, a prompt
+ * the connector got right once instead of every person rediscovering it in an
+ * empty box, and where the answer goes. A loop copies the prompt and owns it.
+ */
+export type WorkflowDefinition = {
+  id: string;
+  name: string;
+  summary: string;
+  triggerId: string;
+  prompt: string;
+  guidancePlaceholder?: string;
+  /** Overrides of the trigger's starting points. */
+  actionId?: string;
+  actionConnectorId?: ConnectorId;
+  actionTarget?: ConnectionSettings;
+  pollEveryMs?: number;
+};
+
+/**
+ * A trigger, and the workflow on it when there is one, as the one thing a
+ * loop runs. A loop names this by `workflowId`, which is a workflow's id or,
+ * for a custom loop, a trigger's.
+ */
+export type WorkflowDescriptor = Omit<TriggerDescriptor, "id"> & {
+  id: string;
+  triggerId: string;
+  name: string;
+  summary: string;
+  /** Empty for a custom loop, which brings its own. */
+  prompt: string;
+  /** True when there is no workflow, only the trigger. */
+  custom: boolean;
 };
 
 export type ConnectorManifest = {
@@ -198,7 +219,11 @@ export type ConnectorManifest = {
   /** Tailwind class for the card icon tile. */
   accent: string;
   auth: AuthDescriptor;
-  workflows: WorkflowDescriptor[];
+  /** What can start a loop: "Starts when". */
+  triggers: TriggerDescriptor[];
+  /** Ready-made jobs, each on one of the triggers above. */
+  workflows: WorkflowDefinition[];
+  /** Where an answer can go: "Send to". */
   actions: ActionDescriptor[];
   settings: SettingField[];
   /** Connecting more than one account of this connector is meaningful. */

@@ -64,23 +64,28 @@ export const feishuManifest = defineManifest({
       },
     ],
   },
+  triggers: [
+    {
+      id: "feishu.ask",
+      when: "The Feishu / Lark bot is mentioned",
+      trigger: "someone @mentions the Feishu / Lark bot in a group it is in",
+      runsIn: "folder",
+      settings: [folder],
+      guidancePlaceholder:
+        "Anything the agent should know about this project before it starts. For example: run pnpm test before saying a change works.",
+      answer: "text",
+      actionId: "feishu.reply",
+      pollEveryMs: 60_000,
+    },
+  ],
   workflows: [
     {
       id: "feishu.ask",
       name: "Do what I ask the Feishu / Lark bot",
       summary:
         "Runs the agent when someone @mentions the Feishu / Lark bot in a group, and answers in the thread.",
-      trigger: "someone @mentions the Feishu / Lark bot in a group it is in",
-      when: "The Feishu / Lark bot is mentioned",
-      writes: "a reply in the thread",
-      runsIn: "folder",
-      settings: [folder],
+      triggerId: "feishu.ask",
       prompt: ASK_PROMPT,
-      guidancePlaceholder:
-        "Anything the agent should know about this project before it starts. For example: run pnpm test before saying a change works.",
-      answer: "text",
-      actionId: "feishu.reply",
-      pollEveryMs: 60_000,
     },
   ],
   actions: [

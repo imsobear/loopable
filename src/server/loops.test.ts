@@ -11,11 +11,11 @@ const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops } = await import("./db/schema.ts");
 const { createLoop, getLoop, updateLoop } = await import("./loops.ts");
 const { draftForWorkflow } = await import("#/lib/loop-draft.ts");
-const { githubManifest } = await import("#/connectors/github/manifest.ts");
+const { connectorWorkflow } = await import("#/connectors/manifests.ts");
 
 await migrateIfNeeded();
 
-const REVIEW = githubManifest.workflows.find((entry) => entry.id === "github.review_requested")!;
+const REVIEW = connectorWorkflow("github", "github.review_requested")!;
 
 /** Both steps at once: what the form does when somebody presses the button. */
 function added(connectorId: string, workflowId: string, changes: Record<string, unknown> = {}) {
@@ -69,6 +69,31 @@ describe("choosing a workflow", () => {
     expect(draft.prompt).toBe(REVIEW.prompt);
     // On when saved, because pressing the button is the whole of meaning to.
     expect(draft.enabled).toBe(true);
+  });
+});
+
+describe("what a loop runs", () => {
+  it("is a workflow on top of its trigger", () => {
+    expect(REVIEW.custom).toBe(false);
+    expect(REVIEW.triggerId).toBe("github.review_requested");
+    expect(REVIEW.watches).toBe("is:open is:pr review-requested:@me");
+    expect(REVIEW.actionId).toBe("github.submit_review");
+  });
+
+  it("is a trigger alone when no workflow sits on it", () => {
+    const mail = connectorWorkflow("gmail", "gmail.new_mail")!;
+    expect(mail.custom).toBe(true);
+    expect(mail.prompt).toBe("");
+    // A trigger that only reads keeps its answer in Inbox until told otherwise.
+    expect(draftForWorkflow("gmail", "gmail.new_mail")).toMatchObject({
+      prompt: "",
+      actionConnectorId: "schedule",
+      actionId: "schedule.record",
+    });
+  });
+
+  it("is nothing for an id no connector knows", () => {
+    expect(connectorWorkflow("github", "github.nonsense")).toBeUndefined();
   });
 });
 

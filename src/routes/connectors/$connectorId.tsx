@@ -124,7 +124,7 @@ function ConnectorDetailPage() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-medium">Loops</h2>
-          {manifest.workflows.length > 0 ? (
+          {manifest.triggers.length > 0 ? (
             <Button variant="ghost" size="sm" nativeButton={false} render={<Link to="/loops/new" />}>
               <Plus />
               New loop
@@ -158,10 +158,19 @@ function ConnectorDetailPage() {
         )}
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-3">
+        <CapabilityList
+          title="Starts when"
+          empty="Nothing. This connector cannot start a loop."
+          items={manifest.triggers.map((trigger) => ({
+            id: trigger.id,
+            name: trigger.when,
+            summary: `When ${trigger.trigger}.`,
+          }))}
+        />
         <CapabilityList
           title="Workflows"
-          empty="None yet."
+          empty="None. Use a custom loop."
           items={manifest.workflows.map((workflow) => ({
             id: workflow.id,
             name: workflow.name,
@@ -169,7 +178,7 @@ function ConnectorDetailPage() {
           }))}
         />
         <CapabilityList
-          title="Writes"
+          title="Send to"
           empty="Nothing. This connector only reads."
           items={manifest.actions.map((action) => ({
             id: action.id,

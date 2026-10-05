@@ -105,25 +105,41 @@ export const githubManifest = defineManifest({
     // if they are happy for it to be shared.
     note: "Connect the account the team will send work to. An account made for this is cleanest, but your own works too if you are happy to share it. Reviews and comments appear under its name, and it sees only the repositories it can access. Sign in to GitHub as that account first; GitHub authorizes whichever account the browser is signed in as.",
   },
+  triggers: [
+    {
+      id: "github.review_requested",
+      when: "A GitHub review is requested",
+      // Team requests matter more than they sound: in most repositories with a
+      // CODEOWNERS file, review arrives addressed to a team rather than a person.
+      trigger: "someone requests a review from the connected account, directly or through its team",
+      // review-requested covers teams; user-review-requested would not.
+      watches: "is:open is:pr review-requested:@me",
+      settings: [repositories, ignoreDrafts, ignoreBots, sizeLimit],
+      runsIn: "checkout",
+      answer: "review",
+      actionId: "github.submit_review",
+    },
+    {
+      id: "github.issue_assigned",
+      when: "A GitHub issue is assigned",
+      trigger: "an issue is assigned to the connected account",
+      // is:issue matters: without it this would pick up pull requests too.
+      watches: "is:open is:issue assignee:@me",
+      settings: [repositories],
+      runsIn: "checkout",
+      answer: "text",
+      actionId: "github.post_issue_comment",
+    },
+  ],
   workflows: [
     {
       id: "github.review_requested",
       name: "Review pull requests",
       summary: "Posts a review when someone requests one from the connected account.",
-      // Team requests matter more than they sound: in most repositories with a
-      // CODEOWNERS file, review arrives addressed to a team rather than a person.
-      trigger: "someone requests a review from the connected account, directly or through its team",
-      when: "A GitHub review is requested",
-      // review-requested covers teams; user-review-requested would not.
-      watches: "is:open is:pr review-requested:@me",
-      writes: "a review on the pull request, as a comment rather than an approval",
-      settings: [repositories, ignoreDrafts, ignoreBots, sizeLimit],
+      triggerId: "github.review_requested",
       prompt: REVIEW_PROMPT,
       guidancePlaceholder:
         "Anything specific to your team. For example: we require a test for every new endpoint.",
-      answer: "review",
-      runsIn: "checkout",
-      actionId: "github.submit_review",
     },
     {
       // The id is the one "Plan issues assigned to me" had. Planning was one
@@ -132,18 +148,10 @@ export const githubManifest = defineManifest({
       id: "github.issue_assigned",
       name: "Reply to issues",
       summary: "Answers an issue in a comment when it is assigned to the connected account.",
-      trigger: "an issue is assigned to the connected account",
-      when: "A GitHub issue is assigned",
-      // is:issue matters: without it this would pick up pull requests too.
-      watches: "is:open is:issue assignee:@me",
-      writes: "a comment on the issue",
-      settings: [repositories],
+      triggerId: "github.issue_assigned",
       prompt: REPLY_PROMPT,
       guidancePlaceholder:
         "Anything specific to this codebase worth knowing before answering. For example: questions about billing should point at docs/billing.md.",
-      answer: "text",
-      runsIn: "checkout",
-      actionId: "github.post_issue_comment",
     },
   ],
   actions: [

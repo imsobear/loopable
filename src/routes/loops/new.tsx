@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { allWorkflows, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
+import { allTriggers, allWorkflows, connectorManifest, connectorWorkflow } from "@/connectors/manifests.ts";
 import type { ConnectorManifest, WorkflowDescriptor } from "@/connectors/types.ts";
 import type { LoopView } from "@/lib/domain.ts";
 import { draftForWorkflow } from "@/lib/loop-draft.ts";
@@ -106,14 +106,14 @@ function CustomLoop({ connectorId, workflowId }: { connectorId: string; workflow
           <SelectValue>
             {() => {
               const workflow = connectorWorkflow(connectorId, workflowId);
-              return workflow?.when ?? workflow?.name ?? workflowId;
+              return workflow?.when ?? workflowId;
             }}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {allWorkflows().map(({ connector, workflow }) => (
-            <SelectItem key={workflow.id} value={`${connector.id}::${workflow.id}`}>
-              {workflow.when ?? workflow.name}
+          {allTriggers().map(({ connector, trigger }) => (
+            <SelectItem key={`${connector.id}::${trigger.id}`} value={`${connector.id}::${trigger.id}`}>
+              {trigger.when}
             </SelectItem>
           ))}
         </SelectContent>

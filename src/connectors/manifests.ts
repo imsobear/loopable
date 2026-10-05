@@ -8,6 +8,7 @@ import type {
   ActionDescriptor,
   ConnectorId,
   ConnectorManifest,
+  TriggerDescriptor,
   WorkflowDescriptor,
 } from "./types.ts";
 
@@ -47,11 +48,53 @@ export function connectionNoun(id: ConnectorId): "account" | "bot" {
   return connectorManifest(id)?.auth.kind === "token" ? "bot" : "account";
 }
 
+export function connectorTrigger(
+  connectorId: ConnectorId,
+  triggerId: string,
+): TriggerDescriptor | undefined {
+  return connectorManifest(connectorId)?.triggers.find((entry) => entry.id === triggerId);
+}
+
+/** A trigger with nothing on top: what a custom loop runs. */
+function customOn(trigger: TriggerDescriptor): WorkflowDescriptor {
+  return {
+    ...trigger,
+    triggerId: trigger.id,
+    name: trigger.when,
+    summary: `When ${trigger.trigger}.`,
+    prompt: "",
+    custom: true,
+  };
+}
+
+/**
+ * What a loop runs, by the id it stores: a workflow, merged with the trigger
+ * it sits on, or a trigger alone for a custom loop.
+ */
 export function connectorWorkflow(
   connectorId: ConnectorId,
   workflowId: string,
 ): WorkflowDescriptor | undefined {
-  return connectorManifest(connectorId)?.workflows.find((entry) => entry.id === workflowId);
+  const manifest = connectorManifest(connectorId);
+  if (!manifest) return undefined;
+  const defined = manifest.workflows.find((entry) => entry.id === workflowId);
+  if (defined) {
+    const trigger = manifest.triggers.find((entry) => entry.id === defined.triggerId);
+    if (!trigger) return undefined;
+    return {
+      ...trigger,
+      ...defined,
+      guidancePlaceholder: defined.guidancePlaceholder ?? trigger.guidancePlaceholder,
+      actionId: defined.actionId ?? trigger.actionId,
+      actionConnectorId: defined.actionConnectorId ?? trigger.actionConnectorId,
+      actionTarget: defined.actionTarget ?? trigger.actionTarget,
+      pollEveryMs: defined.pollEveryMs ?? trigger.pollEveryMs,
+      triggerId: trigger.id,
+      custom: false,
+    };
+  }
+  const trigger = manifest.triggers.find((entry) => entry.id === workflowId);
+  return trigger ? customOn(trigger) : undefined;
 }
 
 export function connectorAction(
@@ -109,6 +152,20 @@ export function allWorkflows(): Array<{
     ...CONNECTOR_MANIFESTS.filter((connector) => connector.id !== "schedule"),
   ];
   return ordered.flatMap((connector) =>
-    connector.workflows.map((workflow) => ({ connector, workflow })),
+    connector.workflows.map((entry) => ({
+      connector,
+      workflow: connectorWorkflow(connector.id, entry.id)!,
+    })),
+  );
+}
+
+/** Every trigger on offer, the clock first, for choosing what starts a custom loop. */
+export function allTriggers(): Array<{ connector: ConnectorManifest; trigger: TriggerDescriptor }> {
+  const ordered = [
+    ...CONNECTOR_MANIFESTS.filter((connector) => connector.id === "schedule"),
+    ...CONNECTOR_MANIFESTS.filter((connector) => connector.id !== "schedule"),
+  ];
+  return ordered.flatMap((connector) =>
+    connector.triggers.map((trigger) => ({ connector, trigger })),
   );
 }

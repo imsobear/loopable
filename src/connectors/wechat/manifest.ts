@@ -82,23 +82,28 @@ export const wechatManifest: ConnectorManifest = {
     kind: "qr_scan",
     note: "Scanning binds a bot to your WeChat account. Loopable can then read what people send that bot and answer as it, and nothing else on your account.",
   },
+  triggers: [
+    {
+      id: "wechat.ask",
+      when: "The WeChat bot gets a message",
+      trigger: "someone sends the WeChat bot a message",
+      // No query to show: messages arrive on a stream rather than being found
+      // by asking, so there is nothing here that could be checked.
+      runsIn: "folder",
+      settings: [folder, askers],
+      guidancePlaceholder:
+        "Anything the agent should know about this project before it starts. For example: run pnpm test before saying a change works.",
+      answer: "text",
+      actionId: "wechat.reply",
+    },
+  ],
   workflows: [
     {
       id: "wechat.ask",
       name: "Do what I ask the WeChat bot",
       summary: "Runs the agent when someone messages the WeChat bot, and answers in the chat.",
-      trigger: "someone sends the WeChat bot a message",
-      when: "The WeChat bot gets a message",
-      // No query to show: messages arrive on a stream rather than being found
-      // by asking, so there is nothing here that could be checked.
-      writes: "a reply in the chat",
-      runsIn: "folder",
-      settings: [folder, askers],
+      triggerId: "wechat.ask",
       prompt: ASK_PROMPT,
-      guidancePlaceholder:
-        "Anything the agent should know about this project before it starts. For example: run pnpm test before saying a change works.",
-      answer: "text",
-      actionId: "wechat.reply",
     },
   ],
   actions: [

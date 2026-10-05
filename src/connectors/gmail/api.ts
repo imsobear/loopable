@@ -106,7 +106,14 @@ export function getMessage(accessToken: string, id: string): Promise<GmailMessag
   return request<GmailMessage>(accessToken, `/messages/${id}?format=full`);
 }
 
-/** Send a message already written as RFC 2822 text. */
-export function sendMessage(accessToken: string, raw: string): Promise<{ id: string; threadId?: string }> {
-  return request(accessToken, "/messages/send", { method: "POST", body: { raw } });
+/** Send a message already written as RFC 2822 text, in a thread when one is given. */
+export function sendMessage(
+  accessToken: string,
+  raw: string,
+  threadId?: string,
+): Promise<{ id: string; threadId?: string }> {
+  return request(accessToken, "/messages/send", {
+    method: "POST",
+    body: threadId ? { raw, threadId } : { raw },
+  });
 }

@@ -60,15 +60,15 @@ function candidates(items: SearchItem[], repositories: string[]): Candidate[] {
 }
 
 /**
- * What the workflow says it watches for, which is what gets asked. Taking the
+ * What the trigger says it watches for, which is what gets asked. Taking the
  * query from the manifest is the point: it is shown on the loop page, and a
  * search that quietly differed from the one on screen would be the worst kind
  * of wrong.
  */
-function query(workflowId: string): string {
-  const workflow = githubManifest.workflows.find((entry) => entry.id === workflowId);
-  if (!workflow?.watches) throw new Error(`GitHub cannot watch for ${workflowId}.`);
-  return workflow.watches;
+function query(triggerId: string): string {
+  const trigger = githubManifest.triggers.find((entry) => entry.id === triggerId);
+  if (!trigger?.watches) throw new Error(`GitHub cannot watch for ${triggerId}.`);
+  return trigger.watches;
 }
 
 export async function pollGithub(input: {

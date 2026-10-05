@@ -72,8 +72,9 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
     const { credential } = await credentialForConnector(loop.connectorId);
     // Settings a loop was saved before are missing rather than false, so the
     // connector fills the gaps from what the workflow declares.
+    // Connectors watch triggers; a workflow is only what sits on one.
     const answer = await runtime.poll({
-      workflowId: loop.workflowId,
+      workflowId: workflow.triggerId,
       settings: loop.settings,
       credential,
       cursor: loop.pollCursor ?? null,

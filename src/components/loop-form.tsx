@@ -69,7 +69,7 @@ function WorkflowDetails({ workflow }: { workflow: WorkflowDescriptor }) {
     <details suppressHydrationWarning className="group text-sm">
       <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
-        Fixed by the workflow
+        Fixed by the trigger
       </summary>
       <dl className="mt-2 grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 rounded-lg bg-muted/50 p-3 text-xs">
         {rows.map(([label, value]) => (

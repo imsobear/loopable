@@ -1,7 +1,8 @@
 import { defineRuntime } from "../define.ts";
 import { oauthAppRegistration } from "../oauth-app.ts";
 import { getMessage, getProfile, sendMessage } from "./api.ts";
-import { composeMail, mailContext, mailRef, permalink, summarise } from "./mail.ts";
+import { composeMail, headerOf, mailContext, mailRef, permalink, summarise } from "./mail.ts";
+import { pollGmail, type MailPayload } from "./poll.ts";
 import {
   buildAuthorizeUrl,
   createPkce,
@@ -43,9 +44,6 @@ export async function usableToken(
   });
   return { accessToken: refreshed.accessToken, refreshed };
 }
-
-/** What a task keeps about the mail it is for. */
-type MailPayload = { messageId: string };
 
 /** The mailbox, as a person would recognise it. */
 function accountOf(emailAddress: string) {
@@ -93,15 +91,47 @@ export const gmailRuntime = defineRuntime({
     };
   },
 
-  async applyAction({ actionId, target, source, body, credential }) {
-    if (actionId !== "gmail.send") throw new Error(`Gmail cannot ${actionId}.`);
-    const to = typeof target.to === "string" ? target.to.trim() : "";
-    if (!to) throw new Error("This loop does not say who to email. Set To on the loop.");
-    const named = typeof target.subject === "string" ? target.subject.trim() : "";
+  async poll({ workflowId, settings, credential }) {
     const { accessToken } = await usableToken(credential as GmailCredential);
+    // Which mailbox this is, so mail from itself can be told apart.
+    const profile = await getProfile(accessToken);
+    // No cursor: Gmail is asked what matches now and answers completely.
+    return {
+      signals: await pollGmail({
+        workflowId,
+        settings,
+        accessToken,
+        emailAddress: profile.emailAddress,
+      }),
+    };
+  },
+
+  /**
+   * Answers go to the connected account itself, the way a bot answers
+   * whoever asked it. When the run started from an email in this inbox, the
+   * answer joins that thread.
+   */
+  async applyAction({ actionId, source, body, credential }) {
+    if (actionId !== "gmail.send") throw new Error(`Gmail cannot ${actionId}.`);
+    const { accessToken } = await usableToken(credential as GmailCredential);
+    const profile = await getProfile(accessToken);
+
+    let subject = source.title || "From Loopable";
+    let threadId: string | undefined;
+    let inReplyTo: string | undefined;
+    const sourceId = source.connectorId === "gmail" ? source.ref.replace(/^mail#/, "") : "";
+    if (sourceId) {
+      const original = await getMessage(accessToken, sourceId);
+      threadId = original.threadId;
+      inReplyTo = headerOf(original, "Message-ID") || undefined;
+      const said = headerOf(original, "Subject");
+      if (said) subject = /^re:/i.test(said) ? said : `Re: ${said}`;
+    }
+
     const sent = await sendMessage(
       accessToken,
-      composeMail({ to, subject: named || source.title || "From Loopable", body }),
+      composeMail({ to: profile.emailAddress, subject, body, inReplyTo }),
+      threadId,
     );
     return { url: permalink(sent.id) };
   },
