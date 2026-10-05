@@ -99,7 +99,7 @@ export function QrConnect({
 
   return (
     <Card>
-      <CardContent className="flex flex-col items-center gap-4 py-8">
+      <CardContent className="flex flex-col items-center gap-4 py-4">
         <p className="max-w-md text-center text-sm text-muted-foreground">{note}</p>
 
         {expired ? (

@@ -1,10 +1,10 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Server } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Copy, RotateCcw, Server } from "lucide-react";
+import { Empty, List, PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { agentManifest } from "@/agents/manifests.ts";
+import { cn } from "@/lib/utils";
 import { useLiveRefresh } from "@/components/use-live-tasks.ts";
 import type { RunnerView } from "@/lib/domain.ts";
 import { getRunnersPage, removeRunner, rotateRunnerJoinToken } from "@/server/functions/runners.ts";
@@ -14,107 +14,110 @@ export const Route = createFileRoute("/runners/")({
   component: RunnersPage,
 });
 
-function inventoryLines(runner: RunnerView) {
-  if (runner.inventory.length === 0) {
-    return <p className="mt-2 text-sm text-muted-foreground">No coding agents found yet.</p>;
-  }
-  return (
-    <ul className="mt-2 text-sm text-muted-foreground">
-      {runner.inventory.map((entry) => (
-        <li key={entry.agentId}>
-          {entry.agentId}
-          {entry.signedIn ? " · signed in" : entry.installed ? " · not signed in" : " · missing"}
-        </li>
-      ))}
-    </ul>
-  );
+/** Which agents this runner has, in a few words. */
+function agentsOn(runner: RunnerView): string {
+  if (runner.inventory.length === 0) return "No agents found";
+  return runner.inventory
+    .map((entry) => {
+      const name = agentManifest(entry.agentId)?.name ?? entry.agentId;
+      return entry.signedIn ? name : entry.installed ? `${name} (not signed in)` : `${name} (missing)`;
+    })
+    .join(", ");
 }
 
 function RunnersPage() {
   const { runners, joinToken, origin } = Route.useLoaderData();
   const router = useRouter();
   useLiveRefresh();
+  const command = `loopable runner --url ${origin} --token ${joinToken}`;
 
   return (
-    <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Runners</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          A runner is a process that runs agents. Join one on every host that should do work.
-        </p>
-      </header>
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Runners" description="Machines that run agents for your loops." />
 
-      <Card>
-        <CardHeader className="text-base font-medium">Join a runner</CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          <p className="text-muted-foreground">
-            Install the CLI once (<code className="text-xs">npm install -g loopable-cli</code>),
-            sign in a coding agent on that host, then start a runner. Use this LAN IP so
-            other machines can reach the App.
-          </p>
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
-            {`loopable runner --url ${origin} --token ${joinToken}`}
-          </pre>
-          <div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try {
-                  await rotateRunnerJoinToken();
-                  await router.invalidate();
-                  toast.success("Join token rotated. Existing runners keep working.");
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : String(error));
-                }
-              }}
-            >
-              Rotate join token
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium">Join a runner</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              if (!window.confirm("Rotate the join token? Runners already joined keep working.")) return;
+              try {
+                await rotateRunnerJoinToken();
+                await router.invalidate();
+                toast.success("Join token rotated");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : String(error));
+              }
+            }}
+          >
+            <RotateCcw />
+            Rotate token
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl bg-muted p-1 pl-3">
+          <code className="min-w-0 flex-1 overflow-x-auto py-1.5 text-xs whitespace-nowrap">{command}</code>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Copy"
+            onClick={async () => {
+              await navigator.clipboard.writeText(command);
+              toast.success("Copied");
+            }}
+          >
+            <Copy />
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Run it on any machine with <code>loopable-cli</code> installed and an agent signed in.
+        </p>
+      </div>
 
       {runners.length === 0 ? (
-        <Alert>
-          <AlertDescription>
-            No runner has joined yet. Loops will wait until one is online.
-          </AlertDescription>
-        </Alert>
+        <Empty>No runner has joined yet. Tasks wait until one is online.</Empty>
       ) : (
-        <div className="flex flex-col gap-3">
+        <List>
           {runners.map((runner) => (
-            <Card key={runner.id}>
-              <CardContent className="flex items-start gap-4 pt-6">
-                <Server className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{runner.name}</p>
-                    <Badge variant={runner.status === "online" ? "default" : "outline"}>
-                      {runner.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{runner.hostname}</p>
-                  {inventoryLines(runner)}
+            <div key={runner.id} className="flex items-center gap-3 px-4 py-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Server className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{runner.name}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        runner.status === "online" ? "bg-emerald-500" : "bg-muted-foreground/50",
+                      )}
+                    />
+                    {runner.status === "online" ? "Online" : "Offline"}
+                  </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      await removeRunner({ data: { id: runner.id } });
-                      await router.invalidate();
-                    } catch (error) {
-                      toast.error(error instanceof Error ? error.message : String(error));
-                    }
-                  }}
-                >
-                  Forget
-                </Button>
-              </CardContent>
-            </Card>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {runner.hostname} · {agentsOn(runner)}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await removeRunner({ data: { id: runner.id } });
+                    await router.invalidate();
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : String(error));
+                  }
+                }}
+              >
+                Forget
+              </Button>
+            </div>
           ))}
-        </div>
+        </List>
       )}
     </div>
   );

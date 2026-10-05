@@ -1,12 +1,10 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { ArrowRight, CircleAlert } from "lucide-react";
+import { ChevronRight, CircleAlert } from "lucide-react";
 import { ConnectionStatusBadge } from "@/components/connection-status";
 import { ConnectorIcon } from "@/components/connector-icon";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { List, PageHeader } from "@/components/page";
 import { CONNECTOR_MANIFESTS, connectionNoun, needsAccount } from "@/connectors/manifests.ts";
 import { getConnectorOverview } from "@/server/functions/connectors.ts";
 
@@ -37,16 +35,10 @@ function ConnectorsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Connectors</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Connect the services a loop should watch. Credentials stay with Loopable.
-        </p>
-      </header>
+      <PageHeader title="Connectors" description="The services loops watch and write to." />
 
-      <div className="flex flex-col gap-4">
-        {/* A clock offers workflows but no account, and a card whose only
-            button is "Set up" would lead nowhere. */}
+      {/* A clock needs no account, so it has nothing to set up here. */}
+      <List>
         {CONNECTOR_MANIFESTS.filter((manifest) => needsAccount(manifest.id)).map((manifest) => {
           const state = overview.find((entry) => entry.connectorId === manifest.id);
           const connections = state?.connections ?? [];
@@ -54,50 +46,40 @@ function ConnectorsPage() {
           const unavailable = readiness && !readiness.ready ? readiness : null;
 
           return (
-            <Card key={manifest.id}>
-              <CardHeader className="flex flex-row items-start gap-4">
-                <ConnectorIcon icon={manifest.icon} accent={manifest.accent} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-medium">{manifest.name}</h2>
-                    {connections.length > 0 ? (
-                      <Badge variant="secondary">
-                        {connections.length} {connectionNoun(manifest.id)}
-                        {connections.length > 1 ? "s" : ""}
-                      </Badge>
-                    ) : null}
+            <Link
+              key={manifest.id}
+              to="/connectors/$connectorId"
+              params={{ connectorId: manifest.id }}
+              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+            >
+              <ConnectorIcon icon={manifest.icon} accent={manifest.accent} className="size-8" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{manifest.name}</p>
+                {unavailable ? (
+                  <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                    <CircleAlert className="size-3 shrink-0" />
+                    {unavailable.reason}
+                  </p>
+                ) : connections.length > 0 ? (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {connections.map((connection) => (
+                      <span key={connection.id} className="flex items-center gap-1.5">
+                        {connection.accountLabel}
+                        <ConnectionStatusBadge status={connection.status} />
+                      </span>
+                    ))}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{manifest.tagline}</p>
-                </div>
-                <Button variant="outline" nativeButton={false} render={<Link to="/connectors/$connectorId" params={{ connectorId: manifest.id }} />}>
-                  {connections.length > 0 ? "Manage" : "Set up"}
-                  <ArrowRight />
-                </Button>
-              </CardHeader>
-
-              {(connections.length > 0 || unavailable) && (
-                <CardContent className="flex flex-col gap-2 border-t pt-4">
-                  {unavailable ? (
-                    <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CircleAlert className="mt-0.5 size-4 shrink-0" />
-                      <span>{unavailable.reason}</span>
-                    </p>
-                  ) : null}
-                  {connections.map((connection) => (
-                    <div key={connection.id} className="flex items-center gap-3 text-sm">
-                      <span className="font-medium">{connection.accountLabel}</span>
-                      <ConnectionStatusBadge status={connection.status} />
-                      {connection.lastError ? (
-                        <span className="truncate text-muted-foreground">{connection.lastError}</span>
-                      ) : null}
-                    </div>
-                  ))}
-                </CardContent>
-              )}
-            </Card>
+                ) : (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    No {connectionNoun(manifest.id)} yet
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </Link>
           );
         })}
-      </div>
+      </List>
     </div>
   );
 }

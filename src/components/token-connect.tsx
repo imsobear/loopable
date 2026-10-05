@@ -49,17 +49,19 @@ export function TokenConnect({
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-4 py-6">
-        {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
-        {helpUrl ? (
-          <a
-            href={helpUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Open the app dashboard
-          </a>
+      <CardContent className="flex flex-col gap-4 py-2">
+        {note ? (
+          <p className="text-xs text-muted-foreground">
+            {note}
+            {helpUrl ? (
+              <>
+                {" "}
+                <a href={helpUrl} target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                  Open the app dashboard
+                </a>
+              </>
+            ) : null}
+          </p>
         ) : null}
         {fields.map((field) => (
           <div key={field.key} className="flex flex-col gap-1.5">

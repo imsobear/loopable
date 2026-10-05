@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Bot, ChevronDown, MousePointerClick, PlayCircle, Sparkles, Terminal, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { List, PageHeader } from "@/components/page";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,20 +44,17 @@ function AgentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          The coding CLIs Loopable knows how to run. Presence comes from runners. Settings here are
-          how every runner invokes that CLI.
-        </p>
-      </header>
+      <PageHeader
+        title="Agents"
+        description="The coding CLIs runners can use. Settings apply on every runner."
+      />
 
-      <div className="flex flex-col gap-2">
+      <List>
         {AGENT_MANIFESTS.map((manifest) => {
           const view = agents.find((agent) => agent.agentId === manifest.id);
           return view ? <AgentRow key={manifest.id} manifest={manifest} view={view} /> : null;
         })}
-      </div>
+      </List>
     </div>
   );
 }
@@ -98,11 +95,11 @@ function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView
   };
 
   return (
-    <Card>
-      <div className="flex items-start gap-3 p-4">
+    <div>
+      <div className="flex items-center gap-3 px-4 py-3">
         <span
           className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md",
+            "flex size-8 shrink-0 items-center justify-center rounded-md",
             online ? manifest.accent : "bg-muted text-muted-foreground",
           )}
         >
@@ -114,12 +111,12 @@ function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView
           onClick={() => setOpen((value) => !value)}
         >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{manifest.name}</span>
+            <span className="text-sm font-medium">{manifest.name}</span>
             {view.isDefault ? (
-              <Badge>{view.defaultIsImplicit ? "Default (only one signed in)" : "Default"}</Badge>
+              <Badge variant="secondary">Default</Badge>
             ) : null}
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">{presence(view)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{presence(view)}</p>
         </button>
         <div className="flex shrink-0 items-center gap-1">
           {!view.isDefault ? (
@@ -135,7 +132,7 @@ function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView
                 })
               }
             >
-              Default
+              Make default
             </Button>
           ) : null}
           <Button
@@ -151,9 +148,8 @@ function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView
       </div>
 
       {open ? (
-        <CardContent className="flex flex-col gap-4 border-t pt-4">
-          <p className="text-sm text-muted-foreground">{manifest.tagline}</p>
-          {!online ? <p className="text-sm text-muted-foreground">{manifest.installHint}</p> : null}
+        <div className="flex flex-col gap-4 border-t bg-muted/30 px-4 py-4 sm:pl-15">
+          {!online ? <p className="text-xs text-muted-foreground">{manifest.installHint}</p> : null}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-2">
@@ -245,8 +241,8 @@ function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView
           {testOutput ? (
             <p className="whitespace-pre-wrap text-xs text-muted-foreground">{testOutput}</p>
           ) : null}
-        </CardContent>
+        </div>
       ) : null}
-    </Card>
+    </div>
   );
 }

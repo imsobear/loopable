@@ -37,9 +37,9 @@ export function PageHeader({
           {back.label}
         </Link>
       ) : null}
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         {icon}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-56">
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
           {description ? (
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
