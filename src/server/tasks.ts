@@ -647,7 +647,9 @@ export async function absorbAgentOutput(id: string, raw: string): Promise<TaskVi
       return (await getTask(id))!;
     }
     await updateTask(id, { output: said, comments: [] });
-    await finish(id, existing, { state: "prepared" });
+    // Nothing to write anywhere, so keeping the reply is the whole job and the
+    // task is done. "Prepared" is for a dry run, which held a write back.
+    await finish(id, existing, { state: "done" });
     return (await getTask(id))!;
   }
 

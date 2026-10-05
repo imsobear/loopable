@@ -566,7 +566,8 @@ describe("a prompt from the inbox", () => {
     const done = await driveTask(queued.id);
 
     expect(asked).toBe("Say hello in one word.");
-    expect(done.state).toBe("prepared");
+    // Done, not prepared: there was never anything to write.
+    expect(done.state).toBe("done");
     expect(done.output).toBe("hello");
     expect(writes).toHaveLength(0);
   });

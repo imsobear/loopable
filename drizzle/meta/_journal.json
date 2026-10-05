@@ -176,6 +176,13 @@
       "when": 1789100000009,
       "tag": "0024_prompt_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1789100000010,
+      "tag": "0025_prompt_tasks_done",
+      "breakpoints": true
     }
   ]
 }
