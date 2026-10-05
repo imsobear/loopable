@@ -90,6 +90,17 @@ pnpm db:studio
 
 `pnpm runner` is only for a second machine while `pnpm dev` is already running.
 
+### Release
+
+CI runs typecheck, tests, and both builds on every pull request and on `main`. To publish `loopable-cli`, merge to `main`, then from a clean, pushed `main`:
+
+```bash
+pnpm release minor --dry-run   # every check, nothing changed
+pnpm release minor             # or patch, major, or an exact x.y.z
+```
+
+It checks git and npm, runs typecheck, tests, and build, then bumps the version, commits, tags `vX.Y.Z`, publishes, and pushes. Runners on other machines need `npm install -g loopable-cli` too. The site deploys on its own with `pnpm site:deploy`.
+
 The public site is `site/` (static HTML, Vite). `pnpm site:dev` to preview. `pnpm site:build` writes `site/dist` for a Cloudflare Worker with assets only. `pnpm site:deploy` when you are ready to publish it.
 
 | Path | Contents |
