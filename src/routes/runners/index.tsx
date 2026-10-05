@@ -29,7 +29,10 @@ function RunnersPage() {
   const { runners, joinToken, origin } = Route.useLoaderData();
   const router = useRouter();
   useLiveRefresh();
-  const command = `loopable runner --url ${origin} --token ${joinToken}`;
+  const commands = [
+    "npm install -g loopable-cli",
+    `loopable runner --url ${origin} --token ${joinToken}`,
+  ].join("\n");
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,14 +59,14 @@ function RunnersPage() {
             Rotate token
           </Button>
         </div>
-        <div className="flex items-center gap-2 rounded-xl bg-muted p-1 pl-3">
-          <code className="min-w-0 flex-1 overflow-x-auto py-1.5 text-xs whitespace-nowrap">{command}</code>
+        <div className="flex items-start gap-2 rounded-xl bg-muted p-1 pl-3">
+          <pre className="min-w-0 flex-1 overflow-x-auto py-1.5 text-xs leading-relaxed">{commands}</pre>
           <Button
             variant="ghost"
             size="icon-sm"
             aria-label="Copy"
             onClick={async () => {
-              await navigator.clipboard.writeText(command);
+              await navigator.clipboard.writeText(commands);
               toast.success("Copied");
             }}
           >
@@ -71,7 +74,8 @@ function RunnersPage() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Run it on any machine with <code>loopable-cli</code> installed and an agent signed in.
+          Needs Node 22+ and an agent CLI signed in on that machine. Skip the first line if the CLI
+          is already installed.
         </p>
       </div>
 
