@@ -31,7 +31,7 @@ function AppLayout() {
       <SidebarInset>
         {/* No header: the only thing it held was the sidebar toggle, which now
             lives in the sidebar itself, above what it collapses. */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 px-6 py-8 md:px-10">
           {/* Capped and centred. Every page here is a list of sentences, and
               stretched to a wide monitor they run past the width an eye can
               track back from, while the button belonging to a row ends up a

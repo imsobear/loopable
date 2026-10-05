@@ -5,7 +5,7 @@ const folder: SettingField = {
   key: "folder",
   kind: "text",
   label: "Folder to work in",
-  help: "An absolute path to a checkout on this host. The agent runs here, so it can read the code you are asking about.",
+  help: "Absolute path to a checkout on the runner. The agent works here.",
   placeholder: "/Users/you/code/your-project",
 };
 
@@ -13,7 +13,7 @@ const chat: SettingField = {
   key: "chat",
   kind: "text",
   label: "Chat ID",
-  help: "Leave empty to reply to the message that asked. Set a chat ID (oc_…) when the work started somewhere else.",
+  help: "Empty replies where it was asked. Or a chat ID (oc_…).",
   placeholder: "oc_...",
 };
 

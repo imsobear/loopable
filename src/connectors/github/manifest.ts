@@ -7,7 +7,7 @@ const repositories: SettingField = {
   key: "repositories",
   kind: "string_list",
   label: "Repositories",
-  help: "owner/name, one per line. Wildcards work: acme/* or */*. Leave empty for every repository you can see.",
+  help: "owner/name, one per line. acme/* works. Empty means all.",
   placeholder: "acme/web",
 };
 
@@ -22,7 +22,7 @@ const ignoreBots: SettingField = {
   key: "ignoreBots",
   kind: "boolean",
   label: "Skip pull requests opened by bots",
-  help: "Dependabot and friends open a great many, and each one costs a full run.",
+  help: "Such as Dependabot.",
   default: true,
 };
 
@@ -52,7 +52,7 @@ const issueTarget: SettingField = {
   key: "issue",
   kind: "text",
   label: "Issue or pull request",
-  help: "A GitHub URL. Leave empty to write back to whatever triggered the loop.",
+  help: "Empty replies where it was asked. Or a GitHub issue URL.",
   placeholder: "https://github.com/acme/web/issues/12",
 };
 

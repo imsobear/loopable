@@ -5,7 +5,7 @@ const folder: SettingField = {
   key: "folder",
   kind: "text",
   label: "Folder to work in",
-  help: "An absolute path to a checkout on this host. The agent runs here, so it can read the code you are asking about.",
+  help: "Absolute path to a checkout on the runner. The agent works here.",
   placeholder: "/Users/you/code/your-project",
 };
 
@@ -13,7 +13,7 @@ const channel: SettingField = {
   key: "channel",
   kind: "text",
   label: "Channel",
-  help: "Leave empty to reply in the thread that asked. Set a channel ID when the work started somewhere else.",
+  help: "Empty replies where it was asked. Or a channel ID.",
   placeholder: "C0123456789",
 };
 

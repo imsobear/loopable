@@ -1,21 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Bell } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { Field, Section } from "@/components/page";
 import { SettingFieldInputs, initialFieldValues } from "@/components/setting-fields";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_MANIFESTS } from "@/agents/manifests.ts";
 import {
@@ -24,6 +24,7 @@ import {
   connectorManifest,
   connectorWorkflow,
 } from "@/connectors/manifests.ts";
+import type { WorkflowDescriptor } from "@/connectors/types.ts";
 import type { ConnectionSettings, LoopEdit } from "@/lib/domain.ts";
 import { saveLoop } from "@/server/functions/loops.ts";
 
@@ -31,7 +32,7 @@ const DEFAULT_AGENT = "__default";
 
 /** Zero is stored as null: "as often as the dispatcher does" is not a duration. */
 const POLL_CHOICES = [
-  { value: "0", label: "Every time the dispatcher looks" },
+  { value: "0", label: "Every couple of minutes" },
   { value: String(10 * 60_000), label: "Every 10 minutes" },
   { value: String(30 * 60_000), label: "Every 30 minutes" },
   { value: String(60 * 60_000), label: "Every hour" },
@@ -41,50 +42,59 @@ const POLL_CHOICES = [
 /** Connectors that can write at all, for the question of where the answer goes. */
 const WRITERS = CONNECTOR_MANIFESTS.filter((entry) => entry.actions.length > 0);
 
+/** One select value for a connector and one of its actions. */
+const destination = (connectorId: string, actionId: string) => `${connectorId}::${actionId}`;
+
+const RUNS_IN: Record<NonNullable<WorkflowDescriptor["runsIn"]>, string> = {
+  checkout: "A fresh clone of the repository",
+  folder: "The folder this loop names",
+  temp: "A scratch folder with only what it was given",
+};
+
+const ANSWER: Record<WorkflowDescriptor["answer"], string> = {
+  review: "A summary, plus comments on lines",
+  code: "A change to the code",
+  text: "One block of text",
+};
+
 /**
- * Shown rather than hidden, and locked rather than editable.
- *
- * These are the parts of a workflow that only mean anything alongside the code
- * that reads them: the query a connector sends, whether the agent gets a
- * checkout, how its answer is parsed. Copying them onto a loop would freeze
- * whatever was true the day it was made, and leaving them off the page would
- * mean nobody could see what their loop actually does.
+ * The parts of a workflow a loop cannot change: what it asks the service,
+ * where the agent runs, and how the answer is read. Folded away, since they
+ * are worth checking once and never editing.
  */
-function Locked({
-  label,
-  value,
-  help,
-  mono,
-}: {
-  label: string;
-  value: string;
-  help: string;
-  mono?: boolean;
-}) {
+function WorkflowDetails({ workflow }: { workflow: WorkflowDescriptor }) {
+  const rows: Array<[string, React.ReactNode]> = [];
+  if (workflow.watches) {
+    rows.push(["Looks for", <code className="font-mono text-xs">{workflow.watches}</code>]);
+  }
+  rows.push(["Runs in", RUNS_IN[workflow.runsIn ?? "temp"]]);
+  rows.push(["Answer", ANSWER[workflow.answer]]);
+
   return (
-    <div className="flex flex-col gap-2">
-      <Label className="text-muted-foreground">{label}</Label>
-      <Input
-        readOnly
-        disabled
-        value={value}
-        className={mono ? "font-mono text-xs disabled:opacity-100" : "disabled:opacity-100"}
-      />
-      <p className="text-xs text-muted-foreground">{help}</p>
-    </div>
+    <details className="group text-sm">
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+        Fixed by the workflow
+      </summary>
+      <dl className="mt-2 grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 rounded-lg bg-muted/50 p-3 text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
 /**
  * A loop is one of a connector's workflows with its own answers to the
- * questions it asks. Which of those a loop owns is the whole shape of this
- * page: what it looks for and how the answer is read belong to the workflow
- * and are locked, while what narrows it, where it writes and which agent runs
- * it belong to the loop.
+ * questions it asks: what narrows it, which agent runs it and with what
+ * words, and where the answer goes.
  *
  * Serves a loop that exists and one that does not. A loop with no id has been
- * chosen and not saved, so leaving this page is the end of it: nothing was
- * written down, and nothing is watching for anything.
+ * chosen and not saved, so leaving this page is the end of it.
  */
 export function LoopForm({ loop }: { loop: LoopEdit }) {
   const navigate = useNavigate();
@@ -96,7 +106,6 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
   const [prompt, setPrompt] = useState(loop.prompt);
   const [guidance, setGuidance] = useState(loop.guidance ?? "");
   const [agentId, setAgentId] = useState(loop.agentId ?? DEFAULT_AGENT);
-  const [enabled, setEnabled] = useState(loop.enabled);
   const [settings, setSettings] = useState<ConnectionSettings>(() =>
     initialFieldValues(workflow?.settings ?? [], loop.settings),
   );
@@ -112,10 +121,10 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
   const [saving, setSaving] = useState(false);
 
   const action = connectorAction(actionConnectorId, actionId);
-  const writerName = connectorManifest(actionConnectorId)?.name ?? actionConnectorId;
+  const sourceName = connector?.name ?? loop.connectorId;
 
-  /** Changing where the answer goes changes what has to be said about it. */
-  const chooseAction = (connectorId: string, id: string) => {
+  const chooseDestination = (value: string) => {
+    const [connectorId, id] = value.split("::") as [string, string];
     setActionConnectorId(connectorId);
     setActionId(id);
     setActionTarget(initialFieldValues(connectorAction(connectorId, id)?.target ?? [], {}));
@@ -126,9 +135,8 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
       <Alert variant="destructive">
         <AlertTitle>This workflow is no longer offered</AlertTitle>
         <AlertDescription>
-          {connector?.name ?? loop.connectorId} used to have <code>{loop.workflowId}</code> and no
-          longer does, so this loop cannot run or be edited. Deleting it is the only thing left to
-          do with it.
+          {sourceName} no longer has <code>{loop.workflowId}</code>, so this loop cannot run or be
+          edited. You can still delete it.
         </AlertDescription>
       </Alert>
     );
@@ -151,11 +159,16 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
           actionId,
           actionTarget,
           pollEveryMs: Number(pollEveryMs) || null,
-          enabled,
+          // On/off lives in the page header, so this keeps whatever it is now.
+          enabled: loop.enabled,
         },
       });
-      toast.success(fresh ? `Added "${saved.name}"` : `Saved ${saved.name}`);
-      await navigate({ to: "/loops" });
+      toast.success(fresh ? `Added ${saved.name}` : `Saved ${saved.name}`);
+      await navigate(
+        fresh
+          ? { to: "/loops/$loopId", params: { loopId: saved.id } }
+          : { to: "/loops/$loopId", params: { loopId: saved.id }, search: { tab: "settings" } },
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -163,227 +176,28 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
     }
   };
 
+  const crosses = action && actionConnectorId !== loop.connectorId;
+  const flattens = action && workflow.answer === "review" && !action.accepts.includes("review");
+
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardContent className="flex flex-col gap-5 pt-6">
-          <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-4 text-sm">
-            <Bell className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <div className="flex flex-col gap-1">
-              <p>
-                When {workflow.trigger}, {connector?.name ?? loop.connectorId} hands it to an agent.
-              </p>
-              <p className="flex items-center gap-1.5 text-muted-foreground">
-                <ArrowRight className="size-3.5 shrink-0" />
-                {action
-                  ? `Then, on ${writerName}: ${action.name.toLowerCase()}.`
-                  : "Where the answer goes is no longer offered; choose again below."}
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col">
+      <Section title="When" description={`When ${workflow.trigger}.`}>
+        <Field label="Name" htmlFor="loop-name">
+          <Input id="loop-name" value={name} onChange={(event) => setName(event.target.value)} />
+        </Field>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="loop-name">Name</Label>
-            <Input
-              id="loop-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Only for your benefit, and worth changing if you run this workflow more than once.
-            </p>
-          </div>
+        <SettingFieldInputs
+          fields={workflow.settings}
+          values={settings}
+          idPrefix="setting-"
+          onChange={(key, value) => setSettings((prev) => ({ ...prev, [key]: value }))}
+        />
 
-          <Locked
-            label="What it looks for"
-            mono
-            value={workflow.watches ?? "Nothing is asked for; it arrives as it happens"}
-            help={
-              workflow.watches
-                ? `Word for word what Loopable asks ${connector?.name ?? loop.connectorId} every couple of minutes${
-                    workflow.settings.length > 0
-                      ? ", before anything below narrows it further."
-                      : "."
-                  }${workflow.watches.includes("@me") ? " @me is the connected account, not you." : ""}`
-                : `${connector?.name ?? loop.connectorId} sends this over as it happens, and Loopable picks it up within a couple of minutes.`
-            }
-          />
-
-          <Locked
-            label="Where the agent runs"
-            value={
-              workflow.runsIn === "checkout"
-                ? "In a scratch directory; the prompt tells the agent to clone"
-                : workflow.runsIn === "folder"
-                  ? "In the folder this loop names"
-                  : "In a scratch directory holding only what it was given"
-            }
-            help={
-              workflow.runsIn === "checkout"
-                ? "The agent clones the repository with that machine's git. Loopable's shared GitHub account is not used to clone; it only writes the answer afterwards, as a review or a comment."
-                : workflow.runsIn === "folder"
-                  ? "This job reads real code to do its work, so it runs in a real checkout. It does not write there: anything it changed would be sitting in your working copy."
-                  : "The agent gets the files it was given and nothing else."
-            }
-          />
-
-          <Locked
-            label="How its answer is read"
-            value={
-              workflow.answer === "review"
-                ? "A summary, plus points attached to lines"
-                : workflow.answer === "code"
-                  ? "A change to the code, described in a sentence or two"
-                  : "One block of text"
-            }
-            help="Part of how this job works rather than a preference, so it is fixed here and cannot drift from the code that parses it."
-          />
-
-          {workflow.settings.length > 0 ? (
-            <div className="flex flex-col gap-5 rounded-lg border p-4">
-              <p className="text-sm font-medium">Only when</p>
-              <SettingFieldInputs
-                fields={workflow.settings}
-                values={settings}
-                idPrefix="setting-"
-                onChange={(key, value) => setSettings((prev) => ({ ...prev, [key]: value }))}
-              />
-            </div>
-          ) : null}
-
-          <div className="flex flex-col gap-5 rounded-lg border p-4">
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Where the answer goes</p>
-              <p className="text-xs text-muted-foreground">
-                Usually back to whatever triggered the loop, which is what this started as. It does
-                not have to be, and it does not have to be the same service.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <div className="flex flex-1 flex-col gap-2">
-                <Label htmlFor="loop-action-connector">Service</Label>
-                <Select
-                  value={actionConnectorId}
-                  onValueChange={(value) =>
-                    value && chooseAction(value, connectorManifest(value)!.actions[0]!.id)
-                  }
-                >
-                  <SelectTrigger id="loop-action-connector" className="w-full">
-                    <SelectValue>
-                      {(value: string) => connectorManifest(value)?.name ?? value}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WRITERS.map((entry) => (
-                      <SelectItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-1 flex-col gap-2">
-                <Label htmlFor="loop-action">What it does there</Label>
-                <Select
-                  value={actionId}
-                  onValueChange={(value) => value && chooseAction(actionConnectorId, value)}
-                >
-                  <SelectTrigger id="loop-action" className="w-full">
-                    <SelectValue>
-                      {(value: string) =>
-                        connectorAction(actionConnectorId, value)?.name ?? value
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(connectorManifest(actionConnectorId)?.actions ?? []).map((entry) => (
-                      <SelectItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {action ? <p className="text-xs text-muted-foreground">{action.summary}</p> : null}
-
-            {/* Answering the thing that triggered the loop is only possible
-                when the two are on the same service, so a loop that crosses
-                has to be told where instead of being left to fail at the
-                write. */}
-            {action && actionConnectorId !== loop.connectorId ? (
-              <Alert>
-                <AlertTitle>This writes somewhere it did not read</AlertTitle>
-                <AlertDescription>
-                  {writerName} has no way to answer something on{" "}
-                  {connector?.name ?? loop.connectorId}, so choose below where this should land.
-                  Both accounts have to be connected for the loop to run.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
-            {action && workflow.answer === "review" && !action.accepts.includes("review") ? (
-              <p className="text-xs text-muted-foreground">
-                This cannot attach a comment to a line, so the review arrives as prose with the
-                file and line of each point written into it. Nothing is dropped.
-              </p>
-            ) : null}
-
-            {action && action.target.length > 0 ? (
-              <SettingFieldInputs
-                fields={action.target}
-                values={actionTarget}
-                idPrefix="target-"
-                onChange={(key, value) => setActionTarget((prev) => ({ ...prev, [key]: value }))}
-              />
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="loop-prompt">What the agent is asked to do</Label>
-            <p className="text-xs text-muted-foreground">
-              {fresh
-                ? `Copied from “${workflow.name}”, and yours once you save. Editing it here changes nothing anywhere else, and a later version of that workflow will not change it back.`
-                : `Copied from “${workflow.name}” when this loop was made, and yours now. Editing it here changes nothing anywhere else, and a later version of that workflow will not change it back.`}
-            </p>
-            <Textarea
-              id="loop-prompt"
-              rows={12}
-              className="font-mono text-xs"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="loop-guidance">Anything else the agent should know</Label>
-            <p className="text-xs text-muted-foreground">
-              Optional, and added after what you asked above. For a standing note about your team
-              rather than about the job, so the two do not have to be untangled later.
-            </p>
-            <Textarea
-              id="loop-guidance"
-              rows={4}
-              value={guidance}
-              placeholder={workflow.guidancePlaceholder}
-              onChange={(event) => setGuidance(event.target.value)}
-            />
-          </div>
-
-          {/* Only the control is narrow. The help belongs to the section and
-              reads as a column of three words a line inside a box this wide. */}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="loop-every">How often to look</Label>
-            <p className="text-xs text-muted-foreground">
-              Waiting longer is not only about being polite to the service. Anything that decides
-              what deserves an agent by weighing a batch needs a batch to weigh, and looking
-              constantly means finding one thing at a time and running all of them.
-            </p>
+        {/* A clock has its own times above; how often to look means nothing to it. */}
+        {loop.connectorId === "schedule" ? null : (
+          <Field label="Check" htmlFor="loop-every" className="sm:max-w-xs">
             <Select value={pollEveryMs} onValueChange={(value) => value && setPollEveryMs(value)}>
-              <SelectTrigger id="loop-every" className="w-full sm:max-w-xs">
+              <SelectTrigger id="loop-every" className="w-full">
                 <SelectValue>
                   {(value: string) =>
                     POLL_CHOICES.find((choice) => choice.value === value)?.label ?? value
@@ -398,53 +212,123 @@ export function LoopForm({ loop }: { loop: LoopEdit }) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
+        )}
 
-          <div className="flex flex-col gap-2 sm:max-w-xs">
-            <Label htmlFor="loop-agent">Run it with</Label>
-            <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
-              <SelectTrigger id="loop-agent" className="w-full">
-                <SelectValue>
-                  {(value: string) =>
-                    value === DEFAULT_AGENT
-                      ? "The default agent"
-                      : (AGENT_MANIFESTS.find((entry) => entry.id === value)?.name ?? value)
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={DEFAULT_AGENT}>The default agent</SelectItem>
-                {AGENT_MANIFESTS.map((entry) => (
-                  <SelectItem key={entry.id} value={entry.id}>
-                    {entry.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              The dispatcher picks an online runner that has this agent signed in.
-            </p>
-          </div>
+        <WorkflowDetails workflow={workflow} />
+      </Section>
 
-          <div className="flex items-center justify-between gap-4 border-t pt-5">
-            <div>
-              <Label htmlFor="loop-enabled">Enabled</Label>
-              <p className="mt-1 text-xs text-muted-foreground">
-                A disabled loop is kept but never matches.
-              </p>
-            </div>
-            <Switch id="loop-enabled" checked={enabled} onCheckedChange={setEnabled} />
-          </div>
-        </CardContent>
-      </Card>
+      <Section title="Agent">
+        <Field label="Run with" htmlFor="loop-agent" className="sm:max-w-xs">
+          <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
+            <SelectTrigger id="loop-agent" className="w-full">
+              <SelectValue>
+                {(value: string) =>
+                  value === DEFAULT_AGENT
+                    ? "Default agent"
+                    : (AGENT_MANIFESTS.find((entry) => entry.id === value)?.name ?? value)
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={DEFAULT_AGENT}>Default agent</SelectItem>
+              {AGENT_MANIFESTS.map((entry) => (
+                <SelectItem key={entry.id} value={entry.id}>
+                  {entry.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
 
-      <div className="flex items-center gap-2">
+        <Field
+          label="Prompt"
+          htmlFor="loop-prompt"
+          hint={`Starts as “${workflow.name}”. Changes stay on this loop.`}
+        >
+          <Textarea
+            id="loop-prompt"
+            rows={10}
+            className="font-mono text-xs"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+          />
+        </Field>
+
+        <Field label="Team notes" htmlFor="loop-guidance" hint="Optional. Added after the prompt.">
+          <Textarea
+            id="loop-guidance"
+            rows={3}
+            value={guidance}
+            placeholder={workflow.guidancePlaceholder}
+            onChange={(event) => setGuidance(event.target.value)}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Answer">
+        <Field
+          label="Send to"
+          htmlFor="loop-destination"
+          hint={
+            crosses
+              ? `${sourceName} and ${connectorManifest(actionConnectorId)?.name ?? actionConnectorId} both need a connection.`
+              : flattens
+                ? "Line comments arrive as text, with file and line written in."
+                : undefined
+          }
+        >
+          <Select
+            value={destination(actionConnectorId, actionId)}
+            onValueChange={(value) => value && chooseDestination(value)}
+          >
+            <SelectTrigger id="loop-destination" className="w-full sm:max-w-sm">
+              <SelectValue>
+                {() =>
+                  action
+                    ? `${connectorManifest(actionConnectorId)?.name ?? actionConnectorId} · ${action.name}`
+                    : "Choose where the answer goes"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {WRITERS.map((writer) => (
+                <SelectGroup key={writer.id}>
+                  <SelectLabel>{writer.name}</SelectLabel>
+                  {writer.actions.map((entry) => (
+                    <SelectItem key={entry.id} value={destination(writer.id, entry.id)}>
+                      {entry.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        {action && action.target.length > 0 ? (
+          <SettingFieldInputs
+            fields={action.target}
+            values={actionTarget}
+            idPrefix="target-"
+            onChange={(key, value) => setActionTarget((prev) => ({ ...prev, [key]: value }))}
+          />
+        ) : null}
+      </Section>
+
+      <div className="flex items-center gap-2 border-t pt-6 md:pl-52">
         <Button onClick={save} disabled={saving}>
-          {saving ? (fresh ? "Adding..." : "Saving...") : fresh ? "Add loop" : "Save loop"}
+          {saving ? "Saving..." : fresh ? "Add loop" : "Save changes"}
         </Button>
         <Button
           variant="ghost"
-          onClick={() => navigate({ to: fresh ? "/loops/new" : "/loops" })}
+          onClick={() =>
+            navigate(
+              fresh
+                ? { to: "/loops/new" }
+                : { to: "/loops/$loopId", params: { loopId: loop.id! } },
+            )
+          }
           disabled={saving}
         >
           Cancel

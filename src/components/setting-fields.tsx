@@ -56,14 +56,12 @@ export function SettingFieldInputs({
       {fields.map((field) => {
         const id = `${idPrefix}${field.key}`;
         return (
-          <div key={field.key} className="flex flex-col gap-2">
+          <div key={field.key} className="flex flex-col gap-1.5">
             {field.kind === "boolean" ? (
               <div className="flex items-center justify-between gap-4">
-                <div>
+                <div className="flex flex-col gap-0.5">
                   <Label htmlFor={id}>{field.label}</Label>
-                  {field.help ? (
-                    <p className="mt-1 text-xs text-muted-foreground">{field.help}</p>
-                  ) : null}
+                  {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
                 </div>
                 <Switch
                   id={id}
@@ -74,11 +72,10 @@ export function SettingFieldInputs({
             ) : (
               <>
                 <Label htmlFor={id}>{field.label}</Label>
-                {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
                 {field.kind === "string_list" ? (
                   <Textarea
                     id={id}
-                    rows={4}
+                    rows={3}
                     placeholder={field.placeholder}
                     value={((values[field.key] as string[]) ?? []).join("\n")}
                     onChange={(event) =>
@@ -96,7 +93,7 @@ export function SettingFieldInputs({
                     value={values[field.key] as string}
                     onValueChange={(value) => onChange(field.key, value)}
                   >
-                    <SelectTrigger id={id} className="w-full">
+                    <SelectTrigger id={id} className="w-full sm:max-w-xs">
                       <SelectValue>
                         {(value: string) =>
                           field.options.find((option) => option.value === value)?.label ?? value
@@ -119,6 +116,7 @@ export function SettingFieldInputs({
                     onChange={(event) => onChange(field.key, event.target.value)}
                   />
                 )}
+                {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
               </>
             )}
           </div>

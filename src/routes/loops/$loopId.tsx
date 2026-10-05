@@ -1,24 +1,41 @@
-import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, CircleAlert, Eye, Play, RefreshCw } from "lucide-react";
+import { CircleAlert, Play, RefreshCw, Trash2 } from "lucide-react";
+import { ConnectorIcon } from "@/components/connector-icon";
 import { LoopForm } from "@/components/loop-form";
+import { LinkTabs, PageHeader, Section } from "@/components/page";
 import { TaskList } from "@/components/task-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { connectorManifest } from "@/connectors/manifests.ts";
-import type { LoopPollState } from "@/lib/domain.ts";
+import { agentManifest } from "@/agents/manifests.ts";
+import { connectorAction, connectorManifest } from "@/connectors/manifests.ts";
+import type { LoopPollState, LoopView } from "@/lib/domain.ts";
 import { issuesFor } from "@/lib/gaps.ts";
+import { ago } from "@/lib/time.ts";
 import { useLiveRefresh } from "@/components/use-live-tasks.ts";
-import { getLoopById, getLoopPollState, getLoopReadiness, lookLoopNow, runLoopBacklog } from "@/server/functions/loops.ts";
+import {
+  getLoopById,
+  getLoopPollState,
+  getLoopReadiness,
+  lookLoopNow,
+  removeLoop,
+  runLoopBacklog,
+  toggleLoop,
+} from "@/server/functions/loops.ts";
 import { getLoopTasks, runLoopNow } from "@/server/functions/tasks.ts";
 
+type Tab = "tasks" | "settings";
+
 export const Route = createFileRoute("/loops/$loopId")({
+  // The tab lives in the URL so either one can be linked to. Tasks is the
+  // default and stays out of the URL.
+  validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
+    search.tab === "settings" ? { tab: "settings" } : {},
   loader: async ({ params }) => {
     const loop = await getLoopById({ data: { id: params.loopId } });
     if (!loop) throw notFound();
@@ -32,27 +49,47 @@ export const Route = createFileRoute("/loops/$loopId")({
   component: LoopPage,
 });
 
+function useAction() {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const run = async (key: string, work: () => Promise<string | void>) => {
+    setBusy(key);
+    try {
+      const message = await work();
+      await router.invalidate();
+      if (message) toast.success(message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return { busy, run };
+}
+
 function LoopPage() {
   const { loop, tasks, poll, readiness } = Route.useLoaderData();
+  const { tab = "tasks" } = Route.useSearch();
   useLiveRefresh();
   const issues = issuesFor(readiness, loop);
+  const connector = connectorManifest(loop.connectorId);
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/loops"
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      <PageHeader
+        back={{ to: "/loops", label: "Loops" }}
+        icon={connector ? <ConnectorIcon icon={connector.icon} accent={connector.accent} /> : null}
+        title={loop.name}
+        actions={<HeaderActions loop={loop} />}
       >
-        <ArrowLeft className="size-4" />
-        Loops
-      </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">{loop.name}</h1>
+        <Summary loop={loop} poll={poll} />
+      </PageHeader>
 
       {issues.length > 0 ? (
         <Alert>
           <CircleAlert />
-          <AlertTitle>This loop cannot run yet</AlertTitle>
-          <AlertDescription className="flex flex-col gap-1">
+          <AlertTitle>Cannot run yet</AlertTitle>
+          <AlertDescription className="flex flex-col gap-0.5">
             {issues.map((line) => (
               <span key={line}>{line}</span>
             ))}
@@ -60,254 +97,239 @@ function LoopPage() {
         </Alert>
       ) : null}
 
-      <Watching loop={loop} poll={poll} />
+      {loop.enabled && poll.pollError ? (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>The last check failed</AlertTitle>
+          <AlertDescription>{poll.pollError}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      {/* Opening a loop is nearly always about changing it; its runs are in the
-          inbox too. */}
-      <Tabs defaultValue="settings">
-        <TabsList>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-        </TabsList>
+      <LinkTabs
+        items={[
+          {
+            label: (
+              <>
+                Tasks
+                {tasks.length > 0 ? (
+                  <span className="text-xs text-muted-foreground">{tasks.length}</span>
+                ) : null}
+              </>
+            ),
+            to: "/loops/$loopId",
+            params: { loopId: loop.id },
+            search: {},
+            active: tab === "tasks",
+          },
+          {
+            label: "Settings",
+            to: "/loops/$loopId",
+            params: { loopId: loop.id },
+            search: { tab: "settings" },
+            active: tab === "settings",
+          },
+        ]}
+      />
 
-        <TabsContent value="settings" className="pt-2">
-          <LoopForm loop={loop} />
-        </TabsContent>
-
-        <TabsContent value="tasks" className="flex flex-col gap-4 pt-2">
-          <RunBox loop={loop} />
-          <TaskList tasks={tasks} showLoop={false} empty="This loop has not run yet." />
-        </TabsContent>
-      </Tabs>
+      {tab === "settings" ? (
+        <div className="flex flex-col">
+          <LoopForm key={loop.id} loop={loop} />
+          <DeleteLoop loop={loop} />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <Backlog loop={loop} poll={poll} />
+          <TryOnLink loop={loop} />
+          <TaskList tasks={tasks} showLoop={false} empty="No runs yet." />
+        </div>
+      )}
     </div>
   );
 }
 
-function LookNowButton({ loopId }: { loopId: string }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
+/** One line under the title: where it answers, with what, and when it last looked. */
+function Summary({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
+  const action = connectorAction(loop.actionConnectorId, loop.actionId);
+  const writer = connectorManifest(loop.actionConnectorId);
+  const agent = loop.agentId ? agentManifest(loop.agentId) : undefined;
+  const parts = [
+    action ? `${writer?.name ?? loop.actionConnectorId} · ${action.name}` : null,
+    agent?.name ?? "Default agent",
+    loop.enabled ? (poll.polledAt ? `Checked ${ago(poll.polledAt)}` : "Not checked yet") : null,
+  ].filter(Boolean);
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const report = await lookLoopNow({ data: { id: loopId } });
-          await router.invalidate();
-          if (report.error) {
-            toast.error(report.error);
-          } else {
-            toast.success("Looked");
+    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+      {loop.enabled ? null : <Badge variant="secondary">Off</Badge>}
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
+function HeaderActions({ loop }: { loop: LoopView }) {
+  const { busy, run } = useAction();
+  const byHand = connectorManifest(loop.connectorId)?.byHand.kind ?? "none";
+
+  return (
+    <>
+      {byHand === "now" ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() =>
+            run("run", async () => {
+              await runLoopNow({ data: { loopId: loop.id, url: "", dryRun: false } });
+              return "Queued";
+            })
           }
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : String(error));
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <RefreshCw className={busy ? "animate-spin" : undefined} />
-      {busy ? "Looking..." : "Look now"}
-    </Button>
+        >
+          <Play />
+          Run now
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy !== null || !loop.enabled}
+          onClick={() =>
+            run("look", async () => {
+              const report = await lookLoopNow({ data: { id: loop.id } });
+              if (report.error) throw new Error(report.error);
+              return "Checked";
+            })
+          }
+        >
+          <RefreshCw className={busy === "look" ? "animate-spin" : undefined} />
+          Check now
+        </Button>
+      )}
+      <label className="flex items-center gap-2 pl-1 text-sm">
+        <Switch
+          checked={loop.enabled}
+          disabled={busy !== null}
+          onCheckedChange={(enabled) =>
+            run("toggle", async () => {
+              await toggleLoop({ data: { id: loop.id, enabled } });
+              return enabled ? "Turned on" : "Turned off";
+            })
+          }
+        />
+        {loop.enabled ? "On" : "Off"}
+      </label>
+    </>
   );
 }
 
-function when(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
-/**
- * Whether the loop is really watching is the one thing a page cannot work out
- * for itself, and the thing a person most wants to know after turning one on.
- */
-function Watching({
-  loop,
-  poll,
-}: {
-  loop: { id: string; enabled: boolean };
-  poll: LoopPollState;
-}) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-
-  if (!loop.enabled) {
-    return (
-      <Alert>
-        <AlertTitle>This loop is off</AlertTitle>
-        <AlertDescription>Nothing is being watched for until you turn it back on.</AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (poll.pollError) {
-    return (
-      <Alert variant="destructive">
-        <CircleAlert />
-        <AlertTitle>The last look did not work</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3">
-          <span>{poll.pollError}</span>
-          <LookNowButton loopId={loop.id} />
-        </AlertDescription>
-      </Alert>
-    );
-  }
+/** What matched but was not run: already there when the loop was made, or held back. */
+function Backlog({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
+  const { busy, run } = useAction();
+  if (poll.backlog.length === 0) return null;
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 pt-6">
-        <div className="flex flex-wrap items-start justify-between gap-3 text-sm">
-          <div className="flex items-start gap-3">
-            <Eye className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <p className="text-muted-foreground">
-              {poll.polledAt
-                ? `Watching. Last looked ${when(poll.polledAt)}.`
-                : "Not looked yet. The dispatcher checks every couple of minutes; the first look records what is already waiting without running it."}
-            </p>
-          </div>
-          <LookNowButton loopId={loop.id} />
-        </div>
-
-        {poll.backlog.length > 0 ? (
-          <div className="flex flex-col gap-3 rounded-lg border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">
-                  {poll.backlog.length === 1
-                    ? "One thing is waiting"
-                    : `${poll.backlog.length} things are waiting`}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Matched, but not run: either it was already there before the loop was made, or
-                  it was held back for the reason shown. Run them if you want them dealt with too.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    const { queued } = await runLoopBacklog({ data: { id: loop.id } });
-                    await router.invalidate();
-                    toast.success(queued === 1 ? "Queued 1 run" : `Queued ${queued} runs`);
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : String(error));
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {busy ? "Queueing..." : "Run these too"}
-              </Button>
-            </div>
-            <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-              {poll.backlog.slice(0, 8).map((item) => (
-                <li key={item.key} className="truncate">
-                  {item.sourceRef} · {item.sourceTitle}
-                  {item.hold ? <span className="text-foreground"> · {item.hold}</span> : null}
-                </li>
-              ))}
-              {poll.backlog.length > 8 ? <li>and {poll.backlog.length - 8} more</li> : null}
-            </ul>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-3 rounded-xl bg-muted/50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">
+          {poll.backlog.length} waiting
+          <span className="font-normal text-muted-foreground"> · matched, not run</span>
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() =>
+            run("backlog", async () => {
+              const { queued } = await runLoopBacklog({ data: { id: loop.id } });
+              return queued === 1 ? "Queued 1 run" : `Queued ${queued} runs`;
+            })
+          }
+        >
+          Run all
+        </Button>
+      </div>
+      <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+        {poll.backlog.slice(0, 5).map((item) => (
+          <li key={item.key} className="truncate">
+            <span className="text-foreground">{item.sourceRef}</span> {item.sourceTitle}
+            {item.hold ? <span className="text-amber-700 dark:text-amber-500"> · {item.hold}</span> : null}
+          </li>
+        ))}
+        {poll.backlog.length > 5 ? <li>and {poll.backlog.length - 5} more</li> : null}
+      </ul>
+    </div>
   );
 }
 
-/**
- * A loop that runs by itself still has to be shaped, and waiting for a real
- * signal to arrive is a slow way to do it. Dry run means that shaping leaves
- * no marks on a real repository.
- */
-function RunBox({ loop }: { loop: { id: string; connectorId: string } }) {
-  const router = useRouter();
+/** Run the loop on one link, by hand, without waiting for something to arrive. */
+function TryOnLink({ loop }: { loop: LoopView }) {
+  const { busy, run } = useAction();
   const [url, setUrl] = useState("");
   const [dryRun, setDryRun] = useState(true);
-  const [running, setRunning] = useState(false);
   const manifest = connectorManifest(loop.connectorId);
-  const byHand = manifest?.byHand ?? { kind: "none" as const };
-
-  const run = async () => {
-    setRunning(true);
-    try {
-      await runLoopNow({ data: { loopId: loop.id, url: url.trim(), dryRun } });
-      await router.invalidate();
-      setUrl("");
-      toast.success(dryRun ? "Queued as a dry run" : "Queued");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  // Nothing here can start a run, so the card would be a box that only makes
-  // errors. Saying why is more use than offering one.
-  if (byHand.kind === "none") {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          This loop can only run on something arriving, so there is nothing to start by hand. What
-          it does with what arrives is worth trying on the first one, with dry run left on.
-        </CardContent>
-      </Card>
-    );
-  }
+  if (manifest?.byHand.kind !== "link") return null;
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 pt-6">
-        <div className="flex flex-col gap-2">
-          {byHand.kind === "now" ? (
-            <>
-              <Label>Run it now, without waiting for the time</Label>
-              <div className="flex items-center justify-between gap-4">
-                <p className="text-xs text-muted-foreground">
-                  Runs exactly as it would when the clock came round, and does not count as that
-                  run: the next scheduled one still happens.
-                </p>
-                <Button onClick={run} disabled={running}>
-                  <Play />
-                  Run
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Label htmlFor="run-url">Try this loop on a {manifest?.name ?? ""} link</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="run-url"
-                  value={url}
-                  placeholder={byHand.placeholder}
-                  onChange={(event) => setUrl(event.target.value)}
-                />
-                <Button onClick={run} disabled={running || url.trim() === ""}>
-                  <Play />
-                  Run
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <Label htmlFor="run-dry">Dry run</Label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {dryRun
-                ? "Prepare the result and show it to you, without writing anything."
-                : "Write the result back, exactly as the loop would on its own."}
-            </p>
-          </div>
-          <Switch id="run-dry" checked={dryRun} onCheckedChange={setDryRun} />
-        </div>
-      </CardContent>
-    </Card>
+    <form
+      className="flex flex-col gap-2 sm:flex-row sm:items-center"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void run("try", async () => {
+          await runLoopNow({ data: { loopId: loop.id, url: url.trim(), dryRun } });
+          setUrl("");
+          return dryRun ? "Queued as a dry run" : "Queued";
+        });
+      }}
+    >
+      <Input
+        aria-label={`${manifest.name} link`}
+        value={url}
+        placeholder={`Try on a link: ${manifest.byHand.placeholder}`}
+        onChange={(event) => setUrl(event.target.value)}
+        className="flex-1"
+      />
+      <div className="flex items-center gap-3">
+        <Label className="flex items-center gap-2 font-normal text-muted-foreground">
+          <Switch checked={dryRun} onCheckedChange={setDryRun} />
+          Dry run
+        </Label>
+        <Button type="submit" disabled={busy !== null || url.trim() === ""}>
+          <Play />
+          Run
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function DeleteLoop({ loop }: { loop: LoopView }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Section title="Delete" className="mt-6">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">Its runs are deleted with it.</p>
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={busy}
+          onClick={async () => {
+            if (!window.confirm(`Delete ${loop.name}?`)) return;
+            setBusy(true);
+            try {
+              await removeLoop({ data: { id: loop.id } });
+              toast.success(`Deleted ${loop.name}`);
+              await navigate({ to: "/loops" });
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : String(error));
+              setBusy(false);
+            }
+          }}
+        >
+          <Trash2 />
+          Delete loop
+        </Button>
+      </div>
+    </Section>
   );
 }

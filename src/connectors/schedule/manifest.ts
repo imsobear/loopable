@@ -29,7 +29,7 @@ const at: SettingField = {
   key: "at",
   kind: "text",
   label: "At",
-  help: "On a 24-hour clock, in this host's own time zone. Only the minutes are used by an hourly loop.",
+  help: "24-hour time, in this host's time zone.",
   placeholder: "09:00",
 };
 
@@ -37,7 +37,7 @@ const weekday: SettingField = {
   key: "weekday",
   kind: "select",
   label: "On",
-  help: "Only used by a loop that runs once a week.",
+  help: "For weekly loops.",
   options: WEEKDAY_NAMES.map((name, index) => ({ value: String(index), label: name })),
   default: "1",
 };
@@ -46,7 +46,7 @@ const folder: SettingField = {
   key: "folder",
   kind: "text",
   label: "Folder to work in",
-  help: "An absolute path. Nothing arrives to be looked at on a schedule, so this is the whole of what the agent is given.",
+  help: "Absolute path on the runner. The agent works here.",
   placeholder: "/Users/you/code/web",
 };
 

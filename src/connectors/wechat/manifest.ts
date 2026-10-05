@@ -9,7 +9,7 @@ const folder: SettingField = {
   key: "folder",
   kind: "text",
   label: "Folder to work in",
-  help: "An absolute path to a checkout on this host. The agent runs here, so it can read the code you are asking about.",
+  help: "Absolute path to a checkout on the runner. The agent works here.",
   placeholder: "/Users/you/code/your-project",
 };
 
@@ -40,7 +40,7 @@ const recipient: SettingField = {
   key: "to",
   kind: "select",
   label: "Who to send it to",
-  help: "WeChat only reliably delivers a reply to a conversation you started. Sending to yourself out of the blue is refused unless you have written to the bot in the last half day or so, which makes this a poor fit for anything that has to arrive overnight.",
+  help: "\"Me\" only arrives if you messaged the bot in the last half day.",
   options: [
     { value: "source", label: "Whoever asked" },
     { value: "me", label: "Me" },
