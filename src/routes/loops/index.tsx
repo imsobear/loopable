@@ -34,7 +34,7 @@ function LoopsPage() {
             matches something is the one that runs, so order matters.
           </p>
         </div>
-        <Button render={<Link to="/loops/new" />}>
+        <Button nativeButton={false} render={<Link to="/loops/new" />}>
           <Plus />
           New loop
         </Button>
@@ -48,7 +48,7 @@ function LoopsPage() {
             <p className="text-sm text-muted-foreground">
               No loops yet, so nothing is being watched for.
             </p>
-            <Button variant="outline" render={<Link to="/loops/new" />}>
+            <Button variant="outline" nativeButton={false} render={<Link to="/loops/new" />}>
               See what Loopable can do
             </Button>
           </CardContent>

@@ -69,7 +69,7 @@ function ConnectorsPage() {
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{manifest.tagline}</p>
                 </div>
-                <Button variant="outline" render={<Link to="/connectors/$connectorId" params={{ connectorId: manifest.id }} />}>
+                <Button variant="outline" nativeButton={false} render={<Link to="/connectors/$connectorId" params={{ connectorId: manifest.id }} />}>
                   {connections.length > 0 ? "Manage" : "Set up"}
                   <ArrowRight />
                 </Button>

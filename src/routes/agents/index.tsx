@@ -38,7 +38,7 @@ export const Route = createFileRoute("/agents/")({
   component: AgentsPage,
 });
 
-export function AgentsPage() {
+function AgentsPage() {
   const { agents } = Route.useLoaderData();
   useLiveRefresh();
 

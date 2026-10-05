@@ -38,7 +38,7 @@ export const getAgentsPage = createServerFn({ method: "GET" }).handler(async () 
 }));
 
 export const saveAgent = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     (data: {
       agentId: string;
       permissionMode: PermissionMode;
@@ -56,14 +56,14 @@ export const saveAgent = createServerFn({ method: "POST" })
   });
 
 export const chooseDefaultAgent = createServerFn({ method: "POST" })
-  .inputValidator((data: { agentId: string }) => data)
+  .validator((data: { agentId: string }) => data)
   .handler(async ({ data }) => {
     await setDefaultAgent(data.agentId);
     return await withRunners(await listAgents());
   });
 
 export const runAgentTest = createServerFn({ method: "POST" })
-  .inputValidator((data: { agentId: string }) => data)
+  .validator((data: { agentId: string }) => data)
   .handler(async ({ data }) => {
     const result = await testAgent(data.agentId);
     return {

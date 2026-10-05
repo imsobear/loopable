@@ -13,7 +13,7 @@ export const rotateRunnerJoinToken = createServerFn({ method: "POST" }).handler(
 );
 
 export const removeRunner = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await forgetRunner(data.id);
     return await listRunners();

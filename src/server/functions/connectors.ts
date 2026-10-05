@@ -54,7 +54,7 @@ export const getConnectorOverview = createServerFn({ method: "GET" }).handler(
  * provider's login works.
  */
 export const beginQrLogin = createServerFn({ method: "POST" })
-  .inputValidator((data: { connectorId: string }) => data)
+  .validator((data: { connectorId: string }) => data)
   .handler(async ({ data }): Promise<QrLoginView> => {
     const runtime = connectorRuntime(data.connectorId);
     if (!runtime.auth.startQrLogin) {
@@ -73,7 +73,7 @@ export const beginQrLogin = createServerFn({ method: "POST" })
  * confirmed login is saved here and the page is told only that it worked.
  */
 export const continueQrLogin = createServerFn({ method: "POST" })
-  .inputValidator((data: { connectorId: string; attempt: JsonValue }) => data)
+  .validator((data: { connectorId: string; attempt: JsonValue }) => data)
   .handler(async ({ data }): Promise<QrPollView> => {
     const runtime = connectorRuntime(data.connectorId);
     if (!runtime.auth.pollQrLogin) {
@@ -93,7 +93,7 @@ export const continueQrLogin = createServerFn({ method: "POST" })
  * label, never the token back.
  */
 export const connectWithToken = createServerFn({ method: "POST" })
-  .inputValidator((data: { connectorId: string; fields: Record<string, string> }) => data)
+  .validator((data: { connectorId: string; fields: Record<string, string> }) => data)
   .handler(async ({ data }) => {
     const runtime = connectorRuntime(data.connectorId);
     if (!runtime.auth.connectWithFields) {
@@ -105,16 +105,16 @@ export const connectWithToken = createServerFn({ method: "POST" })
   });
 
 export const disconnectConnection = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await removeConnection(data.id);
     return { ok: true };
   });
 
 export const verifyConnection = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => await checkConnection(data.id));
 
 export const saveConnectionSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string; settings: ConnectionSettings }) => data)
+  .validator((data: { id: string; settings: ConnectionSettings }) => data)
   .handler(async ({ data }) => await updateConnectionSettings(data.id, data.settings));

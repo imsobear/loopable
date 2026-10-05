@@ -27,39 +27,39 @@ export const getLoopsPage = createServerFn({ method: "GET" }).handler(async () =
 export const getLoopReadiness = createServerFn({ method: "GET" }).handler(async () => await loopReadiness());
 
 export const getLoopById = createServerFn({ method: "GET" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => await getLoop(data.id));
 
 export const saveLoop = createServerFn({ method: "POST" })
-  .inputValidator(edit)
+  .validator(edit)
   .handler(async ({ data }) => {
     const { id, ...values } = data;
     return id ? await updateLoop(id, values) : await createLoop(values);
   });
 
 export const toggleLoop = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string; enabled: boolean }) => data)
+  .validator((data: { id: string; enabled: boolean }) => data)
   .handler(async ({ data }) => await setLoopEnabled(data.id, data.enabled));
 
 export const removeLoop = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await deleteLoop(data.id);
     return await listLoops();
   });
 
 export const reorderLoop = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string; direction: "up" | "down" }) => data)
+  .validator((data: { id: string; direction: "up" | "down" }) => data)
   .handler(async ({ data }) => await moveLoop(data.id, data.direction));
 
 export const getLoopPollState = createServerFn({ method: "GET" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => await loopPollState(data.id));
 
 export const runLoopBacklog = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => ({ queued: await runBacklog(data.id) }));
 
 export const lookLoopNow = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data }) => await lookNow(data.id));

@@ -71,7 +71,7 @@ function ConnectorDetailPage() {
               {pasting ? "Cancel" : "Add bot"}
             </Button>
           ) : (
-            <Button render={<a href={`/api/connectors/${connectorId}/authorize`} />}>
+            <Button nativeButton={false} render={<a href={`/api/connectors/${connectorId}/authorize`} />}>
               {state.connections.length > 0 ? "Add another account" : "Connect"}
             </Button>
           )
@@ -271,6 +271,7 @@ function ConnectionCard({
         {broken ? (
           <Button
             size="sm"
+            nativeButton={false}
             render={<a href={`/api/connectors/${connection.connectorId}/authorize`} />}
           >
             <RotateCcw />
