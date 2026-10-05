@@ -32,13 +32,15 @@ A workflow is not a loop template. Creating a loop copies the prompt onto the lo
 
 The UI does not need to say “workflow.” New loop is choosing a job by the name the connector gave it. In code and in this document the word is workflow, and the column is `workflowId`.
 
-**Loop.** One instance of a workflow: your repositories, your notes, which agent. This is what people edit. Loops run by themselves. A loop names an agent, not a runner. The dispatcher picks an online runner that has that agent signed in. If none does, the loop is saved anyway and the page says it cannot run yet.
+**Loop.** One instance of a workflow, or a custom loop: a trigger with your own prompt. It holds your settings, which agent, the folder it works in, and where the answer goes. This is what people edit. Loops run by themselves. A loop names an agent, not a runner. The dispatcher picks an online runner that has that agent signed in. If none does, the loop is saved anyway and the page says it cannot run yet.
 
 **Signal.** One thing a loop noticed. The connector’s key on a signal has to change exactly when there is something new to do. Same signal does not run twice.
 
 The first look never acts. Whatever is already waiting when a loop is created is that loop’s backlog, recorded rather than run.
 
-**Task.** One run of one loop against one signal: fetch the context, let the agent work, write the result back. The inbox is the list of tasks. A task is kept whether it wrote anything or not.
+**Task.** One run of one loop against one signal: fetch the context, let the agent work, write the result back. A prompt asked from the inbox with “Ask an agent” is a task with no loop, and nothing to write back. The inbox is the list of tasks. A task is kept whether it wrote anything or not.
+
+**Folder.** Loops that read your code (chat bots and schedules) work in a folder, given relative to the runner's home, such as `code/web`. Each runner looks for it under its own home, so any runner with that checkout can take the job.
 
 ## What does the work
 

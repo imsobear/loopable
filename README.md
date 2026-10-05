@@ -15,6 +15,7 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 | Comes in from | Loop | Writes back |
 | --- | --- | --- |
+| Any trigger | Custom loop: pick what starts it, write your own prompt | Anywhere below, or Inbox only |
 | Schedule | Do something on a schedule | Inbox, or a Slack, Lark, or GitHub thread |
 | GitHub | Review pull requests | A review, as a comment |
 | GitHub | Reply to issues | A comment on the issue |
@@ -23,7 +24,7 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 | WeChat | Do what I ask the WeChat bot | A reply in the chat |
 | Gmail | Custom loop: “An email arrives” | Anywhere, such as an email back to the same inbox |
 
-A loop’s answer can go to any connector that accepts it, so a scheduled check can post to #oncall.
+A loop’s answer can go to any connector that accepts it, so a scheduled check can post to #oncall. To ask an agent something once, use **Ask an agent** in the inbox.
 
 ## Architecture
 
@@ -62,6 +63,7 @@ loopable start                # App + Dispatcher, bound on all interfaces
 On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address, signed in as the account your team will send work to (see [GitHub: a shared account](docs/connectors.md#github-a-shared-account)). Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
 
 ```bash
+npm install -g loopable-cli   # on another machine; already done here
 loopable runner --url http://<LAN-IP>:4321 --token <from Runners>
 ```
 

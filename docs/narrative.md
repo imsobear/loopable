@@ -17,8 +17,8 @@ It is for small and mid-size teams. Work comes in from Slack, Lark, GitHub, or a
 The team leaves Loopable running. A signal comes in, a loop matches, the agent runs, the answer is written back.
 
 - **No one has to be there.** A loop runs when the review is requested, when a chat bot is mentioned, or when the clock says so.
-- **The process is shared.** A loop is one job done one way: what to watch, what to ask, where to answer. Anyone on the team can read it and change it.
-- **The knowledge is shared.** A loop works in a folder or a checkout of your repository. The `AGENTS.md` and skills there are what the agent knows, and they live in the team’s repository, not on someone’s laptop.
+- **The process is shared.** A loop is one job done one way: what starts it, what to ask, where to answer. Start from a ready-made workflow, or write a custom loop on any trigger. Anyone on the team can read it and change it.
+- **The knowledge is shared.** A loop works in a checkout of your repository, named relative to the runner's home so every runner finds its own copy. The `AGENTS.md` and skills there are what the agent knows, and they live in the team’s repository, not on someone’s laptop.
 - **Every run is recorded.** The inbox shows what came in, what the agent did, and what it wrote back, whether or not it wrote anything.
 
 It is not a better personal Codex. One person, one chat, one laptop is already solved.
@@ -58,8 +58,8 @@ Signal → Loop → Task
               → Dispatcher writes back
 ```
 
-The runner claims work over HTTP. Loopable does not push into the runner. A Slack bot, a Lark bot, GitHub, and the clock are ways to create a signal. The path inside does not change. Connections live on Loopable. Agent login lives on the runner.
+The runner claims work over HTTP. Loopable does not push into the runner. A Slack bot, a Lark bot, GitHub, an email, and the clock are ways to create a signal. The path inside does not change. Connections live on Loopable. Agent login lives on the runner.
 
-Shipped today: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock, runners, Codex, Claude Code, and Cursor Agent.
+Shipped today: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock, custom loops, runners, Codex, Claude Code, and Cursor Agent.
 
 The words for the parts are in [concepts.md](concepts.md). Extra runners are in [deploy.md](deploy.md).

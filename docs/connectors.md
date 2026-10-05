@@ -54,7 +54,16 @@ WeChat is reached through Tencent's iLink bot API. Loopable speaks it directly r
 
 Connecting means scanning. The connector hands over what the code should contain and a way to ask how the scan is going; the page renders it and asks every couple of seconds. A code lasts about two minutes. The token never reaches the browser: a confirmed scan is saved server-side.
 
-There are no WeChat workflows yet. Binding an account is worth having on its own.
+A loop fires when someone messages the bot, and the answer goes back to whoever asked. WeChat only delivers a reply into a conversation someone started, so it is a place to answer, not a place to send news to.
+
+## Gmail
+
+Gmail is connected by signing in with Google, from `http://127.0.0.1:4321` on the Loopable host.
+
+- **Starts when an email arrives.** A custom loop on “An email arrives” checks the inbox every 30 minutes. It can be narrowed with Gmail search terms, skip mail the account sent, and skip mail that needs nothing, after one quick look at what arrived.
+- **Email this account.** As an answer, Gmail sends to the connected account itself, the way a bot answers whoever asked. When the run started from an email in the same inbox, the answer joins that thread.
+
+Gmail asks for `gmail.readonly` and `gmail.send`. A connection made before sending was offered has to be reconnected to send.
 
 ## Slack bot
 
