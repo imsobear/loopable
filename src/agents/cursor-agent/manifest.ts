@@ -5,7 +5,7 @@ export const cursorAgentManifest = defineAgentManifest({
   name: "Cursor Agent",
   tagline: "Cursor's CLI agent, driven through its print mode.",
   docsUrl: "https://cursor.com/docs/cli",
-  icon: "MousePointerClick",
+  icon: "Cursor",
   accent: "bg-blue-600 text-white",
   binaries: ["cursor-agent"],
   installHint: "Install with curl https://cursor.com/install -fsS | bash, then run cursor-agent login.",

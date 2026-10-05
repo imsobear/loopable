@@ -5,7 +5,7 @@ export const codexManifest = defineAgentManifest({
   name: "Codex",
   tagline: "OpenAI's coding agent, driven non-interactively through codex exec.",
   docsUrl: "https://developers.openai.com/codex/cli",
-  icon: "Terminal",
+  icon: "Codex",
   accent: "bg-neutral-900 text-white",
   binaries: ["codex"],
   installHint: "Install with npm i -g @openai/codex, then run codex login.",

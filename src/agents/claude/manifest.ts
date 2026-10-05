@@ -5,7 +5,7 @@ export const claudeManifest = defineAgentManifest({
   name: "Claude Code",
   tagline: "Anthropic's coding agent, driven through its print mode.",
   docsUrl: "https://docs.claude.com/en/docs/claude-code/cli-reference",
-  icon: "Sparkles",
+  icon: "ClaudeCode",
   accent: "bg-[#d97757] text-white",
   binaries: ["claude"],
   installHint: "Install with curl -fsSL https://claude.ai/install.sh | bash, then run claude auth login.",

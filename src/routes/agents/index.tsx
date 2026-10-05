@@ -1,7 +1,8 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Bot, ChevronDown, MousePointerClick, PlayCircle, Sparkles, Terminal, type LucideIcon } from "lucide-react";
+import { ChevronDown, PlayCircle } from "lucide-react";
+import { ProductIcon } from "@/components/connector-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { List, PageHeader } from "@/components/page";
@@ -25,8 +26,6 @@ import {
   runAgentTest,
   saveAgent,
 } from "@/server/functions/agents.ts";
-
-const ICONS: Record<string, LucideIcon> = { Terminal, MousePointerClick, Sparkles, Bot };
 
 const MODE_LABELS: Record<PermissionMode, string> = {
   read_only: "Read only",
@@ -74,7 +73,6 @@ function presence(view: AgentView): string {
 
 function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView }) {
   const router = useRouter();
-  const Icon = ICONS[manifest.icon] ?? Bot;
   const [open, setOpen] = useState(view.isDefault && !view.defaultIsImplicit);
   const [mode, setMode] = useState<PermissionMode>(view.settings.permissionMode);
   const [model, setModel] = useState(view.settings.model ?? "");
@@ -97,14 +95,10 @@ function AgentRow({ manifest, view }: { manifest: AgentManifest; view: AgentView
   return (
     <div>
       <div className="flex items-center gap-3 px-4 py-3">
-        <span
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-md",
-            online ? manifest.accent : "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="size-4" />
-        </span>
+        <ProductIcon
+          icon={manifest.icon}
+          className={cn("size-8", online ? undefined : "opacity-50 grayscale")}
+        />
         <button
           type="button"
           className="min-w-0 flex-1 text-left"
