@@ -2,7 +2,7 @@
 
 Loopable is your team’s own agent. It runs on a machine the team owns, and the team decides what it can do.
 
-It is for small and mid-size teams. Work comes in from Slack, Lark, GitHub, or a schedule. Codex or Cursor Agent does it on that machine. The answer goes back where it was asked, and every run is recorded.
+It is for small and mid-size teams. Work comes in from Slack, Lark, GitHub, or a schedule. Codex, Claude Code, or Cursor Agent does it on that machine. The answer goes back where it was asked, and every run is recorded.
 
 ## The problem
 
@@ -29,7 +29,7 @@ The agent runs on a Runner the team owns. The usual install is one computer that
 
 - **Reach.** Whatever that machine can reach, the agent can reach: the internal network, logs, databases, internal services.
 - **Extend.** Add any MCP server, CLI, or login to an internal service on that machine. No platform decides what is allowed.
-- **Choose.** Pick the agent and the model. Codex and Cursor Agent today.
+- **Choose.** Pick the agent and the model. Codex, Claude Code, and Cursor Agent today.
 - **Keep local.** Data and credentials stay on the team’s machines. The agent uses the CLI subscription the team already pays for.
 
 ## Safe to leave on
@@ -53,12 +53,12 @@ A team that lives only in Slack, uses only one vendor, and needs nothing inside 
 ```text
 Signal → Loop → Task
               → Dispatcher watches, matches a loop, queues the job
-              → Runner pulls the job, runs Codex or Cursor Agent
+              → Runner pulls the job, runs Codex, Claude Code, or Cursor Agent
               → Dispatcher writes back
 ```
 
 The runner claims work over HTTP. Loopable does not push into the runner. A Slack bot, a Lark bot, GitHub, and the clock are ways to create a signal. The path inside does not change. Connections live on Loopable. Agent login lives on the runner.
 
-Shipped today: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock, runners, Codex and Cursor Agent.
+Shipped today: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock, runners, Codex, Claude Code, and Cursor Agent.
 
 The words for the parts are in [concepts.md](concepts.md). Extra runners are in [deploy.md](deploy.md).

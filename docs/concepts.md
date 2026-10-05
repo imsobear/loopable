@@ -36,9 +36,9 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 ## What does the work
 
-**Agent.** A coding CLI Loopable knows how to invoke: Codex, Cursor Agent. The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
+**Agent.** A coding CLI Loopable knows how to invoke: Codex, Claude Code, Cursor Agent. The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.
 
-**Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub, a Slack bot, a Feishu bot, Gmail, or WeChat. Agent login is Codex or Cursor Agent. They live in different places and must not be merged into one “account.”
+**Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub, a Slack bot, a Feishu bot, Gmail, or WeChat. Agent login is Codex, Claude Code, or Cursor Agent. They live in different places and must not be merged into one “account.”
 
 **Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. The command is `loopable runner`. The join token lives on the Runners page.
 
@@ -68,7 +68,7 @@ The path does not change with how many runners you have. One runner on the same 
 
 | | Connection | Runtime auth | Agent login |
 | --- | --- | --- | --- |
-| What | GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat | git / `gh` on the runner | Codex, Cursor Agent |
+| What | GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat | git / `gh` on the runner | Codex, Claude Code, Cursor Agent |
 | Where | Loopable’s secret store | That host’s home directory | That host’s home directory |
 | Who uses it | App and Dispatcher, to read signals and write back | The agent, via git on that host | Only the agent process |
 

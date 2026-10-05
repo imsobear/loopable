@@ -7,7 +7,7 @@ A lot of team work waits on one person: a review request, a question in #oncall,
 Loopable is a shared agent for small and mid-size teams.
 
 - **Shared.** Work comes in from Slack, Lark, GitHub, or a schedule. A loop says what to do. Nobody has to be there. Every run is recorded in the inbox.
-- **Yours.** Codex or Cursor Agent runs on a machine the team owns. It reaches what that machine reaches, uses the MCP servers and skills you install, and keeps data in-house.
+- **Yours.** Codex, Claude Code, or Cursor Agent runs on a machine the team owns. It reaches what that machine reaches, uses the MCP servers and skills you install, and keeps data in-house.
 
 The story is in [docs/narrative.md](docs/narrative.md). The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
 
@@ -34,7 +34,7 @@ Three processes. The agent always runs on a Runner, never on the App or Dispatch
   <img src="docs/architecture.svg" alt="Slack bot, GitHub, and Lark bot into Loopable. A runner pulls the job. Loopable writes back to the same three." width="920" />
 </p>
 
-Slack bot, GitHub, and Lark bot send work in. Loopable watches, matches a loop, and queues the job. A Runner pulls it, runs Codex or Cursor Agent, and Loopable writes the result back.
+Slack bot, GitHub, and Lark bot send work in. Loopable watches, matches a loop, and queues the job. A Runner pulls it, runs Codex, Claude Code, or Cursor Agent, and Loopable writes the result back.
 
 ```text
 Loopable  ──HTTP pull──  Runner  ──  Agent CLI
@@ -53,7 +53,7 @@ App and Dispatcher share one database and stay on the same host. Only one Dispat
 
 The usual setup is one computer that stays on — a Mac in the office is enough. App, Dispatcher, and a Runner all live there. It looks like a spare machine on a desk. For a small team, that is the product.
 
-You need Node 22+ and an agent CLI signed in on that machine (Codex or Cursor Agent).
+You need Node 22+ and an agent CLI signed in on that machine (Codex, Claude Code, or Cursor Agent).
 
 ```bash
 npm install -g loopable-cli

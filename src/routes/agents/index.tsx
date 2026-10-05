@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Bot, ChevronDown, MousePointerClick, PlayCircle, Terminal, type LucideIcon } from "lucide-react";
+import { Bot, ChevronDown, MousePointerClick, PlayCircle, Sparkles, Terminal, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,7 +26,7 @@ import {
   saveAgent,
 } from "@/server/functions/agents.ts";
 
-const ICONS: Record<string, LucideIcon> = { Terminal, MousePointerClick, Bot };
+const ICONS: Record<string, LucideIcon> = { Terminal, MousePointerClick, Sparkles, Bot };
 
 const MODE_LABELS: Record<PermissionMode, string> = {
   read_only: "Read only",

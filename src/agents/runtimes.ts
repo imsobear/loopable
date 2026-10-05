@@ -1,3 +1,4 @@
+import { claudeRuntime } from "./claude/runtime.ts";
 import { codexRuntime } from "./codex/runtime.ts";
 import { cursorAgentRuntime } from "./cursor-agent/runtime.ts";
 import type { AgentId, AgentRuntime } from "./types.ts";
@@ -5,6 +6,7 @@ import type { AgentId, AgentRuntime } from "./types.ts";
 /** Server-only registry. Never import this from a component. */
 const RUNTIMES: Record<AgentId, AgentRuntime> = {
   codex: codexRuntime,
+  claude: claudeRuntime,
   "cursor-agent": cursorAgentRuntime,
 };
 
