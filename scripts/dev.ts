@@ -70,7 +70,9 @@ async function waitForApp(): Promise<void> {
 const { getJoinToken } = await import("../src/server/runners.ts");
 await waitForApp();
 const joinToken = await getJoinToken();
-runner = run(node, ["--experimental-strip-types", join(root, "src/runner/main.ts")], {
+// --watch for the same reason: a newly added agent is only detected by a
+// runner that has loaded it. It rejoins by hostname, so it stays one runner.
+runner = run(node, ["--watch", "--experimental-strip-types", join(root, "src/runner/main.ts")], {
   LOOPABLE_DEV: "1",
   LOOPABLE_URL: appUrl,
   LOOPABLE_RUNNER_TOKEN: joinToken,
