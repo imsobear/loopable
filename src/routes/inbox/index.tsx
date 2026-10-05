@@ -1,10 +1,19 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Play } from "lucide-react";
+import { MessageSquarePlus, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page";
 import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -25,16 +34,20 @@ function InboxPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Inbox" description="Every run, newest first." />
-      <PromptBox agents={agents} />
+      <PageHeader
+        title="Inbox"
+        description="Every run, newest first."
+        actions={<AskAgent agents={agents} />}
+      />
       <TaskList tasks={tasks} empty="Nothing has run yet." />
     </div>
   );
 }
 
-/** Ask an agent something once. The reply stays here; nothing is written back. */
-function PromptBox({ agents }: { agents: Array<{ agentId: string; name: string }> }) {
+/** Ask an agent something once. The reply stays in Inbox; nothing is written back. */
+function AskAgent({ agents }: { agents: Array<{ agentId: string; name: string }> }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [agentId, setAgentId] = useState(agents[0]?.agentId ?? "");
   const [running, setRunning] = useState(false);
@@ -53,6 +66,7 @@ function PromptBox({ agents }: { agents: Array<{ agentId: string; name: string }
       await runPrompt({ data: { prompt, agentId } });
       await router.invalidate();
       setPrompt("");
+      setOpen(false);
       toast.success("Queued");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -62,42 +76,52 @@ function PromptBox({ agents }: { agents: Array<{ agentId: string; name: string }
   };
 
   return (
-    <div className="rounded-xl bg-card ring-1 ring-foreground/10 focus-within:ring-ring/50">
-      <Textarea
-        aria-label="Prompt"
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void run();
-        }}
-        placeholder="Ask an agent something. The reply stays here."
-        rows={2}
-        className="resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent"
-      />
-      <div className="flex items-center justify-end gap-2 px-3 pb-3">
-        {agents.length === 0 ? (
-          <span className="mr-auto text-xs text-muted-foreground">No agent is online.</span>
-        ) : (
-          <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
-            <SelectTrigger aria-label="Agent" size="sm" className="w-auto">
-              <SelectValue>
-                {(value: string) => agents.find((agent) => agent.agentId === value)?.name ?? value}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {agents.map((agent) => (
-                <SelectItem key={agent.agentId} value={agent.agentId}>
-                  {agent.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Button size="sm" onClick={run} disabled={!canRun}>
-          <Play />
-          {running ? "Queueing..." : "Run"}
-        </Button>
-      </div>
-    </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" />}>
+        <MessageSquarePlus />
+        Ask an agent
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Ask an agent</DialogTitle>
+          <DialogDescription>Runs once. The reply stays in Inbox.</DialogDescription>
+        </DialogHeader>
+        <Textarea
+          aria-label="Prompt"
+          autoFocus
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void run();
+          }}
+          placeholder="What should the agent do?"
+          rows={5}
+        />
+        <DialogFooter className="items-center">
+          {agents.length === 0 ? (
+            <span className="mr-auto text-xs text-muted-foreground">No agent is online.</span>
+          ) : (
+            <Select value={agentId} onValueChange={(value) => value && setAgentId(value)}>
+              <SelectTrigger aria-label="Agent" className="mr-auto w-auto">
+                <SelectValue>
+                  {(value: string) => agents.find((agent) => agent.agentId === value)?.name ?? value}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {agents.map((agent) => (
+                  <SelectItem key={agent.agentId} value={agent.agentId}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={run} disabled={!canRun}>
+            <Play />
+            {running ? "Queueing..." : "Run"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
