@@ -19,6 +19,7 @@ describe("authTest", () => {
         team: "Acme",
         team_id: "T1",
         user_id: "Ubot",
+        user: "loopable",
         bot_id: "B1",
       });
     });
@@ -30,6 +31,7 @@ describe("authTest", () => {
       teamUrl: "https://acme.slack.com/",
       botUserId: "Ubot",
       botId: "B1",
+      botName: "loopable",
     });
   });
 

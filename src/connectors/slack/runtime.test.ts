@@ -54,7 +54,7 @@ describe("connectWithFields", () => {
     );
   });
 
-  it("saves the workspace the token belongs to", async () => {
+  it("names the connection by its bot and the workspace it is in", async () => {
     givenSlack({
       auth: {
         ok: true,
@@ -62,14 +62,15 @@ describe("connectWithFields", () => {
         team: "Acme",
         team_id: "T1",
         user_id: "Ubot",
+        user: "loopable",
         bot_id: "B1",
       },
     });
     await expect(slackRuntime.auth.connectWithFields!({ botToken: " xoxb-good " })).resolves.toEqual({
-      credential: account,
+      credential: { ...account, botName: "loopable" },
       account: {
         id: "T1",
-        label: "Acme",
+        label: "@loopable · Acme",
         url: "https://acme.slack.com/",
       },
     });
