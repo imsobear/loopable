@@ -183,6 +183,20 @@
       "when": 1789100000010,
       "tag": "0025_prompt_tasks_done",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1789100000011,
+      "tag": "0026_guidance_into_prompt",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1789100000012,
+      "tag": "0027_relative_folders",
+      "breakpoints": true
     }
   ]
 }

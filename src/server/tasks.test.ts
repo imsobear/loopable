@@ -125,6 +125,7 @@ const { enqueuePrompt, enqueueTask, getTask, jobForTask, runAssignedAgent, runTa
   await import("./tasks.ts");
 const { getJoinToken, joinRunner } = await import("./runners.ts");
 const { branchFor } = await import("./checkout.ts");
+const { WORKSPACE } = await import("./agent-job.ts");
 
 await migrateIfNeeded();
 
@@ -221,8 +222,8 @@ describe("what the agent is asked", () => {
     expect(job.settings.permissionMode).toBe("workspace_write");
   });
 
-  it("names a host folder as cwd and leaves the rest to the prompt", async () => {
-    const folder = mkdtempSync(join(tmpdir(), "loopable-folder-"));
+  it("names the folder relative to home, and context files by the runner's workspace", async () => {
+    const folder = "code/web";
     await db()
       .insert(loops)
       .values({
@@ -248,8 +249,8 @@ describe("what the agent is asked", () => {
     const job = await jobForTask(queued.id);
 
     expect("runsIn" in job).toBe(false);
-    expect(job.cwd).toBe(folder);
-    expect(job.prompt).toContain(`Read ${join(home, "runs", queued.id, "PULL_REQUEST.md")} first.`);
+    expect(job.cwd).toBe("code/web");
+    expect(job.prompt).toContain(`Read ${WORKSPACE}/PULL_REQUEST.md first.`);
   });
 });
 

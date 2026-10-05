@@ -10,9 +10,11 @@ function wantedAgent(loop: LoopView, readiness: LoopReadiness): string | null {
   return loop.agentId ?? readiness.defaultAgentId;
 }
 
+/** Only a folder saved as an absolute path, from before folders were relative, ties a loop to the host. */
 function needsHost(loop: LoopView): boolean {
   const runsIn = connectorWorkflow(loop.connectorId, loop.workflowId)?.runsIn;
-  return runsIn === "folder";
+  const folder = loop.settings.folder;
+  return runsIn === "folder" && typeof folder === "string" && folder.trim().startsWith("/");
 }
 
 /**

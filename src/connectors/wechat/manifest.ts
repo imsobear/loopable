@@ -1,19 +1,6 @@
 import type { ConnectorManifest, SettingField } from "../types.ts";
 
 /**
- * Where the agent runs. Asking a phone "what broke the build" is only worth
- * anything if the agent can read the build, so this workflow works in a real
- * checkout rather than an empty directory.
- */
-const folder: SettingField = {
-  key: "folder",
-  kind: "text",
-  label: "Folder to work in",
-  help: "Absolute path to a checkout on the runner. The agent works here.",
-  placeholder: "/Users/you/code/your-project",
-};
-
-/**
  * A bot bound to your account can be messaged by other people, and this
  * workflow runs a coding agent on a runner. Answering only yourself is the
  * default because the alternative hands strangers your terminal.
@@ -90,9 +77,7 @@ export const wechatManifest: ConnectorManifest = {
       // No query to show: messages arrive on a stream rather than being found
       // by asking, so there is nothing here that could be checked.
       runsIn: "folder",
-      settings: [folder, askers],
-      guidancePlaceholder:
-        "Anything the agent should know about this project before it starts. For example: run pnpm test before saying a change works.",
+      settings: [askers],
       answer: "text",
       actionId: "wechat.reply",
     },

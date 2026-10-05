@@ -99,7 +99,10 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
 
   const [name, setName] = useState(loop.name);
   const [prompt, setPrompt] = useState(loop.prompt);
-  const [guidance, setGuidance] = useState(loop.guidance ?? "");
+  const [folder, setFolder] = useState(() => {
+    const saved = typeof loop.settings.folder === "string" ? loop.settings.folder : "";
+    return saved.startsWith("~/") ? saved.slice(2) : saved;
+  });
   const [agentId, setAgentId] = useState(loop.agentId ?? DEFAULT_AGENT);
   const [settings, setSettings] = useState<ConnectionSettings>(() =>
     initialFieldValues(workflow?.settings ?? [], loop.settings),
@@ -148,9 +151,9 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
           connectorId: loop.connectorId,
           workflowId: loop.workflowId,
           prompt,
-          guidance: guidance.trim() || null,
+          guidance: null,
           agentId: agentId === DEFAULT_AGENT ? null : agentId,
-          settings,
+          settings: workflow.runsIn === "folder" ? { ...settings, folder } : settings,
           actionConnectorId,
           actionId,
           actionTarget,
@@ -239,6 +242,26 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
           </Select>
         </Field>
 
+        {workflow.runsIn === "folder" ? (
+          <Field
+            label="Folder"
+            htmlFor="loop-folder"
+            hint="Inside the runner's home folder. The agent works here."
+            className="sm:max-w-sm"
+          >
+            <div className="flex items-center rounded-lg border border-input focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+              <span className="pl-2.5 font-mono text-sm text-muted-foreground">~/</span>
+              <Input
+                id="loop-folder"
+                value={folder}
+                placeholder="code/web"
+                onChange={(event) => setFolder(event.target.value)}
+                className="border-0 pl-1 font-mono shadow-none focus-visible:ring-0"
+              />
+            </div>
+          </Field>
+        ) : null}
+
         <Field
           label="Prompt"
           htmlFor="loop-prompt"
@@ -254,15 +277,6 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
           />
         </Field>
 
-        <Field label="Team notes" htmlFor="loop-guidance" hint="Optional. Added after the prompt.">
-          <Textarea
-            id="loop-guidance"
-            rows={3}
-            value={guidance}
-            placeholder={workflow.guidancePlaceholder}
-            onChange={(event) => setGuidance(event.target.value)}
-          />
-        </Field>
       </Section>
 
       <Section title="Answer">

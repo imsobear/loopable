@@ -152,7 +152,6 @@ export type TriggerDescriptor = {
    * "review" is a summary plus findings that get attached to lines.
    */
   answer: AnswerShape;
-  guidancePlaceholder?: string;
   /** Where an answer goes until a loop says otherwise. */
   actionId: string;
   /**
@@ -184,7 +183,6 @@ export type WorkflowDefinition = {
   summary: string;
   triggerId: string;
   prompt: string;
-  guidancePlaceholder?: string;
   /** Overrides of the trigger's starting points. */
   actionId?: string;
   actionConnectorId?: ConnectorId;

@@ -138,8 +138,6 @@ export const githubManifest = defineManifest({
       summary: "Posts a review when someone requests one from the connected account.",
       triggerId: "github.review_requested",
       prompt: REVIEW_PROMPT,
-      guidancePlaceholder:
-        "Anything specific to your team. For example: we require a test for every new endpoint.",
     },
     {
       // The id is the one "Plan issues assigned to me" had. Planning was one
@@ -150,8 +148,6 @@ export const githubManifest = defineManifest({
       summary: "Answers an issue in a comment when it is assigned to the connected account.",
       triggerId: "github.issue_assigned",
       prompt: REPLY_PROMPT,
-      guidancePlaceholder:
-        "Anything specific to this codebase worth knowing before answering. For example: questions about billing should point at docs/billing.md.",
     },
   ],
   actions: [

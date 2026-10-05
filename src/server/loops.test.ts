@@ -138,12 +138,18 @@ describe("a loop that has to work somewhere", () => {
     );
   });
 
-  it("is saved once it has one", async () => {
+  it("is saved relative to the runner's home", async () => {
     const loop = await added("schedule", "schedule.recurring", {
-      settings: { every: "day", at: "09:00", weekday: "1", folder: "/Users/you/code/web" },
+      settings: { every: "day", at: "09:00", weekday: "1", folder: "~/code/web" },
     });
 
-    expect(loop.settings.folder).toBe("/Users/you/code/web");
+    expect(loop.settings.folder).toBe("code/web");
+  });
+
+  it("will not take an absolute path, which means nothing on another runner", async () => {
+    await expect(
+      added("schedule", "schedule.recurring", { settings: { folder: "/Users/you/code/web" } }),
+    ).rejects.toThrow(/relative to the runner's home/);
   });
 
   it("does not ask for one where the agent is given no checkout", async () => {

@@ -117,7 +117,7 @@ describe("issuesFor", () => {
     ).toEqual([]);
   });
 
-  it("still pins a folder loop to a runner on this host", () => {
+  it("pins a loop with an old absolute folder to a runner on this host", () => {
     expect(
       issuesFor(
         { ...ready, hostAgentIds: [] },
@@ -125,10 +125,26 @@ describe("issuesFor", () => {
           name: "Daily look",
           connectorId: "schedule",
           workflowId: "schedule.recurring",
+          settings: { folder: "/Users/me/code/web" },
           actionConnectorId: "wechat",
           actionId: "wechat.reply",
         }),
       ),
     ).toEqual(["Daily look needs a runner on this host with Cursor Agent signed in."]);
+  });
+
+  it("lets a loop with a relative folder run on any runner", () => {
+    expect(
+      issuesFor(
+        { ...ready, hostAgentIds: [] },
+        loop({
+          connectorId: "schedule",
+          workflowId: "schedule.recurring",
+          settings: { folder: "code/web" },
+          actionConnectorId: "wechat",
+          actionId: "wechat.reply",
+        }),
+      ),
+    ).toEqual([]);
   });
 });

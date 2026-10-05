@@ -1,14 +1,6 @@
 import { defineManifest } from "../define.ts";
 import type { SettingField } from "../types.ts";
 
-const folder: SettingField = {
-  key: "folder",
-  kind: "text",
-  label: "Folder to work in",
-  help: "Absolute path to a checkout on the runner. The agent works here.",
-  placeholder: "/Users/you/code/your-project",
-};
-
 const chat: SettingField = {
   key: "chat",
   kind: "text",
@@ -70,9 +62,7 @@ export const feishuManifest = defineManifest({
       when: "The Feishu / Lark bot is mentioned",
       trigger: "someone @mentions the Feishu / Lark bot in a group it is in",
       runsIn: "folder",
-      settings: [folder],
-      guidancePlaceholder:
-        "Anything the agent should know about this project before it starts. For example: run pnpm test before saying a change works.",
+      settings: [],
       answer: "text",
       actionId: "feishu.reply",
       pollEveryMs: 60_000,

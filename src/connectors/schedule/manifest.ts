@@ -42,14 +42,6 @@ const weekday: SettingField = {
   default: "1",
 };
 
-const folder: SettingField = {
-  key: "folder",
-  kind: "text",
-  label: "Folder to work in",
-  help: "Absolute path on the runner. The agent works here.",
-  placeholder: "/Users/you/code/web",
-};
-
 /**
  * Deliberately a frame rather than a job. Every other workflow ships a prompt
  * because "review a pull request" is a problem worth solving once and getting
@@ -88,9 +80,7 @@ export const scheduleManifest = defineManifest({
       // No query to show. A clock is not something one can be written for,
       // and an invented one shown as if it were real is worse than nothing.
       runsIn: "folder",
-      settings: [every, at, weekday, folder],
-      guidancePlaceholder:
-        "Anything that holds every time this runs. For example: this repository releases on Thursdays, so say if anything is unmerged by Wednesday evening.",
+      settings: [every, at, weekday],
       answer: "text",
       actionId: "schedule.record",
     },

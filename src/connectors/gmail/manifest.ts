@@ -77,7 +77,6 @@ export const gmailManifest = defineManifest({
       // The mail is the whole of the work, handed over as a file.
       runsIn: "temp",
       settings: [extraQuery, needsMeOnly, perPoll, skipOwn],
-      guidancePlaceholder: "What matters in this mail. For example: anything about money or a deadline.",
       answer: "text",
       // Kept in Inbox until a loop says where it should go.
       actionConnectorId: "schedule",

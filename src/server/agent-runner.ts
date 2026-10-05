@@ -1,8 +1,9 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { agentRuntime } from "#/agents/runtimes.ts";
 import type { AgentRunResult } from "#/agents/types.ts";
-import type { AgentJob, AgentJobResult } from "./agent-job.ts";
+import { WORKSPACE, resolveFolder, type AgentJob, type AgentJobResult } from "./agent-job.ts";
 import { runDir } from "./paths.ts";
 
 export type RunAgentJobOptions = {
@@ -35,10 +36,23 @@ export async function runAgentJob(
   }
   const logFile = join(workspace, "agent.log");
   const outputFile = join(workspace, "answer.txt");
-  const cwd = job.cwd ?? workspace;
+  let cwd = workspace;
+  if (job.cwd) {
+    cwd = resolveFolder(job.cwd, homedir());
+    if (!existsSync(cwd) || !statSync(cwd).isDirectory()) {
+      return {
+        ok: false,
+        output: "",
+        detail: `There is no folder at ${cwd} on this runner.`,
+        durationMs: 0,
+        command: "",
+      };
+    }
+  }
   const run = options.run ?? ((input) => agentRuntime(job.agentId).run(input));
   const result = await run({
-    prompt: job.prompt,
+    // Context files sit in this runner's workspace, which only it knows.
+    prompt: job.prompt.replaceAll(WORKSPACE, workspace),
     cwd,
     settings: job.settings,
     outputFile,

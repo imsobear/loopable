@@ -8,6 +8,7 @@ import { listAgents } from "./agents.ts";
 import { availableAgentIds } from "./runners.ts";
 import { db } from "./db/client.ts";
 import { connections, loops, type Loop } from "./db/schema.ts";
+import { folderIsLegacy, normalizeFolder } from "./agent-job.ts";
 
 const NAME_LIMIT = 80;
 const PROMPT_LIMIT = 8000;
@@ -106,10 +107,15 @@ function validate(draft: LoopDraft): LoopDraft {
   // A job that works in a checkout cannot be told which one later: it would
   // sit enabled, come round on time and fail at the last step every time.
   // Caught while the person is still looking at the box.
+  // Relative to the runner's home, because each runner keeps its checkouts
+  // under its own: /Users/maya/code/web means nothing on a Linux box.
+  let folder: string | undefined;
   if (workflow.runsIn === "folder") {
-    const folder = draft.settings.folder;
-    if (typeof folder !== "string" || folder.trim() === "") {
-      throw new Error("Say which folder this should work in.");
+    const given = typeof draft.settings.folder === "string" ? draft.settings.folder : "";
+    folder = normalizeFolder(given);
+    if (!folder) throw new Error("Say which folder this should work in.");
+    if (folderIsLegacy(folder)) {
+      throw new Error("Give the folder relative to the runner's home, such as code/web.");
     }
   }
 
@@ -118,7 +124,10 @@ function validate(draft: LoopDraft): LoopDraft {
     name,
     prompt,
     guidance,
-    settings: cleanConditions(workflow.settings, draft.settings),
+    settings: {
+      ...cleanConditions(workflow.settings, draft.settings),
+      ...(folder ? { folder } : {}),
+    },
     actionTarget: cleanConditions(action.target, draft.actionTarget),
   };
 }

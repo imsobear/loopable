@@ -84,7 +84,6 @@ export function connectorWorkflow(
     return {
       ...trigger,
       ...defined,
-      guidancePlaceholder: defined.guidancePlaceholder ?? trigger.guidancePlaceholder,
       actionId: defined.actionId ?? trigger.actionId,
       actionConnectorId: defined.actionConnectorId ?? trigger.actionConnectorId,
       actionTarget: defined.actionTarget ?? trigger.actionTarget,

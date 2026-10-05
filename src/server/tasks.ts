@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
@@ -16,7 +16,14 @@ import type {
 import type { JsonValue, TaskView, WorkItemKind } from "#/lib/domain.ts";
 import { REVIEW_FORMAT, anchorFindings, parseReview, reviewBody, type Finding } from "#/lib/review.ts";
 import { isHosted } from "#/lib/hosted.ts";
-import { AGENT_NOTHING, isAgentNothing, type AgentJob } from "./agent-job.ts";
+import {
+  AGENT_NOTHING,
+  WORKSPACE,
+  folderIsLegacy,
+  isAgentNothing,
+  normalizeFolder,
+  type AgentJob,
+} from "./agent-job.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { branchFor } from "./checkout.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -362,12 +369,13 @@ export function isCancellation(error: unknown): boolean {
  * left to the agent, which would otherwise run somewhere unexpected and answer
  * confidently about the wrong code.
  */
+/**
+ * The loop's folder as it is stored: relative to a runner's home. Whether it
+ * exists is the runner's to find out, since only it can look.
+ */
 function folderFor(loop: Loop): string {
-  const folder = typeof loop.settings.folder === "string" ? loop.settings.folder.trim() : "";
+  const folder = typeof loop.settings.folder === "string" ? normalizeFolder(loop.settings.folder) : "";
   if (!folder) throw new Error("This loop has no folder set. Set one and try again.");
-  if (!isAbsolute(folder)) throw new Error(`The folder must be an absolute path: ${folder}`);
-  if (!existsSync(folder)) throw new Error(`There is no folder at ${folder}.`);
-  if (!statSync(folder).isDirectory()) throw new Error(`${folder} is not a folder.`);
   return folder;
 }
 
@@ -551,7 +559,10 @@ async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> 
   }
   const runnerId = await pickRunner({
     agentId,
-    requiresHost: workflow.runsIn === "folder",
+    requiresHost:
+      workflow.runsIn === "folder" &&
+      typeof loop.settings.folder === "string" &&
+      folderIsLegacy(loop.settings.folder),
   });
   await updateTask(id, {
     state: "awaiting_agent",
@@ -580,7 +591,6 @@ export async function jobForTask(id: string): Promise<AgentJob> {
 
   const { task, loop, workflow, item } = await loadWork(id);
   if (!task.agentId) throw new Error("This task has no agent yet.");
-  const workspace = runDir(id);
   const cwd = workflow.runsIn === "folder" ? folderFor(loop) : undefined;
   const branch = workflow.answer === "code" ? branchFor({ ref: item.ref, taskId: id }) : undefined;
   const settings = { ...(await settingsFor(task.agentId)) };
@@ -598,9 +608,9 @@ export async function jobForTask(id: string): Promise<AgentJob> {
       guidance: loop.guidance,
       item,
       // Folder jobs work in a checkout that does not hold these files, so the
-      // prompt has to name them by their dispatcher path. Everything else runs
-      // where the runner wrote them, so the basename is enough.
-      files: item.context.map((file) => (cwd ? join(workspace, file.name) : file.name)),
+      // prompt names them in the runner's workspace, which the runner fills
+      // in. Everything else runs where the files were written.
+      files: item.context.map((file) => (cwd ? `${WORKSPACE}/${file.name}` : file.name)),
       branch,
     }),
     settings,
