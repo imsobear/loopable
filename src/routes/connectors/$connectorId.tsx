@@ -1,7 +1,7 @@
-import { createFileRoute, notFound, useRouter } from "@tanstack/react-router";
+import { Link, createFileRoute, notFound, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, RotateCcw } from "lucide-react";
+import { ChevronRight, Plus, RefreshCw, RotateCcw } from "lucide-react";
 import { ConnectionSettingsForm } from "@/components/connection-settings-form";
 import { ConnectionStatusBadge } from "@/components/connection-status";
 import { ConnectorIcon } from "@/components/connector-icon";
@@ -10,8 +10,9 @@ import { TokenConnect } from "@/components/token-connect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Empty, List, PageHeader } from "@/components/page";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { connectionNoun, connectorManifest } from "@/connectors/manifests.ts";
+import { connectionNoun, connectorManifest, destinationLabel } from "@/connectors/manifests.ts";
 import { registrableCallbackUrl } from "@/lib/callback.ts";
 import type { ConnectionView } from "@/lib/domain.ts";
 import { ago } from "@/lib/time.ts";
@@ -20,15 +21,20 @@ import {
   getConnectorOverview,
   verifyConnection,
 } from "@/server/functions/connectors.ts";
+import { getLoopsPage } from "@/server/functions/loops.ts";
 
 export const Route = createFileRoute("/connectors/$connectorId")({
   loader: async ({ params }) => {
     const manifest = connectorManifest(params.connectorId);
     if (!manifest) throw notFound();
-    const overview = await getConnectorOverview();
+    const [overview, page] = await Promise.all([getConnectorOverview(), getLoopsPage()]);
     const state = overview.find((entry) => entry.connectorId === params.connectorId);
     if (!state) throw notFound();
-    return state;
+    // Loops that watch this connector, or write through it.
+    const loops = page.loops.filter(
+      (loop) => loop.connectorId === params.connectorId || loop.actionConnectorId === params.connectorId,
+    );
+    return { ...state, loops };
   },
   component: ConnectorDetailPage,
 });
@@ -114,6 +120,43 @@ function ConnectorDetailPage() {
           ) : null}
         </Empty>
       ) : null}
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium">Loops</h2>
+          {manifest.workflows.length > 0 ? (
+            <Button variant="ghost" size="sm" nativeButton={false} render={<Link to="/loops/new" />}>
+              <Plus />
+              New loop
+            </Button>
+          ) : null}
+        </div>
+        {state.loops.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No loop uses {manifest.name} yet.</p>
+        ) : (
+          <List>
+            {state.loops.map((loop) => (
+              <Link
+                key={loop.id}
+                to="/loops/$loopId"
+                params={{ loopId: loop.id }}
+                className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{loop.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {loop.connectorId === connectorId
+                      ? destinationLabel(loop.actionConnectorId, loop.actionId)
+                      : `Answers here, from ${connectorManifest(loop.connectorId)?.name ?? loop.connectorId}`}
+                  </p>
+                </div>
+                {loop.enabled ? null : <Badge variant="secondary">Off</Badge>}
+                <ChevronRight className="size-4 text-muted-foreground" />
+              </Link>
+            ))}
+          </List>
+        )}
+      </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <CapabilityList
