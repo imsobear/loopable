@@ -15,6 +15,7 @@
   "engines": {
     "node": ">=22"
   },
+  "packageManager": "pnpm@11.22.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/imsobear/loopable.git"
@@ -46,7 +47,7 @@
     "site:dev": "pnpm --filter loopable-site dev",
     "site:build": "pnpm --filter loopable-site build",
     "site:deploy": "pnpm --filter loopable-site deploy",
-    "prepublishOnly": "pnpm build && pnpm typecheck"
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0"
