@@ -6,7 +6,7 @@ import {
   readAppToken,
 } from "#/server/access.ts";
 import { migrateIfNeeded } from "#/server/db/client.ts";
-import { createMiddleware, createStart } from "@tanstack/react-start";
+import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 
 let migrated: Promise<void> | null = null;
 function ensureMigrated() {
@@ -32,6 +32,14 @@ const appAccess = createMiddleware({ type: "request" }).server(async ({ next, re
   return result;
 });
 
+/**
+ * Server functions are only ever called by the app's own pages, so a request
+ * from another site is refused. Runners use the /api routes, which this skips.
+ */
+const sameOrigin = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn",
+});
+
 export const startInstance = createStart(() => ({
-  requestMiddleware: [appAccess],
+  requestMiddleware: [appAccess, sameOrigin],
 }));
