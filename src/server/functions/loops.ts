@@ -57,8 +57,8 @@ export const getLoopPollState = createServerFn({ method: "GET" })
   .handler(async ({ data }) => await loopPollState(data.id));
 
 export const runLoopBacklog = createServerFn({ method: "POST" })
-  .validator((data: { id: string }) => data)
-  .handler(async ({ data }) => ({ queued: await runBacklog(data.id) }));
+  .validator((data: { id: string; key?: string }) => data)
+  .handler(async ({ data }) => ({ queued: await runBacklog(data.id, data.key) }));
 
 export const lookLoopNow = createServerFn({ method: "POST" })
   .validator((data: { id: string }) => data)

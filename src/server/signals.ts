@@ -264,19 +264,26 @@ export async function loopPollState(loopId: string): Promise<LoopPollState> {
 }
 
 /**
- * Run everything the loop is holding. Asked for explicitly, because it is the
- * one moment a loop does a month of work at once, and because something held
- * back for being too big is being run against the connector's advice.
+ * Run what the loop is holding: one item when `key` is given, or all of it.
+ * Asked for explicitly, because something held back for being too big is
+ * being run against the connector's advice.
  */
-export async function runBacklog(loopId: string): Promise<number> {
+export async function runBacklog(loopId: string, key?: string): Promise<number> {
   const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
   if (!loop) throw new Error("Loop not found");
 
   const waiting = await db()
     .select()
     .from(signals)
-    .where(and(eq(signals.loopId, loopId), inArray(signals.outcome, [...WAITING])))
+    .where(
+      and(
+        eq(signals.loopId, loopId),
+        inArray(signals.outcome, [...WAITING]),
+        key === undefined ? undefined : eq(signals.key, key),
+      ),
+    )
     .all();
+  if (key !== undefined && waiting.length === 0) throw new Error("That item is no longer waiting.");
 
   for (const row of waiting) {
     const task = await enqueueSignal({

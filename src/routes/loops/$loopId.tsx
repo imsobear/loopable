@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { CircleAlert, Play, RefreshCw, Trash2 } from "lucide-react";
 import { ConnectorIcon } from "@/components/connector-icon";
 import { LoopForm } from "@/components/loop-form";
-import { LinkTabs, PageHeader, Section } from "@/components/page";
+import { LinkTabs, List, PageHeader, Section } from "@/components/page";
 import { TaskList } from "@/components/task-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -227,35 +227,36 @@ function Backlog({ loop, poll }: { loop: LoopView; poll: LoopPollState }) {
   if (poll.backlog.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-muted/50 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">
-          {poll.backlog.length} waiting
-          <span className="font-normal text-muted-foreground"> · matched, not run</span>
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy !== null}
-          onClick={() =>
-            run("backlog", async () => {
-              const { queued } = await runLoopBacklog({ data: { id: loop.id } });
-              return queued === 1 ? "Queued 1 run" : `Queued ${queued} runs`;
-            })
-          }
-        >
-          Run all
-        </Button>
-      </div>
-      <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-        {poll.backlog.slice(0, 5).map((item) => (
-          <li key={item.key} className="truncate">
-            <span className="text-foreground">{item.sourceRef}</span> {item.sourceTitle}
-            {item.hold ? <span className="text-amber-700 dark:text-amber-500"> · {item.hold}</span> : null}
-          </li>
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">
+        Waiting <span className="font-normal text-muted-foreground">· matched, not run</span>
+      </p>
+      <List>
+        {poll.backlog.map((item) => (
+          <div key={item.key} className="flex items-center gap-3 px-4 py-2">
+            <div className="min-w-0 flex-1 truncate text-sm">
+              <span className="text-muted-foreground">{item.sourceRef}</span> {item.sourceTitle}
+              {item.hold ? (
+                <span className="text-xs text-amber-700 dark:text-amber-500"> · {item.hold}</span>
+              ) : null}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy !== null}
+              onClick={() =>
+                run(item.key, async () => {
+                  await runLoopBacklog({ data: { id: loop.id, key: item.key } });
+                  return "Queued";
+                })
+              }
+            >
+              <Play />
+              Run
+            </Button>
+          </div>
         ))}
-        {poll.backlog.length > 5 ? <li>and {poll.backlog.length - 5} more</li> : null}
-      </ul>
+      </List>
     </div>
   );
 }

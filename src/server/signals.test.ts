@@ -246,6 +246,19 @@ describe("running the backlog", () => {
     await pollAllLoops();
     expect(await tasksFor("a")).toHaveLength(2);
   });
+
+  it("queues one item by its key and leaves the rest waiting", async () => {
+    await givenLoop("a", 1);
+    answer = [pull(1), pull(2)];
+    await pollAllLoops();
+
+    const [first] = (await loopPollState("a")).backlog;
+    expect(await runBacklog("a", first!.key)).toBe(1);
+
+    expect(await tasksFor("a")).toHaveLength(1);
+    expect((await loopPollState("a")).backlog.map((item) => item.sourceRef)).toEqual(["acme/web#2"]);
+    await expect(runBacklog("a", first!.key)).rejects.toThrow(/no longer waiting/);
+  });
 });
 
 describe("how often to look", () => {

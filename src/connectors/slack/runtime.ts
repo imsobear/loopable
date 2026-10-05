@@ -79,7 +79,11 @@ function destination(
 function accountOf(credential: SlackCredential) {
   return {
     id: credential.teamId,
-    label: credential.team || credential.teamId,
+    // The bot, then the workspace it is in: "@loopable · Acme". The workspace
+    // alone read as if it were the bot's name.
+    label: [credential.botName ? `@${credential.botName}` : null, credential.team || credential.teamId]
+      .filter(Boolean)
+      .join(" · "),
     url: credential.teamUrl || undefined,
   };
 }

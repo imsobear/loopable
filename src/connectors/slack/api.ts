@@ -14,6 +14,8 @@ export type SlackCredential = {
   teamUrl: string;
   botUserId: string;
   botId: string;
+  /** The bot's own name in the workspace, such as loopable. Absent on older connections. */
+  botName?: string;
 };
 
 export type SlackChannel = {
@@ -80,8 +82,9 @@ export async function authTest(botToken: string): Promise<SlackCredential> {
   const teamId = typeof body.team_id === "string" ? body.team_id : "";
   const botUserId = typeof body.user_id === "string" ? body.user_id : "";
   const botId = typeof body.bot_id === "string" ? body.bot_id : "";
+  const botName = typeof body.user === "string" ? body.user : "";
   if (!teamId || !botUserId) throw new Error("Slack did not return which workspace this bot belongs to.");
-  return { botToken, teamId, team, teamUrl, botUserId, botId };
+  return { botToken, teamId, team, teamUrl, botUserId, botId, botName };
 }
 
 export async function listConversations(credential: SlackCredential): Promise<SlackChannel[]> {
