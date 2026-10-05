@@ -163,11 +163,7 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
         },
       });
       toast.success(fresh ? `Added ${saved.name}` : `Saved ${saved.name}`);
-      await navigate(
-        fresh
-          ? { to: "/loops/$loopId", params: { loopId: saved.id } }
-          : { to: "/loops/$loopId", params: { loopId: saved.id }, search: { tab: "settings" } },
-      );
+      await navigate({ to: "/loops/$loopId", params: { loopId: saved.id } });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {

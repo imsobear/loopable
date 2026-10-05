@@ -32,10 +32,10 @@ import { getLoopTasks, runLoopNow } from "@/server/functions/tasks.ts";
 type Tab = "tasks" | "settings";
 
 export const Route = createFileRoute("/loops/$loopId")({
-  // The tab lives in the URL so either one can be linked to. Tasks is the
+  // The tab lives in the URL so either one can be linked to. Settings is the
   // default and stays out of the URL.
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
-    search.tab === "settings" ? { tab: "settings" } : {},
+    search.tab === "tasks" ? { tab: "tasks" } : {},
   loader: async ({ params }) => {
     const loop = await getLoopById({ data: { id: params.loopId } });
     if (!loop) throw notFound();
@@ -69,7 +69,7 @@ function useAction() {
 
 function LoopPage() {
   const { loop, tasks, poll, readiness } = Route.useLoaderData();
-  const { tab = "tasks" } = Route.useSearch();
+  const { tab = "settings" } = Route.useSearch();
   useLiveRefresh();
   const issues = issuesFor(readiness, loop);
   const connector = connectorManifest(loop.connectorId);
@@ -108,6 +108,13 @@ function LoopPage() {
       <LinkTabs
         items={[
           {
+            label: "Settings",
+            to: "/loops/$loopId",
+            params: { loopId: loop.id },
+            search: {},
+            active: tab === "settings",
+          },
+          {
             label: (
               <>
                 Tasks
@@ -118,15 +125,8 @@ function LoopPage() {
             ),
             to: "/loops/$loopId",
             params: { loopId: loop.id },
-            search: {},
+            search: { tab: "tasks" },
             active: tab === "tasks",
-          },
-          {
-            label: "Settings",
-            to: "/loops/$loopId",
-            params: { loopId: loop.id },
-            search: { tab: "settings" },
-            active: tab === "settings",
           },
         ]}
       />
