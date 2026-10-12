@@ -46,7 +46,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
 
       - name: Bump the version and tag it
         id: version
@@ -64,6 +63,11 @@ jobs:
           git commit --quiet -m "Release v$version." -- package.json
           git tag -a "v$version" -m "Release v$version."
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      # After the bump: the bundle carries the version it was built as, and a
+      # runner reports that version, so building first would publish 0.6.0
+      # that calls itself 0.5.0.
+      - run: pnpm build
 
       # The checks above already ran, so publish skips prepublishOnly.
       - run: npm publish --ignore-scripts

@@ -98,9 +98,9 @@ try {
 
 run("pnpm", ["typecheck"]);
 run("pnpm", ["test"]);
-run("pnpm", ["build"]);
 
 if (dryRun) {
+  run("pnpm", ["build"]);
   // What would be uploaded. Not npm publish --dry-run: that still asks the
   // registry about the old version number, which is already there.
   run("npm", ["pack", "--dry-run", "--ignore-scripts"]);
@@ -114,6 +114,8 @@ if (dryRun) {
 
 pkg.version = version;
 writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+// After the bump, so the bundle reports the version it is published as.
+run("pnpm", ["build"]);
 git("commit", "--quiet", "-m", `Release ${tag}.`, "--", "package.json");
 git("tag", "-a", tag, "-m", `Release ${tag}.`);
 say(`\nCommitted and tagged ${tag}.`);
