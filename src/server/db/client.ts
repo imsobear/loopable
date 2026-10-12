@@ -19,6 +19,9 @@ function create() {
     url: databaseUrl(),
     authToken: process.env.LOOPABLE_DATABASE_AUTH_TOKEN,
   });
+  // A local file is shared by the app, the dispatcher and a local runner. Wait
+  // for a moment's lock instead of failing on it.
+  if (client.protocol === "file") void client.execute("PRAGMA busy_timeout = 5000").catch(() => {});
   return drizzle(client, { schema });
 }
 

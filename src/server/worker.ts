@@ -19,6 +19,10 @@ export type WorkerOptions = {
   log?: (message: string) => void;
 };
 
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export type Worker = ReturnType<typeof createWorker>;
 
 export function createWorker(options: WorkerOptions = {}) {
@@ -197,7 +201,10 @@ export function createWorker(options: WorkerOptions = {}) {
     // Fast enough that Stop feels like a button, rather than as slow as the
     // lease it also renews. A one-row update every couple of seconds is
     // nothing next to what the agent is doing.
-    const heartbeat = setInterval(() => void renew(id, abort), Math.min(2_000, leaseMs / 3));
+    const heartbeat = setInterval(
+      () => void renew(id, abort).catch((error: unknown) => log(`lease renew failed for ${id}: ${message(error)}`)),
+      Math.min(2_000, leaseMs / 3),
+    );
 
     const done = execute(id, abort.signal)
       .then(async () => {
@@ -269,10 +276,15 @@ export function createWorker(options: WorkerOptions = {}) {
     }
   }
 
+  /** A pass that fails, say because the database is briefly unreachable, is tried again on the next one. */
+  function safeTick(): void {
+    tick().catch((error: unknown) => log(`queue pass failed: ${message(error)}`));
+  }
+
   function start(): void {
     if (poll) return;
-    void tick();
-    poll = setInterval(() => void tick(), pollIntervalMs);
+    safeTick();
+    poll = setInterval(safeTick, pollIntervalMs);
   }
 
   /**
