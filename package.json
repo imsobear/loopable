@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "loopable": "./dist/cli.mjs"
+    "loopable": "dist/cli.mjs"
   },
   "files": [
     "dist/cli.mjs",
