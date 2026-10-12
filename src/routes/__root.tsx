@@ -1,6 +1,5 @@
 import { HeadContent, Outlet, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { TanStackDevtools } from "@tanstack/react-devtools";
+import { Suspense, lazy } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -27,6 +26,8 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
   component: AppLayout,
 });
+
+const Devtools = import.meta.env.DEV ? lazy(() => import("@/components/devtools")) : () => null;
 
 /** Pages that stand on their own, with no app around them. */
 const BARE = new Set(["/", "/welcome"]);
@@ -63,10 +64,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <Toaster />
-        <TanStackDevtools
-          config={{ position: "bottom-right" }}
-          plugins={[{ name: "Tanstack Router", render: <TanStackRouterDevtoolsPanel /> }]}
-        />
+        <Suspense fallback={null}>
+          <Devtools />
+        </Suspense>
         <Scripts />
       </body>
     </html>
