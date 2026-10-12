@@ -36,6 +36,3 @@ jobs:
 
       - name: Build the CLI
         run: pnpm build
-
-      - name: Build the site
-        run: pnpm site:build

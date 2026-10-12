@@ -6,8 +6,17 @@
   "main": "src/worker.ts",
   "observability": { "enabled": true },
   "vars": {
-    "LOOPABLE_SKIP_MIGRATE": "1"
+    // The App Worker never migrates; the dispatcher container does, once.
+    "LOOPABLE_SKIP_MIGRATE": "1",
+    // Where OAuth callbacks, sign-in and runner logins come back to.
+    "LOOPABLE_BASE_URL": "https://loop.goodone.si"
   },
+  // The site lives here now: the front page is the app's /. Secrets
+  // (database, master key, OAuth apps) are set with wrangler secret put;
+  // see docs/hosting.md.
+  "routes": [{ "pattern": "loop.goodone.si", "custom_domain": true }],
+  "workers_dev": true,
+  "preview_urls": false,
   "triggers": {
     "crons": ["* * * * *"]
   },

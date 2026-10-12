@@ -40,6 +40,7 @@ function dispatcherEnv(env: DispatcherEnv): Record<string, string> {
     LOOPABLE_GITHUB_CLIENT_SECRET: env.LOOPABLE_GITHUB_CLIENT_SECRET ?? "",
     LOOPABLE_GMAIL_CLIENT_ID: env.LOOPABLE_GMAIL_CLIENT_ID ?? "",
     LOOPABLE_GMAIL_CLIENT_SECRET: env.LOOPABLE_GMAIL_CLIENT_SECRET ?? "",
+    LOOPABLE_BASE_URL: env.LOOPABLE_BASE_URL ?? "",
   };
 }
 
