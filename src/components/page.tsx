@@ -52,23 +52,38 @@ export function PageHeader({
   );
 }
 
+/** Marks a field that cannot be left empty. */
+export function RequiredMark() {
+  return (
+    <span aria-hidden="true" className="text-destructive">
+      *
+    </span>
+  );
+}
+
 /** A labelled control, with at most one short line of help under it. */
 export function Field({
   label,
   htmlFor,
   hint,
+  required,
   className,
   children,
 }: {
   label: React.ReactNode;
   htmlFor?: string;
   hint?: React.ReactNode;
+  /** Shown with a mark, so nobody learns it only from the error on saving. */
+  required?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <Label htmlFor={htmlFor}>
+        {label}
+        {required ? <RequiredMark /> : null}
+      </Label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>

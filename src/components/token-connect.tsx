@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RequiredMark } from "@/components/page";
 import type { TokenField } from "@/connectors/types.ts";
 import { connectWithToken } from "@/server/functions/connectors.ts";
 
@@ -65,7 +66,10 @@ export function TokenConnect({
         ) : null}
         {fields.map((field) => (
           <div key={field.key} className="flex flex-col gap-1.5">
-            <Label htmlFor={`token-${field.key}`}>{field.label}</Label>
+            <Label htmlFor={`token-${field.key}`}>
+              {field.label}
+              {field.optional ? null : <RequiredMark />}
+            </Label>
             <Input
               id={`token-${field.key}`}
               type={field.secret ? "password" : "text"}

@@ -178,7 +178,7 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
     <div className="flex flex-col">
       <Section title="When" description={`When ${workflow.trigger}.`}>
         {trigger}
-        <Field label="Name" htmlFor="loop-name">
+        <Field label="Name" htmlFor="loop-name" required>
           <Input id="loop-name" value={name} onChange={(event) => setName(event.target.value)} />
         </Field>
 
@@ -242,6 +242,7 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
           <Field
             label="Folder"
             htmlFor="loop-folder"
+            required
             hint="Inside the runner's home folder. The agent works here."
             className="sm:max-w-sm"
           >
@@ -261,6 +262,7 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
         <Field
           label="Prompt"
           htmlFor="loop-prompt"
+          required
           hint={written ? `Starts as “${workflow.name}”. Changes stay on this loop.` : undefined}
         >
           <Textarea
