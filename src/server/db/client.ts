@@ -18,10 +18,14 @@ function create() {
   const client = createClient({
     url: databaseUrl(),
     authToken: process.env.LOOPABLE_DATABASE_AUTH_TOKEN,
+    // A local file is shared by the app and the dispatcher, two processes.
+    // Every pooled connection waits out a moment's lock instead of failing.
+    timeout: 5_000,
   });
-  // A local file is shared by the app, the dispatcher and a local runner. Wait
-  // for a moment's lock instead of failing on it.
-  if (client.protocol === "file") void client.execute("PRAGMA busy_timeout = 5000").catch(() => {});
+  // WAL lets one process read while the other writes. Without it a reader can
+  // hold up a writer's commit, and a new file starts without it. It is kept in
+  // the file, so setting it once on any connection is enough.
+  if (client.protocol === "file") void client.execute("PRAGMA journal_mode = WAL").catch(() => {});
   return drizzle(client, { schema });
 }
 
