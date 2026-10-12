@@ -1,14 +1,20 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Copy, RotateCcw, Server } from "lucide-react";
+import { ArrowUpCircle, Copy, LoaderCircle, RotateCcw, Server } from "lucide-react";
 import { Empty, List, PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { agentManifest } from "@/agents/manifests.ts";
 import { cn } from "@/lib/utils";
-import { VERSION } from "@/lib/version.ts";
 import { useLiveRefresh } from "@/components/use-live-tasks.ts";
 import type { RunnerView } from "@/lib/domain.ts";
-import { getRunnersPage, removeRunner, rotateRunnerJoinToken } from "@/server/functions/runners.ts";
+import {
+  getRunnersPage,
+  removeRunner,
+  rotateRunnerJoinToken,
+  toggleRunner,
+  updateRunner,
+} from "@/server/functions/runners.ts";
 
 export const Route = createFileRoute("/runners/")({
   loader: () => getRunnersPage(),
@@ -70,7 +76,7 @@ function RunnersPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Runners"
-        description={`Machines that run agents for your loops. This App is v${VERSION}.`}
+        description="Machines that run agents for your loops."
       />
 
       <div className="flex flex-col gap-2">
@@ -98,52 +104,98 @@ function RunnersPage() {
       ) : (
         <List>
           {runners.map((runner) => (
-            <div key={runner.id} className="flex items-center gap-3 px-4 py-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Server className="size-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{runner.name}</span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        runner.status === "online" ? "bg-emerald-500" : "bg-muted-foreground/50",
-                      )}
-                    />
-                    {runner.status === "online" ? "Online" : "Offline"}
-                  </span>
-                </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {runner.hostname} · {runner.version ? `v${runner.version}` : "version unknown"} ·{" "}
-                  {agentsOn(runner)}
-                </p>
-                {runner.outdated ? (
-                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-500">
-                    Older than this App (v{VERSION}), so it may not take every job. On that machine,
-                    run <code>npm install -g loopable-cli</code> and restart the runner.
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await removeRunner({ data: { id: runner.id } });
-                    await router.invalidate();
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : String(error));
-                  }
-                }}
-              >
-                Forget
-              </Button>
-            </div>
+            <RunnerRow key={runner.id} runner={runner} />
           ))}
         </List>
       )}
+    </div>
+  );
+}
+
+function RunnerRow({ runner }: { runner: RunnerView }) {
+  const router = useRouter();
+  const act = async (work: () => Promise<unknown>, done?: string) => {
+    try {
+      await work();
+      await router.invalidate();
+      if (done) toast.success(done);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+  const online = runner.status === "online";
+
+  return (
+    <div className={cn("flex items-center gap-3 px-4 py-3", !runner.enabled && "bg-muted/40")}>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Server className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className={cn("truncate text-sm font-medium", !runner.enabled && "text-muted-foreground")}>
+            {runner.name}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                !runner.enabled ? "bg-muted-foreground/50" : online ? "bg-emerald-500" : "bg-muted-foreground/50",
+              )}
+            />
+            {!runner.enabled ? "Off: takes no jobs" : online ? "Online" : "Offline"}
+          </span>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {runner.hostname} · {runner.version ? `v${runner.version}` : "version unknown"} · {agentsOn(runner)}
+        </p>
+        {runner.updateError ? (
+          <p className="mt-1 text-xs text-destructive">
+            Could not update: {runner.updateError} On that machine, run{" "}
+            <code>npm install -g loopable-cli</code>, then <code>loopable stop</code> and{" "}
+            <code>loopable runner</code>.
+          </p>
+        ) : runner.outdated && !runner.updatable && !runner.updating ? (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-500">
+            v{runner.latest} is out. On that machine, run <code>npm install -g loopable-cli</code>, then{" "}
+            <code>loopable stop</code> and <code>loopable runner</code>.
+          </p>
+        ) : null}
+      </div>
+
+      {runner.updating ? (
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <LoaderCircle className="size-3.5 animate-spin" />
+          Updating to v{runner.latest}
+        </span>
+      ) : runner.outdated && runner.updatable && online ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => act(() => updateRunner({ data: { id: runner.id } }), `Updating ${runner.name}`)}
+        >
+          <ArrowUpCircle />
+          Update to v{runner.latest}
+        </Button>
+      ) : null}
+
+      <Switch
+        checked={runner.enabled}
+        aria-label={runner.enabled ? `Turn ${runner.name} off` : `Turn ${runner.name} on`}
+        onCheckedChange={(enabled) => act(() => toggleRunner({ data: { id: runner.id, enabled } }))}
+      />
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          const how = online
+            ? `Stop ${runner.name} and forget it? It finishes the run it is on, then stops.`
+            : `Forget ${runner.name}?`;
+          if (!window.confirm(how)) return;
+          void act(() => removeRunner({ data: { id: runner.id } }), online ? `Stopping ${runner.name}` : undefined);
+        }}
+      >
+        Forget
+      </Button>
     </div>
   );
 }

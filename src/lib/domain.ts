@@ -199,8 +199,18 @@ export type RunnerView = {
   /** Its loopable-cli version, or null for a runner too old to say. */
   version: string | null;
   protocol: number;
-  /** Older than this App: it may not take every job, and should be upgraded. */
+  /** Older than the newest loopable-cli: it may not take every job, and should be updated. */
   outdated: boolean;
+  /** The newest loopable-cli, what an update brings it to. */
+  latest: string;
+  /** Off means connected but given no jobs. */
+  enabled: boolean;
+  /** Installed from npm, so the console can ask it to update itself. */
+  updatable: boolean;
+  /** Asked to update a moment ago, and not there yet. */
+  updating: boolean;
+  /** Why its last update failed. */
+  updateError: string | null;
 };
 
 /** An agent as the browser sees it: settings, plus which runners have it. */

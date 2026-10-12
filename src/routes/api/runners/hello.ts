@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/runners/hello")({
             inventory?: Parameters<typeof joinRunner>[0]["inventory"];
             version?: string;
             protocol?: number;
+            updatable?: boolean;
           };
           const result = await joinRunner({
             joinToken: bearer(request),
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/api/runners/hello")({
             inventory: body.inventory ?? [],
             version: body.version,
             protocol: body.protocol,
+            updatable: body.updatable,
           });
           return Response.json(result);
         } catch (error) {

@@ -196,7 +196,13 @@ async function startInBackground(args: string[], env: NodeJS.ProcessEnv): Promis
   const tooBig = existsSync(logPath()) && statSync(logPath()).size > 5_000_000;
   const log = openSync(logPath(), tooBig ? "w" : "a");
   const startedAt = tooBig ? 0 : statSync(logPath()).size;
-  const child = spawn(node, args, { cwd: root, env, detached: true, stdio: ["ignore", log, log] });
+  // Told where its pid lives, so after updating itself the new runner is the one stop stops.
+  const child = spawn(node, args, {
+    cwd: root,
+    env: { ...env, LOOPABLE_RUNNER_PIDFILE: pidPath() },
+    detached: true,
+    stdio: ["ignore", log, log],
+  });
   closeSync(log);
   child.unref();
   if (!child.pid) fail("Could not start the runner.");

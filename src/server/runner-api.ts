@@ -36,7 +36,7 @@ import type { RunnerInventoryEntry } from "#/lib/domain.ts";
 
 export async function claimAgentJob(runnerId: string): Promise<AgentJob | null> {
   const row = await getRunner(runnerId);
-  if (!row || !isRunnerOnline(row)) return null;
+  if (!row || !row.enabled || row.forgottenAt || !isRunnerOnline(row)) return null;
 
   const waiting = await db()
     .select()

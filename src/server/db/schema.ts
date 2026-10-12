@@ -359,6 +359,20 @@ export const runners = sqliteTable("runners", {
   version: text("version"),
   /** What jobs it understands; see RUNNER_PROTOCOL. Null means the first. */
   protocol: integer("protocol"),
+  /** Off means connected but given no jobs, until it is turned back on. */
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  /**
+   * Set when someone forgets a runner that is still online: it is told to
+   * stop on its next check-in, and the row goes when it has been told.
+   */
+  forgottenAt: integer("forgotten_at", { mode: "timestamp_ms" }),
+  /** Whether it was installed from npm, and so can update itself. Null before 0.7. */
+  updatable: integer("updatable", { mode: "boolean" }),
+  /** The version it has been asked to update to, until it has been told. */
+  updateTo: text("update_to"),
+  updateRequestedAt: integer("update_requested_at", { mode: "timestamp_ms" }),
+  /** What went wrong the last time it tried, as it said it. */
+  updateError: text("update_error"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

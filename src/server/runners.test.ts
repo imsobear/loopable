@@ -3,7 +3,8 @@ import { mkdtempSync } from "node:fs";
 import { hostname as osHostname } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const home = mkdtempSync(join(tmpdir(), "loopable-runners-"));
 process.env.LOOPABLE_HOME = home;
@@ -12,8 +13,17 @@ process.env.LOOPABLE_KEYCHAIN = "0";
 
 const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, runners, tasks } = await import("./db/schema.ts");
-const { forgetRunner, getJoinToken, heartbeatRunner, joinRunner, listRunners, pickRunner } =
-  await import("./runners.ts");
+const {
+  forgetRunner,
+  getJoinToken,
+  heartbeatRunner,
+  instructionFor,
+  joinRunner,
+  listRunners,
+  pickRunner,
+  requestRunnerUpdate,
+  setRunnerEnabled,
+} = await import("./runners.ts");
 const { FOLDER_JOB_PROTOCOL, RUNNER_PROTOCOL, VERSION } = await import("#/lib/version.ts");
 
 await migrateIfNeeded();
@@ -116,37 +126,111 @@ describe("joinRunner", () => {
   });
 });
 
+/** A task given to a runner and waiting for it to start, as the dispatcher leaves one. */
+async function givenWaitingTask(runnerId: string): Promise<string> {
+  await db()
+    .insert(loops)
+    .values({
+      id: "loop-1",
+      name: "T",
+      connectorId: "github",
+      workflowId: "github.review_requested",
+      prompt: "x",
+      actionConnectorId: "github",
+      actionId: "github.submit_review",
+      priority: 1,
+    })
+    .onConflictDoNothing()
+    .run();
+  const id = randomUUID();
+  await db()
+    .insert(tasks)
+    .values({
+      id,
+      loopId: "loop-1",
+      connectorId: "github",
+      state: "awaiting_agent",
+      sourceUrl: "https://github.com/acme/web/pull/1",
+      sourceKind: "pull_request",
+      sourceRef: "acme/web#1",
+      actionConnectorId: "github",
+      actionId: "github.submit_review",
+      runnerId,
+    })
+    .run();
+  return id;
+}
+
+async function taskState(id: string) {
+  return await db().select({ state: tasks.state, runnerId: tasks.runnerId }).from(tasks).where(eq(tasks.id, id)).get();
+}
+
 describe("forgetRunner", () => {
-  it("refuses while a run is in flight", async () => {
+  it("tells an online runner to stop, hands its waiting jobs back, and removes it once told", async () => {
     const joined = await givenRunner("box-a");
-    await db()
-      .insert(loops)
-      .values({
-        id: "loop-1",
-        name: "T",
-        connectorId: "github",
-        workflowId: "github.review_requested",
-        prompt: "x",
-        actionConnectorId: "github",
-        actionId: "github.submit_review",
-        priority: 1,
-      })
-      .run();
-    await db()
-      .insert(tasks)
-      .values({
-        id: randomUUID(),
-        loopId: "loop-1",
-        connectorId: "github",
-        state: "awaiting_agent",
-        sourceUrl: "https://github.com/acme/web/pull/1",
-        sourceKind: "pull_request",
-        sourceRef: "acme/web#1",
-        actionConnectorId: "github",
-        actionId: "github.submit_review",
-        runnerId: joined.runnerId,
-      })
-      .run();
-    await expect(forgetRunner(joined.runnerId)).rejects.toThrow("in flight");
+    const waiting = await givenWaitingTask(joined.runnerId);
+    await forgetRunner(joined.runnerId);
+
+    expect(await taskState(waiting)).toEqual({ state: "queued", runnerId: null });
+    expect(await listRunners()).toEqual([]);
+    expect(await instructionFor(joined.runnerId)).toMatchObject({ kind: "stop" });
+    expect(await db().select().from(runners).all()).toEqual([]);
+  });
+
+  it("removes an offline runner at once", async () => {
+    const joined = await givenRunner("box-a");
+    await db().update(runners).set({ status: "offline" }).run();
+    await forgetRunner(joined.runnerId);
+    expect(await db().select().from(runners).all()).toEqual([]);
+  });
+
+  it("lets a forgotten machine join again, switched on", async () => {
+    const joined = await givenRunner("box-a");
+    await setRunnerEnabled(joined.runnerId, false);
+    await forgetRunner(joined.runnerId);
+    const again = await givenRunner("box-a");
+    expect((await listRunners()).map((row) => [row.id, row.enabled])).toEqual([[again.runnerId, true]]);
+  });
+});
+
+describe("setRunnerEnabled", () => {
+  it("gives a runner that is off no jobs, and hands its waiting ones back", async () => {
+    const off = await givenRunner("box-a");
+    const on = await givenRunner("box-b");
+    const waiting = await givenWaitingTask(off.runnerId);
+    await setRunnerEnabled(off.runnerId, false);
+
+    expect(await taskState(waiting)).toEqual({ state: "queued", runnerId: null });
+    expect(await pickRunner({ agentId: "codex", requiresHost: false })).toBe(on.runnerId);
+    await setRunnerEnabled(on.runnerId, false);
+    await expect(pickRunner({ agentId: "codex", requiresHost: false })).rejects.toThrow("No runner");
+  });
+});
+
+describe("requestRunnerUpdate", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ version: "99.0.0" })),
+    );
+  });
+
+  it("asks a runner installed from npm to update, once", async () => {
+    const joined = await joinRunner({
+      joinToken: await getJoinToken(),
+      hostname: "box-a",
+      inventory: CODEX,
+      version: "0.6.0",
+      updatable: true,
+    });
+    await requestRunnerUpdate(joined.runnerId);
+    expect((await listRunners("99.0.0"))[0]).toMatchObject({ outdated: true, updating: true });
+    expect(await instructionFor(joined.runnerId)).toEqual({ kind: "update", version: "99.0.0" });
+    expect(await instructionFor(joined.runnerId)).toBeNull();
+  });
+
+  it("will not ask one run from a checkout, which npm cannot update", async () => {
+    const joined = await givenRunner("box-a");
+    await expect(requestRunnerUpdate(joined.runnerId)).rejects.toThrow("cannot update itself");
   });
 });

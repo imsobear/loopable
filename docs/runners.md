@@ -29,6 +29,12 @@ Anyone with the token can add a runner to your workspace. If it gets out, rotate
 
 `loopable logout` stops the runner and forgets the workspace.
 
+## From the Runners page
+
+- **On / off.** A runner that is off stays connected but takes no new jobs; jobs waiting for it go to another runner.
+- **Update.** When a newer `loopable-cli` is out, a runner installed from npm shows **Update to vX**. It finishes the job it is on, installs the new version, and restarts itself. If npm cannot install it, for example for lack of permission, the page says why; update it by hand then.
+- **Forget.** Stops the runner and removes it. It finishes the job it is on first. Running `loopable runner` on that machine again joins it again.
+
 ## Folders
 
 Loops that read your code, such as chat bots and scheduled checks, work in a folder you name on the loop. It is relative to the runner's home, such as `code/web`, so every runner finds its own copy there. Check the repository out at the same path on each machine that should take those jobs. A runner without the folder fails the job with a message saying so.

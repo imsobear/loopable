@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hostname as osHostname } from "node:os";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import type { RunnerInventoryEntry, RunnerView } from "#/lib/domain.ts";
 import { LEGACY_RUNNER_PROTOCOL, RUNNER_PROTOCOL, VERSION, olderThan } from "#/lib/version.ts";
 import { db } from "./db/client.ts";
@@ -20,10 +20,24 @@ function mine() {
   return eq(runners.workspaceId, workspaceId());
 }
 
+/** This workspace's runners that have not been forgotten. */
+function kept() {
+  return and(mine(), isNull(runners.forgottenAt));
+}
+
 const ONLINE_MS = 45_000;
 
 /** What a runner says it is, as it says it on joining and on every heartbeat. */
-export type RunnerBuild = { version?: string | null; protocol?: number | null };
+export type RunnerBuild = {
+  version?: string | null;
+  protocol?: number | null;
+  updatable?: boolean | null;
+  /** Why its last update failed, said once on the heartbeat after. */
+  updateError?: string | null;
+};
+
+/** What Loopable asks of a runner on a heartbeat or a claim. */
+export type RunnerInstruction = { kind: "stop"; reason: string } | { kind: "update"; version: string };
 
 export function protocolOf(row: Pick<Runner, "protocol">): number {
   return row.protocol ?? LEGACY_RUNNER_PROTOCOL;
@@ -33,7 +47,35 @@ function buildFields(build: RunnerBuild) {
   return {
     version: typeof build.version === "string" && build.version ? build.version : null,
     protocol: typeof build.protocol === "number" ? build.protocol : null,
+    ...(typeof build.updatable === "boolean" ? { updatable: build.updatable } : {}),
+    ...(typeof build.updateError === "string" && build.updateError
+      ? { updateError: build.updateError.slice(0, 500) }
+      : {}),
   };
+}
+
+const UPDATE_MS = 3 * 60_000;
+let latest: { version: string; at: number } | null = null;
+
+/**
+ * The newest loopable-cli on npm, which is what a runner can update to. Asked
+ * at most every ten minutes; this App's own version when npm cannot be asked.
+ */
+export async function latestRunnerVersion(): Promise<string> {
+  if (latest && Date.now() - latest.at < 10 * 60_000) return latest.version;
+  try {
+    const res = await fetch("https://registry.npmjs.org/loopable-cli/latest", {
+      signal: AbortSignal.timeout(3_000),
+    });
+    const body = (await res.json()) as { version?: string };
+    if (res.ok && typeof body.version === "string") {
+      latest = { version: body.version, at: Date.now() };
+      return body.version;
+    }
+  } catch {
+    // Offline or slow: fall through to what this App knows.
+  }
+  return latest?.version ?? VERSION;
 }
 
 export function isRunnerOnline(row: Runner, now = Date.now()): boolean {
@@ -42,8 +84,14 @@ export function isRunnerOnline(row: Runner, now = Date.now()): boolean {
   return now - row.lastSeenAt.getTime() < ONLINE_MS;
 }
 
-function toView(row: Runner, now = Date.now()): RunnerView {
+function toView(row: Runner, now = Date.now(), newest = VERSION): RunnerView {
   const online = isRunnerOnline(row, now);
+  const updating =
+    online &&
+    row.updateRequestedAt !== null &&
+    now - row.updateRequestedAt.getTime() < UPDATE_MS &&
+    olderThan(row.version, row.updateTo ?? newest) &&
+    !row.updateError;
   return {
     id: row.id,
     name: row.name,
@@ -53,14 +101,19 @@ function toView(row: Runner, now = Date.now()): RunnerView {
     lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
     version: row.version,
     protocol: protocolOf(row),
-    outdated: protocolOf(row) < RUNNER_PROTOCOL || olderThan(row.version, VERSION),
+    outdated: protocolOf(row) < RUNNER_PROTOCOL || olderThan(row.version, newest),
+    latest: newest,
+    enabled: row.enabled,
+    updatable: row.updatable === true,
+    updating,
+    updateError: row.updateError,
   };
 }
 
-export async function listRunners(): Promise<RunnerView[]> {
+export async function listRunners(newest = VERSION): Promise<RunnerView[]> {
   await db().delete(runners).where(eq(runners.id, "host")).run();
   const now = Date.now();
-  return (await db().select().from(runners).where(mine()).all()).map((row) => toView(row, now));
+  return (await db().select().from(runners).where(kept()).all()).map((row) => toView(row, now, newest));
 }
 
 export async function getRunner(id: string): Promise<Runner | undefined> {
@@ -99,6 +152,7 @@ export async function availableAgentIds(requiresHost = false, minProtocol = 0): 
         .filter(
           (row) =>
             row.status === "online" &&
+            row.enabled &&
             (!requiresHost || row.hostname === local) &&
             row.protocol >= minProtocol,
         )
@@ -124,8 +178,8 @@ export async function pickRunner(input: {
   const now = Date.now();
   const local = osHostname();
   const minProtocol = input.minProtocol ?? 0;
-  const capable = (await db().select().from(runners).where(mine()).all()).filter(
-    (row) => isRunnerOnline(row, now) && runnerCanRun(row, input.agentId),
+  const capable = (await db().select().from(runners).where(kept()).all()).filter(
+    (row) => row.enabled && isRunnerOnline(row, now) && runnerCanRun(row, input.agentId),
   );
   let candidates = capable.filter((row) => protocolOf(row) >= minProtocol);
   if (input.requiresHost) {
@@ -212,6 +266,25 @@ export async function heartbeatRunner(
 }
 
 /**
+ * What to tell a runner now, if anything. Each is said once: a forgotten
+ * runner is removed once it has been told to stop, and an update is asked for
+ * once, so a runner that cannot update is not asked again on every beat.
+ */
+export async function instructionFor(runnerId: string): Promise<RunnerInstruction | null> {
+  const row = await getRunner(runnerId);
+  if (!row) return null;
+  if (row.forgottenAt) {
+    await removeRunnerRow(row.id);
+    return { kind: "stop", reason: "This runner was forgotten in Loopable." };
+  }
+  if (row.updateTo) {
+    await db().update(runners).set({ updateTo: null }).where(eq(runners.id, row.id)).run();
+    if (olderThan(row.version, row.updateTo)) return { kind: "update", version: row.updateTo };
+  }
+  return null;
+}
+
+/**
  * A runner joining with a workspace's join token. Not scoped: the token is
  * what says which workspace, and the runner is added there.
  */
@@ -229,6 +302,7 @@ export async function joinRunner(input: {
     .from(runners)
     .where(and(eq(runners.workspaceId, workspace), eq(runners.hostname, input.hostname)))
     .get();
+  // Joining again after being forgotten is a fresh start, switched on.
   if (!existing) {
     const limit = await runnerLimitReached(workspace);
     if (limit) throw new Error(limit);
@@ -246,6 +320,9 @@ export async function joinRunner(input: {
         lastSeenAt: now,
         hostname: input.hostname,
         tokenHash: tokenHash(token),
+        forgottenAt: null,
+        updateError: null,
+        ...(existing.forgottenAt ? { enabled: true } : {}),
         ...buildFields(input),
       })
       .where(eq(runners.id, id))
@@ -297,22 +374,68 @@ export async function runnerIdForToken(token: string): Promise<string | null> {
   return (await runnerForToken(token))?.id ?? null;
 }
 
-export async function forgetRunner(id: string): Promise<void> {
-  const row = await getRunner(id);
-  if (!row) throw new Error("Unknown runner.");
-  const inflight = await db()
-    .select({ id: tasks.id })
-    .from(tasks)
+/**
+ * Jobs given to a runner that has not started them yet, put back in the queue
+ * so another runner takes them. One it has started stays with it.
+ */
+async function releaseWaitingJobs(runnerId: string): Promise<void> {
+  await db()
+    .update(tasks)
+    .set({ state: "queued", runnerId: null, updatedAt: new Date() })
     .where(
       and(
         eq(tasks.workspaceId, workspaceId()),
-        eq(tasks.runnerId, id),
+        eq(tasks.runnerId, runnerId),
         eq(tasks.state, "awaiting_agent"),
+        or(isNull(tasks.leaseUntil), lte(tasks.leaseUntil, new Date())),
       ),
     )
-    .get();
-  if (inflight) throw new Error("This runner still has a run in flight.");
-  await db().delete(runners).where(and(mine(), eq(runners.id, id))).run();
+    .run();
+}
+
+async function removeRunnerRow(id: string): Promise<void> {
+  await db().delete(runners).where(eq(runners.id, id)).run();
   await secretStore().delete(runnerTokenKey(id));
   await secretStore().delete(`runners.machine.${id}`);
+}
+
+/**
+ * Stops a runner and forgets it. One that is online is told to stop on its
+ * next check-in, finishing the run it is on first; one that is not is simply
+ * removed.
+ */
+export async function forgetRunner(id: string): Promise<void> {
+  const row = await getRunner(id);
+  if (!row || row.forgottenAt) throw new Error("Unknown runner.");
+  await releaseWaitingJobs(id);
+  if (isRunnerOnline(row)) {
+    await db().update(runners).set({ forgottenAt: new Date() }).where(and(mine(), eq(runners.id, id))).run();
+  } else {
+    await removeRunnerRow(id);
+  }
+}
+
+/** Off: still connected, given no new jobs, and its waiting ones go to another runner. */
+export async function setRunnerEnabled(id: string, enabled: boolean): Promise<void> {
+  const row = await getRunner(id);
+  if (!row || row.forgottenAt) throw new Error("Unknown runner.");
+  await db().update(runners).set({ enabled }).where(and(mine(), eq(runners.id, id))).run();
+  if (!enabled) await releaseWaitingJobs(id);
+}
+
+/** Asks a runner to update itself to the newest loopable-cli on its next check-in. */
+export async function requestRunnerUpdate(id: string): Promise<void> {
+  const row = await getRunner(id);
+  if (!row || row.forgottenAt) throw new Error("Unknown runner.");
+  if (!isRunnerOnline(row)) throw new Error(`${row.name} is offline, so it cannot update now.`);
+  if (row.updatable !== true) {
+    throw new Error(`${row.name} cannot update itself. On that machine, run npm install -g loopable-cli.`);
+  }
+  const version = await latestRunnerVersion();
+  if (!olderThan(row.version, version)) throw new Error(`${row.name} is already on v${row.version}.`);
+  await db()
+    .update(runners)
+    .set({ updateTo: version, updateRequestedAt: new Date(), updateError: null })
+    .where(and(mine(), eq(runners.id, id)))
+    .run();
 }
