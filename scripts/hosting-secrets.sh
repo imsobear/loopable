@@ -25,7 +25,7 @@ echo "GitHub OAuth app for loop.goodone.si (callback https://loop.goodone.si/api
 put LOOPABLE_GITHUB_CLIENT_ID "  Client ID"
 put LOOPABLE_GITHUB_CLIENT_SECRET "  Client secret"
 
-echo "Google OAuth client, for Gmail (redirect https://loop.goodone.si/api/connectors/gmail/callback)"
+echo "Google OAuth client, for signing in with Google and for Gmail (redirect https://loop.goodone.si/api/connectors/gmail/callback)"
 put LOOPABLE_GMAIL_CLIENT_ID "  Client ID (empty to skip)"
 put LOOPABLE_GMAIL_CLIENT_SECRET "  Client secret (empty to skip)"
 
