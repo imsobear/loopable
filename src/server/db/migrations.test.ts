@@ -4,13 +4,9 @@ import { describe, expect, it } from "vitest";
 
 const folder = join(process.cwd(), "drizzle");
 
-/** Fixed later by 0031, and an applied migration cannot be edited. */
-const KNOWN = new Set(["0023_shared_host.sql"]);
-
 describe("migrations", () => {
-  it("put a breakpoint between statements, or the migrator runs only the first", () => {
+  it("put a breakpoint between statements: a local file runs only the first, and Turso refuses them all", () => {
     for (const file of readdirSync(folder).filter((name) => name.endsWith(".sql"))) {
-      if (KNOWN.has(file)) continue;
       const chunks = readFileSync(join(folder, file), "utf8").split("--> statement-breakpoint");
       for (const chunk of chunks) {
         // A statement starts a line with its keyword; semicolons alone would

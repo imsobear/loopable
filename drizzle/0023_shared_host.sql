@@ -1,4 +1,5 @@
 ALTER TABLE `tasks` ADD `log_text` text DEFAULT '' NOT NULL;
+--> statement-breakpoint
 CREATE TABLE `secrets` (
 	`key` text PRIMARY KEY NOT NULL,
 	`value` text NOT NULL,
