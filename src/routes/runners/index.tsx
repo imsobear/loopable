@@ -51,7 +51,9 @@ function RunnersPage() {
   const { runners, joinToken, origin, hosted } = Route.useLoaderData();
   const router = useRouter();
   useLiveRefresh();
-  const withToken = `loopable runner --url ${origin} --token ${joinToken}`;
+  // The CLI already points at the hosted service; any other address is named.
+  const at = origin === "https://loop.goodone.si" ? "" : ` --url ${origin}`;
+  const withToken = `loopable runner${at} --token ${joinToken}`;
 
   const rotate = async () => {
     if (!window.confirm("Rotate the join token? Runners already joined keep working.")) return;
@@ -73,42 +75,21 @@ function RunnersPage() {
 
       <div className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">Join a runner</h2>
-        {hosted ? (
-          <>
-            {/* login opens this site to approve the machine, so nobody copies a token. */}
-            <Commands lines={["npm install -g loopable-cli", "loopable login", "loopable runner"]} />
-            <p className="text-xs text-muted-foreground">
-              Needs Node 22+ and an agent CLI signed in on that machine.
-            </p>
-            <details className="group text-xs" suppressHydrationWarning>
-              <summary className="w-fit cursor-pointer list-none text-muted-foreground hover:text-foreground">
-                Or join with a token, for a machine with no browser
-              </summary>
-              <div className="mt-2 flex flex-col gap-2">
-                <Commands lines={[withToken]} />
-                <Button variant="ghost" size="sm" className="w-fit" onClick={rotate}>
-                  <RotateCcw />
-                  Rotate token
-                </Button>
-              </div>
-            </details>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-muted-foreground">On this machine or another on the network:</span>
-              <Button variant="ghost" size="sm" onClick={rotate}>
-                <RotateCcw />
-                Rotate token
-              </Button>
-            </div>
-            <Commands lines={["npm install -g loopable-cli", withToken]} />
-            <p className="text-xs text-muted-foreground">
-              Needs Node 22+ and an agent CLI signed in on that machine. Skip the first line if the
-              CLI is already installed.
-            </p>
-          </>
-        )}
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">
+            {hosted ? "On your machine:" : "On this machine or another on the network:"}
+          </span>
+          <Button variant="ghost" size="sm" onClick={rotate}>
+            <RotateCcw />
+            Rotate token
+          </Button>
+        </div>
+        <Commands lines={["npm install -g loopable-cli", withToken]} />
+        <p className="text-xs text-muted-foreground">
+          Needs Node 22+ and an agent CLI signed in on that machine. The token is remembered there,
+          so after the first time it is just <code>loopable runner</code>. Anyone with the token can
+          add a runner to this workspace; rotate it if it gets out.
+        </p>
       </div>
 
       {runners.length === 0 ? (

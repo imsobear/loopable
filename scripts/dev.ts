@@ -69,11 +69,12 @@ async function waitForApp(): Promise<void> {
 
 await waitForApp();
 // Trying the hosted service locally: there is no workspace until someone
-// signs in, so the runner joins the way a user's would, with loopable login.
+// signs in, so the runner joins the way a user's would, with the token on
+// their Runners page.
 if (process.env.LOOPABLE_HOSTED === "1") {
   process.stdout.write(
-    `\nHosted mode at ${appUrl}. Sign in, then join a runner:\n\n` +
-      `  node --experimental-strip-types src/cli.ts login --url ${appUrl}\n\n`,
+    `\nHosted mode at ${appUrl}. Sign in, then join a runner with the command on the Runners page:\n\n` +
+      `  node --experimental-strip-types src/cli.ts runner --url ${appUrl} --token TOKEN\n\n`,
   );
   await new Promise(() => {});
 }

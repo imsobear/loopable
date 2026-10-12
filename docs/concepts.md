@@ -52,7 +52,7 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 **Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub, a Slack bot, a Feishu bot, Gmail, or WeChat. Agent login is Codex, Claude Code, or Cursor Agent. They live in different places and must not be merged into one “account.”
 
-**Runner.** A process on someone's machine that can run agents for one workspace. It reports an inventory (which agents are installed and signed in) and its version. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. It is connected with `loopable login` and run with `loopable runner`; see [runners.md](runners.md).
+**Runner.** A process on someone's machine that can run agents for one workspace. It reports an inventory (which agents are installed and signed in) and its version. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. It joins with the workspace's token, `loopable runner --token`, and after that is just `loopable runner`; see [runners.md](runners.md).
 
 ## What runs where
 

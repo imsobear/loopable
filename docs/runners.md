@@ -6,19 +6,16 @@ Loopable is hosted at [loop.goodone.si](https://loop.goodone.si). The one thing 
 
 You need Node 22+ and a coding agent signed in on that machine: Codex, Claude Code, or Cursor Agent.
 
+Copy the two lines from the Runners page, which has your workspace's token in them:
+
 ```bash
 npm install -g loopable-cli
-loopable login
-loopable runner
+loopable runner --token <from Runners>
 ```
 
-`loopable login` shows a code and opens the browser. Check the code matches and approve it, signed in. The machine is then connected to your workspace; it remembers this in `~/.loopable/runner.json`, which only you can read. `loopable runner` runs until you stop it, so leave it running in a terminal or under a service manager.
+The first `loopable runner --token` connects the machine to your workspace and remembers it in `~/.loopable/runner.json`, which only you can read. After that it is just `loopable runner`. It runs until you stop it, so leave it running in a terminal or under a service manager. On a server or in a container, set `LOOPABLE_RUNNER_TOKEN` instead of passing `--token`; a token from the environment is not written to disk.
 
-A machine with no browser can join with the token on the Runners page instead:
-
-```bash
-loopable runner --url https://loop.goodone.si --token <from Runners>
-```
+Anyone with the token can add a runner to your workspace. If it gets out, rotate it on the Runners page: runners that already joined keep working.
 
 `loopable logout` forgets the workspace.
 
@@ -30,7 +27,7 @@ GitHub reviews and replies clone the repository with the machine's git, so sign 
 
 ## More than one machine
 
-Run `loopable login` and `loopable runner` on each. Every job goes to an online runner that has the loop's agent signed in, preferring one that is idle. A workspace can have up to 5 runners.
+Run the same `loopable runner --token` on each. Every job goes to an online runner that has the loop's agent signed in, preferring one that is idle. A workspace can have up to 5 runners.
 
 ## Upgrading
 

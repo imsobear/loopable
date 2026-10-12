@@ -55,4 +55,4 @@ Each workspace can have up to 20 loops and 5 runners, and a loop is looked at no
 LOOPABLE_HOSTED=1 LOOPABLE_MASTER_KEY=local LOOPABLE_HOME=$PWD/.hosted PORT=4321 pnpm dev
 ```
 
-This runs the app, sign-in and workspaces on a local file database. Signing in uses the shipped GitHub app, whose callback is registered on port 4321, and the shipped Google client. Open the app at `http://127.0.0.1:4321`, not `localhost`, and stop `pnpm dev` first since it uses the same port. Connect a runner with `node --experimental-strip-types src/cli.ts login --url http://127.0.0.1:4321`.
+This runs the app, sign-in and workspaces on a local file database. Signing in uses the shipped GitHub app, whose callback is registered on port 4321, and the shipped Google client. Open the app at `http://127.0.0.1:4321`, not `localhost`, and stop `pnpm dev` first since it uses the same port. Connect a runner with the command on the Runners page, run from the checkout: `node --experimental-strip-types src/cli.ts runner --url http://127.0.0.1:4321 --token TOKEN`.

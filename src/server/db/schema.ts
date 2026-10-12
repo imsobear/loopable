@@ -449,20 +449,6 @@ export const signInAttempts = sqliteTable("sign_in_attempts", {
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
 });
 
-/**
- * `loopable login` on someone's machine, waiting for them to approve it in
- * the browser. The code is what they see on both screens; the poll secret is
- * what only the CLI holds, so a code read over someone's shoulder is useless.
- */
-export const runnerLogins = sqliteTable("runner_logins", {
-  code: text("code").primaryKey(),
-  pollSecretHash: text("poll_secret_hash").notNull(),
-  /** Set when someone approves it, to the workspace they approved it into. */
-  workspaceId: text("workspace_id"),
-  approvedAt: integer("approved_at", { mode: "timestamp_ms" }),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-});
-
 export type User = typeof users.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
 export type Session = typeof sessions.$inferSelect;

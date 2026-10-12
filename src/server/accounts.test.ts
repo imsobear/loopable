@@ -117,7 +117,7 @@ describe("signing in", () => {
   });
 
   it("returns only to a page on this site", async () => {
-    expect((await signIn(maya, "/runners/connect?code=AB")).returnTo).toBe("/runners/connect?code=AB");
+    expect((await signIn(maya, "/loops?tab=tasks")).returnTo).toBe("/loops?tab=tasks");
     expect(safeReturnTo("https://evil.example")).toBeNull();
     expect(safeReturnTo("//evil.example")).toBeNull();
   });

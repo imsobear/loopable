@@ -19,8 +19,7 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
    ```bash
    npm install -g loopable-cli
-   loopable login
-   loopable runner
+   loopable runner --token <from the Runners page>
    ```
 
 3. Connect GitHub, a Slack bot, or a Lark bot, and turn on a loop.
@@ -71,7 +70,7 @@ pnpm db:generate    # after changing src/server/db/schema.ts
 pnpm db:studio
 ```
 
-`pnpm dev` is a single local workspace with no sign-in. To try sign-in, workspaces, and `loopable login` locally, see [docs/hosting.md](docs/hosting.md#trying-hosted-mode-locally). `pnpm runner` is only for a second machine while `pnpm dev` is running.
+`pnpm dev` is a single local workspace with no sign-in. To try sign-in, workspaces, and joining a runner with a token locally, see [docs/hosting.md](docs/hosting.md#trying-hosted-mode-locally). `pnpm runner` is only for a second machine while `pnpm dev` is running.
 
 ### Release and deploy
 

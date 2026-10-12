@@ -21,7 +21,6 @@ import { Route as LoopsLoopIdRouteImport } from './routes/loops/$loopId'
 import { Route as LoopsNewRouteImport } from './routes/loops/new'
 import { Route as MachinesIndexRouteImport } from './routes/machines/index'
 import { Route as RunnersIndexRouteImport } from './routes/runners/index'
-import { Route as RunnersConnectRouteImport } from './routes/runners/connect'
 import { Route as ApiAuthSigninRouteImport } from './routes/api/auth/signin'
 import { Route as ApiAuthSignoutRouteImport } from './routes/api/auth/signout'
 import { Route as ApiRunnersClaimRouteImport } from './routes/api/runners/claim'
@@ -29,8 +28,6 @@ import { Route as ApiRunnersHeartbeatRouteImport } from './routes/api/runners/he
 import { Route as ApiRunnersHelloRouteImport } from './routes/api/runners/hello'
 import { Route as ApiConnectorsConnectorIdAuthorizeRouteImport } from './routes/api/connectors/$connectorId/authorize'
 import { Route as ApiConnectorsConnectorIdCallbackRouteImport } from './routes/api/connectors/$connectorId/callback'
-import { Route as ApiRunnersLoginPollRouteImport } from './routes/api/runners/login/poll'
-import { Route as ApiRunnersLoginStartRouteImport } from './routes/api/runners/login/start'
 import { Route as ApiRunnersJobsTaskIdCompleteRouteImport } from './routes/api/runners/jobs/$taskId/complete'
 import { Route as ApiRunnersJobsTaskIdLogRouteImport } from './routes/api/runners/jobs/$taskId/log'
 
@@ -94,11 +91,6 @@ const RunnersIndexRoute = RunnersIndexRouteImport.update({
   path: '/runners/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RunnersConnectRoute = RunnersConnectRouteImport.update({
-  id: '/runners/connect',
-  path: '/runners/connect',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAuthSigninRoute = ApiAuthSigninRouteImport.update({
   id: '/api/auth/signin',
   path: '/api/auth/signin',
@@ -136,16 +128,6 @@ const ApiConnectorsConnectorIdCallbackRoute =
     path: '/api/connectors/$connectorId/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiRunnersLoginPollRoute = ApiRunnersLoginPollRouteImport.update({
-  id: '/api/runners/login/poll',
-  path: '/api/runners/login/poll',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiRunnersLoginStartRoute = ApiRunnersLoginStartRouteImport.update({
-  id: '/api/runners/login/start',
-  path: '/api/runners/login/start',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiRunnersJobsTaskIdCompleteRoute =
   ApiRunnersJobsTaskIdCompleteRouteImport.update({
     id: '/api/runners/jobs/$taskId/complete',
@@ -165,7 +147,6 @@ export interface FileRoutesByFullPath {
   '/inbox/$taskId': typeof InboxTaskIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
   '/loops/new': typeof LoopsNewRoute
-  '/runners/connect': typeof RunnersConnectRoute
   '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
   '/inbox/': typeof InboxIndexRoute
@@ -179,8 +160,6 @@ export interface FileRoutesByFullPath {
   '/api/runners/hello': typeof ApiRunnersHelloRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
-  '/api/runners/login/poll': typeof ApiRunnersLoginPollRoute
-  '/api/runners/login/start': typeof ApiRunnersLoginStartRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -191,7 +170,6 @@ export interface FileRoutesByTo {
   '/inbox/$taskId': typeof InboxTaskIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
   '/loops/new': typeof LoopsNewRoute
-  '/runners/connect': typeof RunnersConnectRoute
   '/agents': typeof AgentsIndexRoute
   '/connectors': typeof ConnectorsIndexRoute
   '/inbox': typeof InboxIndexRoute
@@ -205,8 +183,6 @@ export interface FileRoutesByTo {
   '/api/runners/hello': typeof ApiRunnersHelloRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
-  '/api/runners/login/poll': typeof ApiRunnersLoginPollRoute
-  '/api/runners/login/start': typeof ApiRunnersLoginStartRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -218,7 +194,6 @@ export interface FileRoutesById {
   '/inbox/$taskId': typeof InboxTaskIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
   '/loops/new': typeof LoopsNewRoute
-  '/runners/connect': typeof RunnersConnectRoute
   '/agents/': typeof AgentsIndexRoute
   '/connectors/': typeof ConnectorsIndexRoute
   '/inbox/': typeof InboxIndexRoute
@@ -232,8 +207,6 @@ export interface FileRoutesById {
   '/api/runners/hello': typeof ApiRunnersHelloRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
-  '/api/runners/login/poll': typeof ApiRunnersLoginPollRoute
-  '/api/runners/login/start': typeof ApiRunnersLoginStartRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -246,7 +219,6 @@ export interface FileRouteTypes {
     | '/inbox/$taskId'
     | '/loops/$loopId'
     | '/loops/new'
-    | '/runners/connect'
     | '/agents/'
     | '/connectors/'
     | '/inbox/'
@@ -260,8 +232,6 @@ export interface FileRouteTypes {
     | '/api/runners/hello'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
-    | '/api/runners/login/poll'
-    | '/api/runners/login/start'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   fileRoutesByTo: FileRoutesByTo
@@ -272,7 +242,6 @@ export interface FileRouteTypes {
     | '/inbox/$taskId'
     | '/loops/$loopId'
     | '/loops/new'
-    | '/runners/connect'
     | '/agents'
     | '/connectors'
     | '/inbox'
@@ -286,8 +255,6 @@ export interface FileRouteTypes {
     | '/api/runners/hello'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
-    | '/api/runners/login/poll'
-    | '/api/runners/login/start'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   id:
@@ -298,7 +265,6 @@ export interface FileRouteTypes {
     | '/inbox/$taskId'
     | '/loops/$loopId'
     | '/loops/new'
-    | '/runners/connect'
     | '/agents/'
     | '/connectors/'
     | '/inbox/'
@@ -312,8 +278,6 @@ export interface FileRouteTypes {
     | '/api/runners/hello'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
-    | '/api/runners/login/poll'
-    | '/api/runners/login/start'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   fileRoutesById: FileRoutesById
@@ -325,7 +289,6 @@ export interface RootRouteChildren {
   InboxTaskIdRoute: typeof InboxTaskIdRoute
   LoopsLoopIdRoute: typeof LoopsLoopIdRoute
   LoopsNewRoute: typeof LoopsNewRoute
-  RunnersConnectRoute: typeof RunnersConnectRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   ConnectorsIndexRoute: typeof ConnectorsIndexRoute
   InboxIndexRoute: typeof InboxIndexRoute
@@ -339,8 +302,6 @@ export interface RootRouteChildren {
   ApiRunnersHelloRoute: typeof ApiRunnersHelloRoute
   ApiConnectorsConnectorIdAuthorizeRoute: typeof ApiConnectorsConnectorIdAuthorizeRoute
   ApiConnectorsConnectorIdCallbackRoute: typeof ApiConnectorsConnectorIdCallbackRoute
-  ApiRunnersLoginPollRoute: typeof ApiRunnersLoginPollRoute
-  ApiRunnersLoginStartRoute: typeof ApiRunnersLoginStartRoute
   ApiRunnersJobsTaskIdCompleteRoute: typeof ApiRunnersJobsTaskIdCompleteRoute
   ApiRunnersJobsTaskIdLogRoute: typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -431,13 +392,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunnersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/runners/connect': {
-      id: '/runners/connect'
-      path: '/runners/connect'
-      fullPath: '/runners/connect'
-      preLoaderRoute: typeof RunnersConnectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/auth/signin': {
       id: '/api/auth/signin'
       path: '/api/auth/signin'
@@ -487,20 +441,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConnectorsConnectorIdCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/runners/login/poll': {
-      id: '/api/runners/login/poll'
-      path: '/api/runners/login/poll'
-      fullPath: '/api/runners/login/poll'
-      preLoaderRoute: typeof ApiRunnersLoginPollRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/runners/login/start': {
-      id: '/api/runners/login/start'
-      path: '/api/runners/login/start'
-      fullPath: '/api/runners/login/start'
-      preLoaderRoute: typeof ApiRunnersLoginStartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/runners/jobs/$taskId/complete': {
       id: '/api/runners/jobs/$taskId/complete'
       path: '/api/runners/jobs/$taskId/complete'
@@ -525,7 +465,6 @@ const rootRouteChildren: RootRouteChildren = {
   InboxTaskIdRoute: InboxTaskIdRoute,
   LoopsLoopIdRoute: LoopsLoopIdRoute,
   LoopsNewRoute: LoopsNewRoute,
-  RunnersConnectRoute: RunnersConnectRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   ConnectorsIndexRoute: ConnectorsIndexRoute,
   InboxIndexRoute: InboxIndexRoute,
@@ -540,21 +479,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConnectorsConnectorIdAuthorizeRoute:
     ApiConnectorsConnectorIdAuthorizeRoute,
   ApiConnectorsConnectorIdCallbackRoute: ApiConnectorsConnectorIdCallbackRoute,
-  ApiRunnersLoginPollRoute: ApiRunnersLoginPollRoute,
-  ApiRunnersLoginStartRoute: ApiRunnersLoginStartRoute,
   ApiRunnersJobsTaskIdCompleteRoute: ApiRunnersJobsTaskIdCompleteRoute,
   ApiRunnersJobsTaskIdLogRoute: ApiRunnersJobsTaskIdLogRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
