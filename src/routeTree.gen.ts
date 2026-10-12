@@ -32,6 +32,7 @@ import { Route as ApiConnectorsConnectorIdCallbackRouteImport } from './routes/a
 import { Route as ApiRunnersLoginPollRouteImport } from './routes/api/runners/login/poll'
 import { Route as ApiRunnersLoginStartRouteImport } from './routes/api/runners/login/start'
 import { Route as ApiConnectorsGithubCallbackSigninRouteImport } from './routes/api/connectors/github/callback/signin'
+import { Route as ApiConnectorsGmailCallbackSigninRouteImport } from './routes/api/connectors/gmail/callback/signin'
 import { Route as ApiRunnersJobsTaskIdCompleteRouteImport } from './routes/api/runners/jobs/$taskId/complete'
 import { Route as ApiRunnersJobsTaskIdLogRouteImport } from './routes/api/runners/jobs/$taskId/log'
 
@@ -153,6 +154,12 @@ const ApiConnectorsGithubCallbackSigninRoute =
     path: '/api/connectors/github/callback/signin',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiConnectorsGmailCallbackSigninRoute =
+  ApiConnectorsGmailCallbackSigninRouteImport.update({
+    id: '/api/connectors/gmail/callback/signin',
+    path: '/api/connectors/gmail/callback/signin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiRunnersJobsTaskIdCompleteRoute =
   ApiRunnersJobsTaskIdCompleteRouteImport.update({
     id: '/api/runners/jobs/$taskId/complete',
@@ -189,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/api/runners/login/poll': typeof ApiRunnersLoginPollRoute
   '/api/runners/login/start': typeof ApiRunnersLoginStartRoute
   '/api/connectors/github/callback/signin': typeof ApiConnectorsGithubCallbackSigninRoute
+  '/api/connectors/gmail/callback/signin': typeof ApiConnectorsGmailCallbackSigninRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -216,6 +224,7 @@ export interface FileRoutesByTo {
   '/api/runners/login/poll': typeof ApiRunnersLoginPollRoute
   '/api/runners/login/start': typeof ApiRunnersLoginStartRoute
   '/api/connectors/github/callback/signin': typeof ApiConnectorsGithubCallbackSigninRoute
+  '/api/connectors/gmail/callback/signin': typeof ApiConnectorsGmailCallbackSigninRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -244,6 +253,7 @@ export interface FileRoutesById {
   '/api/runners/login/poll': typeof ApiRunnersLoginPollRoute
   '/api/runners/login/start': typeof ApiRunnersLoginStartRoute
   '/api/connectors/github/callback/signin': typeof ApiConnectorsGithubCallbackSigninRoute
+  '/api/connectors/gmail/callback/signin': typeof ApiConnectorsGmailCallbackSigninRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/api/runners/login/poll'
     | '/api/runners/login/start'
     | '/api/connectors/github/callback/signin'
+    | '/api/connectors/gmail/callback/signin'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   fileRoutesByTo: FileRoutesByTo
@@ -300,6 +311,7 @@ export interface FileRouteTypes {
     | '/api/runners/login/poll'
     | '/api/runners/login/start'
     | '/api/connectors/github/callback/signin'
+    | '/api/connectors/gmail/callback/signin'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   id:
@@ -327,6 +339,7 @@ export interface FileRouteTypes {
     | '/api/runners/login/poll'
     | '/api/runners/login/start'
     | '/api/connectors/github/callback/signin'
+    | '/api/connectors/gmail/callback/signin'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   fileRoutesById: FileRoutesById
@@ -355,6 +368,7 @@ export interface RootRouteChildren {
   ApiRunnersLoginPollRoute: typeof ApiRunnersLoginPollRoute
   ApiRunnersLoginStartRoute: typeof ApiRunnersLoginStartRoute
   ApiConnectorsGithubCallbackSigninRoute: typeof ApiConnectorsGithubCallbackSigninRoute
+  ApiConnectorsGmailCallbackSigninRoute: typeof ApiConnectorsGmailCallbackSigninRoute
   ApiRunnersJobsTaskIdCompleteRoute: typeof ApiRunnersJobsTaskIdCompleteRoute
   ApiRunnersJobsTaskIdLogRoute: typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -522,6 +536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConnectorsGithubCallbackSigninRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/connectors/gmail/callback/signin': {
+      id: '/api/connectors/gmail/callback/signin'
+      path: '/api/connectors/gmail/callback/signin'
+      fullPath: '/api/connectors/gmail/callback/signin'
+      preLoaderRoute: typeof ApiConnectorsGmailCallbackSigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/runners/jobs/$taskId/complete': {
       id: '/api/runners/jobs/$taskId/complete'
       path: '/api/runners/jobs/$taskId/complete'
@@ -565,6 +586,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRunnersLoginStartRoute: ApiRunnersLoginStartRoute,
   ApiConnectorsGithubCallbackSigninRoute:
     ApiConnectorsGithubCallbackSigninRoute,
+  ApiConnectorsGmailCallbackSigninRoute: ApiConnectorsGmailCallbackSigninRoute,
   ApiRunnersJobsTaskIdCompleteRoute: ApiRunnersJobsTaskIdCompleteRoute,
   ApiRunnersJobsTaskIdLogRoute: ApiRunnersJobsTaskIdLogRoute,
 }

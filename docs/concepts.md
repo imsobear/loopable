@@ -14,7 +14,7 @@ There is no second path where the dispatcher runs the agent. The agent always ru
 
 ## Who it belongs to
 
-**Account.** A person, signed in with GitHub. Signing in only says who you are; it does not give Loopable your repositories.
+**Account.** A person, signed in with GitHub or Google. Signing in only says who you are; it does not give Loopable your repositories or your mail. A GitHub sign-in and a Google sign-in are two accounts, even with the same email.
 
 **Workspace.** Where everything a person sets up lives: loops, connections, runners, tasks, settings. Each person gets one on their first sign-in. Every query is filtered by workspace, so nothing reads across them. Sharing a workspace with a team comes later.
 

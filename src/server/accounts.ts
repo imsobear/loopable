@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, gt, lt } from "drizzle-orm";
 import { getViewer } from "#/connectors/github/api.ts";
-import { buildAuthorizeUrl, createPkce, exchangeCode } from "#/connectors/github/oauth.ts";
+import * as github from "#/connectors/github/oauth.ts";
+import * as google from "#/connectors/gmail/oauth.ts";
 import { oauthAppRegistration } from "#/connectors/oauth-app.ts";
 import { db } from "./db/client.ts";
 import {
@@ -15,59 +16,127 @@ import {
 import { currentScope } from "./workspace.ts";
 
 /**
- * Signing in to hosted Loopable. GitHub is the only way in: the people this is
- * for already have an account there, and it says who they are without
- * Loopable ever holding a password.
+ * Signing in to hosted Loopable, with GitHub or Google. Either one says who
+ * you are without Loopable ever holding a password.
  *
- * Signing in asks GitHub only who you are. Reaching your repositories is a
- * separate step, the GitHub connection, which may well be a different account.
+ * Signing in asks only who you are. Reaching your repositories or your mail is
+ * a separate step, a connection, which may well be a different account. A
+ * GitHub sign-in and a Google sign-in are two accounts, even with the same
+ * email: joining them on an address would let whoever controls one provider's
+ * account walk into the other's workspace.
  */
 export const SESSION_COOKIE = "loopable_session";
-const SIGN_IN_SCOPES = ["read:user"];
 const ATTEMPT_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-function hash(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+export type SignInProvider = "github" | "google";
+
+export function isSignInProvider(value: unknown): value is SignInProvider {
+  return value === "github" || value === "google";
 }
 
-/** Where GitHub sends the browser back after sign-in. */
-export function signInCallbackPath(): string {
-  // Under the GitHub connection's own callback, so one registered callback URL
-  // covers both: GitHub accepts any path beneath the one registered.
-  return "/api/connectors/github/callback/signin";
+/** Who a provider says someone is, the same shape whichever it was. */
+export type Profile = {
+  provider: SignInProvider;
+  /** The provider's stable id for the account. */
+  subject: string;
+  login: string;
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+};
+
+type Provider = {
+  label: string;
+  /** Which app registration this uses; Google sign-in shares the Gmail client. */
+  registration: string;
+  /**
+   * Beneath the connection's own callback, so one registration covers both:
+   * GitHub accepts any path under the registered one, and Google's loopback
+   * clients accept any path at all. A hosted Google client lists it exactly.
+   */
+  callbackPath: string;
+  authorizeUrl(input: { clientId: string; redirectUri: string; state: string; challenge: string }): string;
+  profile(input: { clientId: string; clientSecret: string; code: string; redirectUri: string; verifier: string }): Promise<Profile>;
+};
+
+const PROVIDERS: Record<SignInProvider, Provider> = {
+  github: {
+    label: "GitHub",
+    registration: "github",
+    callbackPath: "/api/connectors/github/callback/signin",
+    authorizeUrl: (input) => github.buildAuthorizeUrl({ ...input, scopes: ["read:user"] }),
+    async profile(input) {
+      const credential = await github.exchangeCode(input);
+      const { user } = await getViewer(credential.accessToken);
+      return {
+        provider: "github",
+        subject: String(user.id),
+        login: user.login,
+        name: user.name ?? null,
+        email: null,
+        avatarUrl: user.avatar_url,
+      };
+    },
+  },
+  google: {
+    label: "Google",
+    registration: "gmail",
+    callbackPath: "/api/connectors/gmail/callback/signin",
+    authorizeUrl: (input) => google.buildSignInUrl(input),
+    async profile(input) {
+      const credential = await google.exchangeCode(input);
+      const person = await google.getUserInfo(credential.accessToken);
+      return {
+        provider: "google",
+        subject: person.sub,
+        login: person.email ?? person.sub,
+        name: person.name ?? null,
+        email: person.email ?? null,
+        avatarUrl: person.picture ?? null,
+      };
+    },
+  },
+};
+
+/** Where the provider sends the browser back after sign-in. */
+export function signInCallbackPath(provider: SignInProvider = "github"): string {
+  return PROVIDERS[provider].callbackPath;
 }
 
-function registration() {
-  const app = oauthAppRegistration("github");
-  if (!app) throw new Error("Sign-in is not set up: this build has no GitHub app registration.");
+function registration(provider: SignInProvider) {
+  const app = oauthAppRegistration(PROVIDERS[provider].registration);
+  if (!app) {
+    throw new Error(`Signing in with ${PROVIDERS[provider].label} is not set up here.`);
+  }
   return app;
 }
 
-/** The URL to send someone to GitHub with, having remembered how to finish. */
-export async function startSignIn(input: { origin: string; returnTo?: string }): Promise<string> {
+/** The URL to send someone to the provider with, having remembered how to finish. */
+export async function startSignIn(input: {
+  provider?: SignInProvider;
+  origin: string;
+  returnTo?: string;
+}): Promise<string> {
+  const provider = input.provider ?? "github";
+  const app = registration(provider);
   const now = Date.now();
   await db().delete(signInAttempts).where(lt(signInAttempts.expiresAt, new Date(now))).run();
   const state = randomBytes(16).toString("base64url");
-  const { verifier, challenge } = createPkce();
-  const redirectUri = `${input.origin}${signInCallbackPath()}`;
+  const { verifier, challenge } = github.createPkce();
+  const redirectUri = `${input.origin}${signInCallbackPath(provider)}`;
   await db()
     .insert(signInAttempts)
     .values({
       state,
+      provider,
       verifier,
       redirectUri,
       returnTo: safeReturnTo(input.returnTo),
       expiresAt: new Date(now + ATTEMPT_TTL_MS),
     })
     .run();
-  return buildAuthorizeUrl({
-    clientId: registration().clientId,
-    redirectUri,
-    state,
-    challenge,
-    scopes: SIGN_IN_SCOPES,
-  });
+  return PROVIDERS[provider].authorizeUrl({ clientId: app.clientId, redirectUri, state, challenge });
 }
 
 /** Only a path on this site, so a sign-in link cannot be used to send someone elsewhere. */
@@ -78,27 +147,40 @@ export function safeReturnTo(value: string | undefined | null): string | null {
 
 export type SignedIn = { sessionToken: string; user: User; workspaceId: string; returnTo: string | null };
 
-type GithubProfile = { id: number; login: string; name?: string | null; avatar_url: string };
+type ProfileFor = (input: {
+  provider: SignInProvider;
+  code: string;
+  redirectUri: string;
+  verifier: string;
+}) => Promise<Profile>;
 
 /**
- * Finishing a sign-in: who GitHub says this is, their workspace (made on the
- * first sign-in), and a new session. `profileFor` is swapped out in tests.
+ * Finishing a sign-in: who the provider says this is, their workspace (made on
+ * the first sign-in), and a new session. `profileFor` is swapped out in tests.
  */
 export async function completeSignIn(
-  input: { code: string; state: string },
-  profileFor: (code: string, redirectUri: string, verifier: string) => Promise<GithubProfile> = githubProfile,
+  input: { provider?: SignInProvider; code: string; state: string },
+  profileFor: ProfileFor = providerProfile,
 ): Promise<SignedIn> {
+  const provider = input.provider ?? "github";
   const attempt = await db()
     .select()
     .from(signInAttempts)
     .where(eq(signInAttempts.state, input.state))
     .get();
   if (attempt) await db().delete(signInAttempts).where(eq(signInAttempts.state, input.state)).run();
-  if (!attempt || attempt.expiresAt.getTime() < Date.now()) {
+  // A state from one provider's sign-in is no good at the other's callback.
+  if (!attempt || attempt.provider !== provider || attempt.expiresAt.getTime() < Date.now()) {
     throw new Error("That sign-in link has expired. Sign in again.");
   }
 
-  const profile = await profileFor(input.code, attempt.redirectUri, attempt.verifier);
+  const profile = await profileFor({
+    provider,
+    code: input.code,
+    redirectUri: attempt.redirectUri,
+    verifier: attempt.verifier,
+  });
+  if (profile.provider !== provider) throw new Error("That sign-in came back from the wrong place.");
   const user = await upsertUser(profile);
   const workspaceId = await workspaceFor(user);
   const sessionToken = randomBytes(32).toString("base64url");
@@ -114,28 +196,28 @@ export async function completeSignIn(
   return { sessionToken, user, workspaceId, returnTo: attempt.returnTo };
 }
 
-async function githubProfile(code: string, redirectUri: string, verifier: string): Promise<GithubProfile> {
-  const app = registration();
-  const credential = await exchangeCode({
-    clientId: app.clientId,
-    clientSecret: app.clientSecret,
-    code,
-    redirectUri,
-    verifier,
-  });
-  return (await getViewer(credential.accessToken)).user;
+function providerProfile(input: Parameters<ProfileFor>[0]): Promise<Profile> {
+  const app = registration(input.provider);
+  return PROVIDERS[input.provider].profile({ ...app, ...input });
 }
 
-async function upsertUser(profile: GithubProfile): Promise<User> {
-  const githubId = String(profile.id);
-  const values = { login: profile.login, name: profile.name ?? null, avatarUrl: profile.avatar_url };
-  const existing = await db().select().from(users).where(eq(users.githubId, githubId)).get();
+async function upsertUser(profile: Profile): Promise<User> {
+  const column = profile.provider === "github" ? users.githubId : users.googleId;
+  const values = {
+    login: profile.login,
+    name: profile.name,
+    email: profile.email,
+    avatarUrl: profile.avatarUrl,
+  };
+  const existing = await db().select().from(users).where(eq(column, profile.subject)).get();
   if (existing) {
     await db().update(users).set(values).where(eq(users.id, existing.id)).run();
     return { ...existing, ...values };
   }
   const id = randomUUID();
-  await db().insert(users).values({ id, githubId, ...values }).run();
+  const identity =
+    profile.provider === "github" ? { githubId: profile.subject } : { googleId: profile.subject };
+  await db().insert(users).values({ id, ...identity, ...values }).run();
   return (await db().select().from(users).where(eq(users.id, id)).get())!;
 }
 
@@ -147,6 +229,10 @@ async function workspaceFor(user: User): Promise<string> {
   await db().insert(workspaces).values({ id, name: user.login }).run();
   await db().insert(members).values({ workspaceId: id, userId: user.id, role: "owner" }).run();
   return id;
+}
+
+function hash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 export type Viewer = {

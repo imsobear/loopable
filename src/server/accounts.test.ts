@@ -20,16 +20,33 @@ const {
   viewerInScope,
 } = await import("./accounts.ts");
 const { withWorkspace } = await import("./workspace.ts");
+type Profile = import("./accounts.ts").Profile;
 
 await migrateIfNeeded();
 
-const maya = { id: 101, login: "maya", name: "Maya Chen", avatar_url: "https://a/maya.png" };
+const maya: Profile = {
+  provider: "github",
+  subject: "101",
+  login: "maya",
+  name: "Maya Chen",
+  email: null,
+  avatarUrl: "https://a/maya.png",
+};
+const mayaOnGoogle: Profile = {
+  provider: "google",
+  subject: "g-101",
+  login: "maya@example.com",
+  name: "Maya Chen",
+  email: "maya@example.com",
+  avatarUrl: null,
+};
 
-/** A sign-in from start to finish, with GitHub replaced by a profile. */
+/** A sign-in from start to finish, with the provider replaced by a profile. */
 async function signIn(profile = maya, returnTo?: string) {
-  const url = new URL(await startSignIn({ origin: "https://loop.example", returnTo }));
+  const provider = profile.provider;
+  const url = new URL(await startSignIn({ provider, origin: "https://loop.example", returnTo }));
   const state = url.searchParams.get("state")!;
-  return await completeSignIn({ code: "code", state }, async () => profile);
+  return await completeSignIn({ provider, code: "code", state }, async () => profile);
 }
 
 describe("signing in", () => {
@@ -52,8 +69,36 @@ describe("signing in", () => {
 
   it("gives someone else their own workspace", async () => {
     const mine = await signIn();
-    const theirs = await signIn({ id: 202, login: "wei", name: "Wei", avatar_url: "" });
+    const theirs = await signIn({ ...maya, subject: "202", login: "wei", name: "Wei" });
     expect(theirs.workspaceId).not.toBe(mine.workspaceId);
+  });
+
+  it("asks Google only who you are, and comes back beside the Gmail callback", async () => {
+    const url = new URL(await startSignIn({ provider: "google", origin: "https://loop.example" }));
+    expect(url.origin).toBe("https://accounts.google.com");
+    expect(url.searchParams.get("scope")).toBe("openid email profile");
+    expect(url.searchParams.get("access_type")).toBeNull();
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://loop.example/api/connectors/gmail/callback/signin",
+    );
+  });
+
+  it("keeps a Google sign-in apart from a GitHub one, even for the same person", async () => {
+    const onGithub = await signIn();
+    const onGoogle = await signIn(mayaOnGoogle);
+    const again = await signIn(mayaOnGoogle);
+    expect(onGoogle.user.id).not.toBe(onGithub.user.id);
+    expect(onGoogle.workspaceId).not.toBe(onGithub.workspaceId);
+    expect(again.user.id).toBe(onGoogle.user.id);
+    expect(onGoogle.user.email).toBe("maya@example.com");
+  });
+
+  it("will not finish one provider's sign-in at the other's callback", async () => {
+    const url = new URL(await startSignIn({ provider: "github", origin: "https://loop.example" }));
+    const state = url.searchParams.get("state")!;
+    await expect(
+      completeSignIn({ provider: "google", code: "c", state }, async () => mayaOnGoogle),
+    ).rejects.toThrow(/expired/);
   });
 
   it("uses a sign-in link once", async () => {

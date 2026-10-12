@@ -225,6 +225,13 @@
       "when": 1789100000016,
       "tag": "0031_secrets_table",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1789100000017,
+      "tag": "0032_google_sign_in",
+      "breakpoints": true
     }
   ]
 }

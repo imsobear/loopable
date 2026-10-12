@@ -21,7 +21,11 @@ The Worker wakes the dispatcher on every request and once a minute from a cron t
    - Authorization callback URL: `https://loop.goodone.si/api/connectors/github/callback`
 
    That one callback covers both signing in and connecting GitHub: sign-in comes back to `/api/connectors/github/callback/signin`, which GitHub accepts because it is beneath the registered URL.
-3. **Google OAuth client** (for Gmail, optional). In Google Cloud, add `https://loop.goodone.si/api/connectors/gmail/callback` as an authorized redirect URI, and enable the Gmail API.
+3. **Google OAuth client** (for signing in with Google, and for Gmail). In Google Cloud, create a client of type *Web application* with two authorized redirect URIs:
+   - `https://loop.goodone.si/api/connectors/gmail/callback/signin` (signing in)
+   - `https://loop.goodone.si/api/connectors/gmail/callback` (connecting Gmail)
+
+   Enable the Gmail API. On the OAuth consent screen, add the scopes `openid`, `email` and `profile` beside the Gmail ones, and publish the app; while it is in *Testing*, only the test users listed there can sign in.
 4. **Secrets on the Worker.** From a checkout, signed in to wrangler:
 
    ```bash
@@ -53,4 +57,4 @@ Each workspace can have up to 20 loops and 5 runners, and a loop is looked at no
 LOOPABLE_HOSTED=1 LOOPABLE_MASTER_KEY=local LOOPABLE_HOME=$PWD/.hosted PORT=4322 pnpm dev
 ```
 
-This runs the app, sign-in and workspaces on a local file database. Signing in needs the shipped GitHub app, whose callback is `http://127.0.0.1/api/connectors/github/callback`, so open the app at `http://127.0.0.1:4322`. Connect a runner with `node --experimental-strip-types src/cli.ts login --url http://127.0.0.1:4322`.
+This runs the app, sign-in and workspaces on a local file database. Signing in uses the shipped GitHub app and Google client, which accept `http://127.0.0.1` on any port, so open the app at `http://127.0.0.1:4322`, not `localhost`. Connect a runner with `node --experimental-strip-types src/cli.ts login --url http://127.0.0.1:4322`.

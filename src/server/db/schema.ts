@@ -376,7 +376,12 @@ export type Runner = typeof runners.$inferSelect;
 /** A person, as GitHub knows them. Signing in with GitHub is the only way in. */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
-  githubId: text("github_id").notNull().unique(),
+  /** Set when this person signs in with GitHub. */
+  githubId: text("github_id").unique(),
+  /** Set when this person signs in with Google: the account's stable `sub`. */
+  googleId: text("google_id").unique(),
+  email: text("email"),
+  /** A GitHub login, or the email address for a Google sign-in. */
   login: text("login").notNull(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
@@ -433,9 +438,10 @@ export const sessions = sqliteTable(
   (table) => [index("sessions_user_idx").on(table.userId)],
 );
 
-/** A sign-in that is mid-flight at GitHub: the CSRF state and the PKCE verifier. */
+/** A sign-in that is mid-flight at GitHub or Google: the CSRF state and the PKCE verifier. */
 export const signInAttempts = sqliteTable("sign_in_attempts", {
   state: text("state").primaryKey(),
+  provider: text("provider").$type<"github" | "google">().notNull().default("github"),
   verifier: text("verifier").notNull(),
   redirectUri: text("redirect_uri").notNull(),
   /** Where to go after signing in, such as the page that asked for it. */

@@ -44,8 +44,8 @@ export function Landing({ next, error }: { next?: string; error?: string }) {
     if (!page) return;
     // Every sign-in link comes back to wherever the visitor was trying to go.
     if (next) {
-      for (const link of page.querySelectorAll<HTMLAnchorElement>('a[href="/api/auth/signin"]')) {
-        link.href = signInHref(next);
+      for (const link of page.querySelectorAll<HTMLAnchorElement>("a[data-provider]")) {
+        link.href = signInHref(next, link.dataset.provider === "google" ? "google" : "github");
       }
     }
     const stops: Array<() => void> = [];

@@ -14,7 +14,7 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 ## Get started
 
-1. Sign in at [loop.goodone.si](https://loop.goodone.si) with GitHub.
+1. Sign in at [loop.goodone.si](https://loop.goodone.si) with GitHub or Google.
 2. Connect your machine. It needs Node 22+ and Codex, Claude Code, or Cursor Agent signed in.
 
    ```bash

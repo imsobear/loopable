@@ -16,6 +16,9 @@ export type GmailCredential = {
 const AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN = "https://oauth2.googleapis.com/token";
 const REVOKE = "https://oauth2.googleapis.com/revoke";
+const USERINFO = "https://openidconnect.googleapis.com/v1/userinfo";
+
+type FetchLike = typeof fetch;
 
 export function createPkce(): { verifier: string; challenge: string } {
   const verifier = randomBytes(32).toString("base64url");
@@ -48,7 +51,43 @@ export function buildAuthorizeUrl(input: {
   return `${AUTHORIZE}?${query.toString()}`;
 }
 
-type FetchLike = typeof fetch;
+/**
+ * Signing in to Loopable with Google: who you are, and nothing of your mail.
+ * No offline access, so Google hands back no refresh token to keep.
+ */
+export function buildSignInUrl(input: {
+  clientId: string;
+  redirectUri: string;
+  state: string;
+  challenge: string;
+}): string {
+  const query = new URLSearchParams({
+    client_id: input.clientId,
+    redirect_uri: input.redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    state: input.state,
+    code_challenge: input.challenge,
+    code_challenge_method: "S256",
+    prompt: "select_account",
+  });
+  return `${AUTHORIZE}?${query.toString()}`;
+}
+
+export type GoogleUser = { sub: string; email?: string; name?: string; picture?: string };
+
+export async function getUserInfo(accessToken: string, fetchImpl: FetchLike = fetch): Promise<GoogleUser> {
+  const res = await fetchImpl(USERINFO, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) throw new Error(`Google would not say who signed in (${res.status}).`);
+  const body = (await res.json()) as Partial<GoogleUser>;
+  if (typeof body.sub !== "string" || !body.sub) throw new Error("Google did not say who signed in.");
+  return {
+    sub: body.sub,
+    email: typeof body.email === "string" ? body.email : undefined,
+    name: typeof body.name === "string" ? body.name : undefined,
+    picture: typeof body.picture === "string" ? body.picture : undefined,
+  };
+}
 
 /** Google's token endpoint takes a form, not JSON, and answers JSON either way. */
 async function postToken(
