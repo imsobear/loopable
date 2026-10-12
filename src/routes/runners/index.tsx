@@ -86,9 +86,10 @@ function RunnersPage() {
         </div>
         <Commands lines={["npm install -g loopable-cli", withToken]} />
         <p className="text-xs text-muted-foreground">
-          Needs Node 22+ and an agent CLI signed in on that machine. The token is remembered there,
-          so after the first time it is just <code>loopable runner</code>. Anyone with the token can
-          add a runner to this workspace; rotate it if it gets out.
+          Needs Node 22+ and an agent CLI signed in on that machine. It runs in the background, and the
+          token is remembered, so after the first time it is just <code>loopable runner</code>. Stop it
+          with <code>loopable stop</code>. Anyone with the token can add a runner to this workspace;
+          rotate it if it gets out.
         </p>
       </div>
 

@@ -13,11 +13,21 @@ npm install -g loopable-cli
 loopable runner --token <from Runners>
 ```
 
-The first `loopable runner --token` connects the machine to your workspace and remembers it in `~/.loopable/runner.json`, which only you can read. After that it is just `loopable runner`. It runs until you stop it, so leave it running in a terminal or under a service manager. On a server or in a container, set `LOOPABLE_RUNNER_TOKEN` instead of passing `--token`; a token from the environment is not written to disk.
+The first `loopable runner --token` connects the machine to your workspace and remembers it in `~/.loopable/runner.json`, which only you can read. After that it is just `loopable runner`.
+
+The runner starts in the background and keeps running after you close the terminal. `loopable runner` waits until it has joined, so a wrong token is said straight away.
+
+| Command | Does |
+| --- | --- |
+| `loopable status` | Whether it is running, and where its log is |
+| `loopable logs` | The log; `-f` keeps following it |
+| `loopable stop` | Stops it |
+
+It does not start again by itself after the machine restarts; run `loopable runner` again. On a server or in a container, run `loopable runner --foreground` under the service manager instead, and set `LOOPABLE_RUNNER_TOKEN` rather than passing `--token`: a token from the environment is not written to disk.
 
 Anyone with the token can add a runner to your workspace. If it gets out, rotate it on the Runners page: runners that already joined keep working.
 
-`loopable logout` forgets the workspace.
+`loopable logout` stops the runner and forgets the workspace.
 
 ## Folders
 
@@ -35,4 +45,4 @@ Run the same `loopable runner --token` on each. Every job goes to an online runn
 npm install -g loopable-cli
 ```
 
-Then restart `loopable runner`. The Runners page shows each runner's version and flags any that are older than the service. An older runner keeps working, but does not take jobs that need something newer, such as loops that work in a folder.
+Then `loopable stop` and `loopable runner` to restart it on the new version. The Runners page shows each runner's version and flags any that are older than the service. An older runner keeps working, but does not take jobs that need something newer, such as loops that work in a folder.
