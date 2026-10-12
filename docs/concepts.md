@@ -1,8 +1,6 @@
 # Concepts
 
-Loopable is your team’s own agent, running on a machine the team owns. It watches the services a team already works in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded. Why it exists is in [narrative.md](narrative.md).
-
-The usual install is one computer that stays on. Extra runners join the same way. The path a task takes does not change.
+Loopable is workflows for the coding agent you already have. It is hosted at loop.goodone.si; the agent runs on your machine. It watches the services you already work in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded. Why it exists is in [narrative.md](narrative.md).
 
 ```text
 Signal → Loop → Task
@@ -12,13 +10,19 @@ Signal → Loop → Task
               → Task is recorded
 ```
 
-There is no second path where “the local dispatcher runs the agent.” The agent always runs on a Runner. The runner pulls work over HTTP (`/api/runners/claim`). Loopable does not push jobs into the runner.
+There is no second path where the dispatcher runs the agent. The agent always runs on a Runner, on someone's machine. The runner pulls work over HTTPS (`/api/runners/claim`). Loopable does not push jobs into the runner.
+
+## Who it belongs to
+
+**Account.** A person, signed in with GitHub. Signing in only says who you are; it does not give Loopable your repositories.
+
+**Workspace.** Where everything a person sets up lives: loops, connections, runners, tasks, settings. Each person gets one on their first sign-in. Every query is filtered by workspace, so nothing reads across them. Sharing a workspace with a team comes later.
 
 ## What you configure
 
 **Connector.** A kind of service: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account.
 
-**Connection.** One credential of a connector — the team's shared GitHub account, a Slack bot, a Feishu bot, a Gmail inbox. Credentials live in Loopable. Agents never see them.
+**Connection.** One credential of a connector — a GitHub account, a Slack bot, a Feishu bot, a Gmail inbox. Credentials are encrypted in the service. Agents never see them.
 
 A connector registers three lists:
 
@@ -48,39 +52,36 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 **Agent login.** That CLI’s own login on the runner’s host. It is not a Connection. Connection is GitHub, a Slack bot, a Feishu bot, Gmail, or WeChat. Agent login is Codex, Claude Code, or Cursor Agent. They live in different places and must not be merged into one “account.”
 
-**Runner.** A process that can run agents. It reports an inventory: which agents are installed and signed in. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. The command is `loopable runner`. The join token lives on the Runners page.
+**Runner.** A process on someone's machine that can run agents for one workspace. It reports an inventory (which agents are installed and signed in) and its version. It heartbeats, pulls a job, runs the agent, and returns output and logs. It does not poll connectors, does not hold Connections, and does not write back to GitHub or Slack. It is connected with `loopable login` and run with `loopable runner`; see [runners.md](runners.md).
 
-## What you install
+## What runs where
 
-**Loopable** is the install on the control host. Two roles, one install:
+| Part | Where | Does |
+| --- | --- | --- |
+| **App** | Hosted | The pages, sign-in, OAuth callbacks, and the interface runners pull from |
+| **Dispatcher** | Hosted | Watches for signals, matches loops, queues jobs, writes back through Connections |
+| **Runner** | Your machine | Pulls jobs, runs the agent CLI |
 
-| Role | Does |
-| --- | --- |
-| **App** | The UI, the HTTP API, OAuth callbacks, and the interface runners pull from |
-| **Dispatcher** | Watches for signals, matches loops, queues jobs, writes back through Connections |
-
-They share one database. They are not two products. They need not be two services. `loopable start` runs App and Dispatcher on the same host so a loop keeps running when nobody has the window open. How to start each is in [deploy.md](deploy.md). Changing this repo is `pnpm dev`, not a deploy.
+App and Dispatcher share one database and serve every workspace. Only one Dispatcher runs against it. How the service is deployed is in [hosting.md](hosting.md). Changing this repo is `pnpm dev`, which runs all three on one machine as a single local workspace.
 
 Do not call this a management platform. The product is Loopable. The console is for writing loops and seeing what ran, not for operating a fleet.
 
-**Runner** is a separate process on every host that should run agents. Start it with the URL and join token from Runners:
-
 ```text
-Loopable  ──HTTP pull──  Runner  ──  Agent CLI
-(App + Dispatcher)
+Loopable  ──HTTPS pull──  Runner  ──  Agent CLI
+(hosted)                  (your machine)
 ```
 
-The path does not change with how many runners you have. One runner on the same host as Loopable, or several on other hosts: each one joins the same way.
+The path does not change with how many runners you have: each one joins the same way.
 
 ## Three kinds of credential
 
 | | Connection | Runtime auth | Agent login |
 | --- | --- | --- | --- |
 | What | GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat | git / `gh` on the runner | Codex, Claude Code, Cursor Agent |
-| Where | Loopable’s secret store | That host’s home directory | That host’s home directory |
+| Where | The service, encrypted | That machine's home directory | That machine's home directory |
 | Who uses it | App and Dispatcher, to read signals and write back | The agent, via git on that host | Only the agent process |
 
-They stay apart even when two of them are GitHub. The Connection is the team's shared account, which watches and writes through the API. Runtime auth is git on that host, used by the agent when the prompt asks it to clone. Loopable does not copy the Connection token onto a runner or into an agent.
+They stay apart even when two of them are GitHub. The Connection is the account Loopable watches and writes through, over the API. Runtime auth is git on that host, used by the agent when the prompt asks it to clone. Loopable does not copy the Connection token onto a runner or into an agent.
 
 The agent’s environment never contains Loopable’s service credentials. When a job needs a repository, the prompt tells the agent to clone it. That uses the machine’s git, not the Connection.
 

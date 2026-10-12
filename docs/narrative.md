@@ -1,65 +1,62 @@
 # Narrative
 
-Loopable is your team’s own agent. It runs on a machine the team owns, and the team decides what it can do.
+Loopable is workflows for the coding agent you already have. You set them up in the browser at loop.goodone.si, and they run on your machine.
 
-It is for small and mid-size teams. Work comes in from Slack, Lark, GitHub, or a schedule. Codex, Claude Code, or Cursor Agent does it on that machine. The answer goes back where it was asked, and every run is recorded.
+It is for developers first, and the teams they work in. Work comes in from GitHub, Slack, Lark, email, or the clock. Codex, Claude Code, or Cursor Agent does it on your machine. The answer goes back where it was asked, and every run is recorded.
 
 ## The problem
 
-**Shared work waits on one person.** A review request. “Why is checkout failing?” in #oncall. A morning look at stale issues. Today someone copies it into their own Codex or Cursor. If that person is busy, asleep, or on leave, the work stops. Most of these jobs do not need that person. The knowledge is already in GitHub, Slack, and the logs.
+**Your agent only works while you are watching it.** A review request. “Why is checkout failing?” in #oncall. A morning look at stale issues. Each one waits until you copy it into your agent, and when you are busy, asleep, or on leave, it stops. Most of these jobs do not need you; they need your agent, your access, and a prompt that already works.
 
-**What the team knows lives in personal setups.** Each person has their own prompts, skills, and agent config. The same question gets a different answer depending on who ran it. Nothing is reused, and nothing is recorded.
+**Your setup is scattered.** Prompts live in chat history, skills on one laptop, steps you repeat by hand. The same question gets a different answer each time. Nothing is reused, and nothing is recorded.
 
-**Hosted team agents cannot reach where the work is.** A cloud sandbox does not see the internal network, the logs, the database, or the internal services. It can be extended only as far as the platform allows. It comes with one agent vendor and usually one chat tool.
+**Hosted agents cannot reach where the work is.** A cloud sandbox does not see your internal network, your logs, your database, or your internal services. It can be extended only as far as the platform allows. It comes with one agent vendor and usually one chat tool.
 
-## Layer one: a shared agent for the team
+## Workflows that run on their own
 
-The team leaves Loopable running. A signal comes in, a loop matches, the agent runs, the answer is written back.
+A signal comes in, a loop matches, your agent runs, and the answer is written back.
 
-- **No one has to be there.** A loop runs when the review is requested, when a chat bot is mentioned, or when the clock says so.
-- **The process is shared.** A loop is one job done one way: what starts it, what to ask, where to answer. Start from a ready-made workflow, or write a custom loop on any trigger. Anyone on the team can read it and change it.
-- **The knowledge is shared.** A loop works in a checkout of your repository, named relative to the runner's home so every runner finds its own copy. The `AGENTS.md` and skills there are what the agent knows, and they live in the team’s repository, not on someone’s laptop.
+- **Nobody has to be there.** A loop runs when a review is requested, when a chat bot is mentioned, when an email arrives, or when the clock says so.
+- **One way to do each job.** A loop is what starts it, what to ask, and where to answer. Start from a ready-made workflow, or write a custom loop on any trigger.
+- **Know-how in the repo.** A loop works in a checkout of your repository. The `AGENTS.md` and skills there are what the agent knows.
 - **Every run is recorded.** The inbox shows what came in, what the agent did, and what it wrote back, whether or not it wrote anything.
+- **Good for a team too.** A loop that answers in a team channel, or on a shared GitHub account, works for everyone who asks it.
 
-It is not a better personal Codex. One person, one chat, one laptop is already solved.
+## It runs on your machine
 
-## Layer two: it runs on your machine
+Loopable is hosted, so there is nothing to keep running but the runner. The runner is the one thing you install, and the agent runs there.
 
-The agent runs on a Runner the team owns. The usual install is one computer that stays on. A Mac in the office is enough.
+- **Reach.** Whatever your machine can reach, the agent can reach: the internal network, logs, databases, internal services.
+- **Extend.** Any MCP server, CLI, or login you set up on that machine. No platform decides what is allowed.
+- **Choose.** Codex, Claude Code, or Cursor Agent, and the model you want.
+- **Keep local.** Your code, logs, and network access stay on your machine. The agent uses the plan you already pay for.
 
-- **Reach.** Whatever that machine can reach, the agent can reach: the internal network, logs, databases, internal services.
-- **Extend.** Add any MCP server, CLI, or login to an internal service on that machine. No platform decides what is allowed.
-- **Choose.** Pick the agent and the model. Codex, Claude Code, and Cursor Agent today.
-- **Keep local.** Data and credentials stay on the team’s machines. The agent uses the CLI subscription the team already pays for.
+What does pass through the service: connection tokens, which are encrypted and never handed to the agent, and the prompts and answers of each run, which make up the inbox.
 
 ## Safe to leave on
 
 An agent that runs with nobody watching has to be boring by default.
 
-- Agents start read-only in your folders. GitHub jobs work in a fresh checkout, never in someone’s working copy.
-- Service credentials stay in Loopable. The agent never sees them.
-- GitHub is connected as one shared account the team sends work to. Its access is the repositories that account can reach.
-- On GitHub it reviews and comments. A review is a comment, never an approval, and it does not push code.
+- Agents start read-only in your folders. GitHub jobs work in a fresh checkout, never in your working copy.
+- A review is posted as a comment, never an approval, and nothing is merged or pushed for you.
 - A new loop records what is already waiting. It does not run it.
-- Loopable needs no public URL. It polls Slack, Lark, and GitHub. Nothing on the internet has to reach the office Mac.
+- Everything you set up belongs to your workspace. Nothing reads across workspaces.
 
 ## Who it is for
 
-Small and mid-size teams whose work needs something a hosted agent does not have: the internal network, a chat tool other than Slack, or data that stays in-house.
+Developers who already use a coding agent and want it to take work on its own: reviews, replies, checks, and questions that arrive while they are doing something else. Teams follow when those loops answer somewhere shared.
 
-A team that lives only in Slack, uses only one vendor, and needs nothing inside its network may be better served by a hosted agent. That is fine.
+Someone who needs nothing inside their network, lives in one chat tool, and is happy with one vendor may be better served by a hosted agent. That is fine.
 
 ## How a job runs
 
 ```text
 Signal → Loop → Task
-              → Dispatcher watches, matches a loop, queues the job
-              → Runner pulls the job, runs Codex, Claude Code, or Cursor Agent
+              → Dispatcher (hosted) watches, matches a loop, queues the job
+              → Runner (your machine) pulls the job, runs Codex, Claude Code, or Cursor Agent
               → Dispatcher writes back
 ```
 
-The runner claims work over HTTP. Loopable does not push into the runner. A Slack bot, a Lark bot, GitHub, an email, and the clock are ways to create a signal. The path inside does not change. Connections live on Loopable. Agent login lives on the runner.
+The runner pulls work over HTTPS. Nothing on the internet has to reach your machine. Connections live in the service; your agent's login lives on your machine.
 
-Shipped today: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock, custom loops, runners, Codex, Claude Code, and Cursor Agent.
-
-The words for the parts are in [concepts.md](concepts.md). Extra runners are in [deploy.md](deploy.md).
+The words for the parts are in [concepts.md](concepts.md). Connecting machines is in [runners.md](runners.md).

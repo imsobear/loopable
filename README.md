@@ -1,15 +1,31 @@
 # Loopable
 
-Your team’s own agent. It runs on your machine, and you decide what it can do. [loop.goodone.si](https://loop.goodone.si)
+Workflows for the coding agent you already have. Set them up at [loop.goodone.si](https://loop.goodone.si); they run on your machine.
 
-A lot of team work waits on one person: a review request, a question in #oncall, a morning check. Someone has to copy it into their own Codex, and if they are busy, it stops. Hosted team agents help, but they run in a cloud sandbox that cannot reach your internal network, logs, or services.
+A review request, a question in #oncall, a morning check: today each one waits until you copy it into your agent, and when you are busy or away, it stops. Hosted agents can take some of it, but they run in a cloud sandbox that cannot reach your internal network, logs, or services.
 
-Loopable is a shared agent for small and mid-size teams.
+Loopable watches GitHub, Slack, Lark, email, and the clock, and hands each job to Codex, Claude Code, or Cursor Agent on your own machine. The answer goes back where it was asked, and every run is recorded.
 
-- **Shared.** Work comes in from Slack, Lark, GitHub, or a schedule. A loop says what to do. Nobody has to be there. Every run is recorded in the inbox.
-- **Yours.** Codex, Claude Code, or Cursor Agent runs on a machine the team owns. It reaches what that machine reaches, uses the MCP servers and skills you install, and keeps data in-house.
+- **On its own.** A loop says what starts it, what to ask, and where to answer. Nobody has to be there.
+- **On your machine.** The agent reaches what your machine reaches, uses the MCP servers and skills you installed, and runs on the plan you already pay for.
+- **For your team too.** Answer in a team channel or on a shared GitHub account, and the same loop works for everyone.
 
-The story is in [docs/narrative.md](docs/narrative.md). The words for the parts — loop, workflow, runner, and the rest — are in [docs/concepts.md](docs/concepts.md).
+The story is in [docs/narrative.md](docs/narrative.md). The words for the parts — trigger, workflow, loop, runner — are in [docs/concepts.md](docs/concepts.md).
+
+## Get started
+
+1. Sign in at [loop.goodone.si](https://loop.goodone.si) with GitHub.
+2. Connect your machine. It needs Node 22+ and Codex, Claude Code, or Cursor Agent signed in.
+
+   ```bash
+   npm install -g loopable-cli
+   loopable login
+   loopable runner
+   ```
+
+3. Connect GitHub, a Slack bot, or a Lark bot, and turn on a loop.
+
+More machines, folders, and upgrading are in [docs/runners.md](docs/runners.md).
 
 ## Loops you can run today
 
@@ -26,91 +42,55 @@ The story is in [docs/narrative.md](docs/narrative.md). The words for the parts 
 
 A loop’s answer can go to any connector that accepts it, so a scheduled check can post to #oncall. To ask an agent something once, use **Ask an agent** in the inbox.
 
-## Architecture
-
-Three processes. The agent always runs on a Runner, never on the App or Dispatcher.
+## How it works
 
 <p align="center">
   <img src="docs/architecture.svg" alt="Slack bot, GitHub, and Lark bot into Loopable. A runner pulls the job. Loopable writes back to the same three." width="920" />
 </p>
 
-Slack bot, GitHub, and Lark bot send work in. Loopable watches, matches a loop, and queues the job. A Runner pulls it, runs Codex, Claude Code, or Cursor Agent, and Loopable writes the result back.
+Loopable is hosted: the app and the dispatcher run on Cloudflare. The dispatcher watches your services, matches a loop, and queues the job. Your runner pulls it over HTTPS, runs the agent on your machine, and Loopable writes the answer back.
 
-```text
-Loopable  ──HTTP pull──  Runner  ──  Agent CLI
-(App + Dispatcher)
-```
+| Part | Where | Does |
+| --- | --- | --- |
+| **App** | Hosted | The pages, sign-in, the API runners pull from |
+| **Dispatcher** | Hosted | Watches for signals, matches loops, queues jobs, writes back |
+| **Runner** | Your machine | Pulls a job, runs the agent CLI |
 
-| Process | Does |
-| --- | --- |
-| **App** | UI, HTTP API, OAuth, the interface runners pull from |
-| **Dispatcher** | Watches for signals, matches loops, queues jobs, writes back |
-| **Runner** | Pulls a job over HTTP, runs the agent CLI |
-
-App and Dispatcher share one database and stay on the same host. Only one Dispatcher may run against that database. Runners join over HTTP from that host or other machines. Extra runners are in [docs/deploy.md](docs/deploy.md).
-
-## Run it
-
-The usual setup is one computer that stays on — a Mac in the office is enough. App, Dispatcher, and a Runner all live there. It looks like a spare machine on a desk. For a small team, that is the product.
-
-You need Node 22+ and an agent CLI signed in on that machine (Codex, Claude Code, or Cursor Agent).
-
-```bash
-npm install -g loopable-cli
-loopable start                # App + Dispatcher, bound on all interfaces
-```
-
-On the same computer, open `http://127.0.0.1:4321`. Connect GitHub from that address, signed in as the account your team will send work to (see [GitHub: a shared account](docs/connectors.md#github-a-shared-account)). Write a loop. On Runners, copy the join command and start a runner (this machine is fine):
-
-```bash
-npm install -g loopable-cli   # on another machine; already done here
-loopable runner --url http://<LAN-IP>:4321 --token <from Runners>
-```
-
-If the dispatcher is not running, the app says so. If no runner has joined, tasks wait.
-
-State lives in `~/.loopable/`. Credentials stay in the OS keychain.
-
-Another always-on runner, or opening the UI from a second computer, is in [docs/deploy.md](docs/deploy.md). A company VM is optional later, only if this box is not enough.
+Your code, logs, and network access stay on your machine. Connection tokens are encrypted in the service, and the agent never sees them. Everything you set up belongs to your workspace, and nothing reads across workspaces.
 
 ## Develop
 
-This section is only for working on the code. Running Loopable as a product is the CLI above, not pnpm. Dev uses `~/.loopable-dev/` and a separate keychain namespace, so it does not touch the team database.
-
-TanStack Start (React + Vite), SQLite, Tailwind. Tests are Vitest.
+TanStack Start (React + Vite), SQLite (libSQL hosted), Tailwind. Tests are Vitest.
 
 ```bash
 pnpm install
-pnpm dev            # App + Dispatcher + Runner, ~/.loopable-dev, hot reload
+pnpm dev            # App + Dispatcher + Runner on one machine, ~/.loopable-dev, hot reload
 pnpm typecheck
 pnpm test
 pnpm db:generate    # after changing src/server/db/schema.ts
 pnpm db:studio
 ```
 
-`pnpm runner` is only for a second machine while `pnpm dev` is already running.
+`pnpm dev` is a single local workspace with no sign-in. To try sign-in, workspaces, and `loopable login` locally, see [docs/hosting.md](docs/hosting.md#trying-hosted-mode-locally). `pnpm runner` is only for a second machine while `pnpm dev` is running.
 
-### Release
+### Release and deploy
 
-CI runs typecheck, tests, and both builds on every pull request and on `main`. To publish `loopable-cli`, merge to `main`, then from a clean, pushed `main`:
+CI runs typecheck, tests, and the build on every pull request and on `main`.
 
-```bash
-pnpm release minor --dry-run   # every check, nothing changed
-pnpm release minor             # or patch, major, or an exact x.y.z
-```
-
-It checks git and npm, runs typecheck, tests, and build, then bumps the version, commits, tags `vX.Y.Z`, publishes, and pushes. Runners on other machines need `npm install -g loopable-cli` too. The site deploys on its own with `pnpm site:deploy`.
-
-The public site is `site/` (static HTML, Vite). `pnpm site:dev` to preview. `pnpm site:build` writes `site/dist` for a Cloudflare Worker with assets only. `pnpm site:deploy` when you are ready to publish it.
+- **The CLI** (`loopable-cli` on npm): from a clean, pushed `main`, `pnpm release minor --dry-run`, then `pnpm release minor`. It checks everything, bumps, commits, tags `vX.Y.Z`, publishes, and pushes.
+- **The service**: run the **Deploy** workflow in GitHub Actions. Setup and the domain are in [docs/hosting.md](docs/hosting.md).
 
 | Path | Contents |
 | --- | --- |
 | `src/connectors/` | One folder per connector: `manifest.ts` (browser-safe) and `runtime.ts` (server) |
 | `src/agents/` | One folder per agent, same split |
-| `src/server/` | Database, secrets, queue, server functions |
+| `src/server/` | Database, accounts, workspaces, secrets, queue, server functions |
 | `src/dispatcher/` | Dispatcher process |
 | `src/runner/` | Runner process |
 | `src/routes/` | Pages and `/api/` |
+| `src/landing/` | The front page |
+| `src/worker.ts` | The Cloudflare Worker and its dispatcher container |
+| `site/` | The old site address, now a redirect to loop.goodone.si |
 | `drizzle/` | Migrations |
 
 A new connector is a folder plus one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. See [docs/connectors.md](docs/connectors.md).

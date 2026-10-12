@@ -1,6 +1,6 @@
 # Connectors
 
-A connector is a kind of service: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account. A signed-in account (or a pasted Slack or Feishu bot) is a **Connection**. Credentials live in Loopable. Agents never see them.
+A connector is a kind of service: GitHub, Slack bot, Feishu / Lark bot, Gmail, WeChat, the clock. It declares what it can watch and what it can write. It is not an account. A signed-in account (or a pasted Slack or Feishu bot) is a **Connection**, and belongs to one workspace. Credentials are encrypted in the service. Agents never see them.
 
 Each connector is a folder under `src/connectors/`. It exports two halves, and the split is load bearing:
 
@@ -11,40 +11,37 @@ Each connector is a folder under `src/connectors/`. It exports two halves, and t
 
 The pages render entirely from manifests. Adding a connector means adding a folder and one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. No page changes. The contract lives in `src/connectors/types.ts`.
 
-## GitHub: a shared account
+## GitHub: which account
 
-Connect GitHub as the account the team sends work to. On GitHub, that account is Loopable:
+Signing in to Loopable with GitHub only says who you are. Connecting GitHub is a separate step, and it is the account Loopable watches and writes as:
 
-- **People send it work the normal way.** Request a review from it, or assign it an issue. The workflows watch `review-requested:@me` and `assignee:@me`, and `@me` is the connected account.
+- **Work arrives the normal way.** Request a review from it, or assign it an issue. The workflows watch `review-requested:@me` and `assignee:@me`, and `@me` is the connected account.
 - **What it writes appears under its name.** Reviews and comments come from that account.
 - **Its access is what that account can reach.** OAuth asks for the `repo` scope, but the account only reaches repositories it has access to.
 
-Which account to use:
+Which account to connect:
 
-- **An account made for this**, such as `acme-loopable`, is the cleanest. Work sent to it is clearly for Loopable, what it writes is clearly from Loopable, and it does not stop working when someone leaves. Create it with an email address the team controls, keep its password and 2FA in the team's password manager, and add it to the repositories Loopable should work in. On paid org plans it takes a seat.
-- **Your own account** works too, if you are happy to share it. Then every review requested from you and every issue assigned to you is picked up, and Loopable answers as you.
+- **Your own account** is the simplest. Every review requested from you and every issue assigned to you is picked up, and Loopable answers as you.
+- **An account made for this**, such as `acme-loopable`, suits a team. Work sent to it is clearly for Loopable, what it writes is clearly from Loopable, and it does not stop working when someone leaves. Create it with an email address the team controls and add it to the repositories it should work in. On paid org plans it takes a seat.
 
-To connect, sign in to GitHub as that account, then click Connect in Loopable. GitHub authorizes whichever account the browser is signed in as, so a private window that holds only that session is the easiest way. If jobs clone private repositories, sign the runner's git in as an account that can read them.
+GitHub authorizes whichever account the browser is signed in as, so to connect a different account than your own, use a private window that holds only that session. If jobs clone private repositories, sign the runner's git in as an account that can read them.
 
 A GitHub App was considered and set aside for now. An App cannot be requested as a reviewer or assigned an issue, so the workflows would need labels or mentions instead. Its installation tokens also expire after an hour, which does not suit the runner's git.
 
 ## GitHub OAuth
 
-End users never register an OAuth app. They click Connect. Loopable ships one GitHub app (and one Google app) whose callback is loopback:
+Nobody using Loopable registers an OAuth app. They click Connect.
 
-```
-http://127.0.0.1/api/connectors/github/callback
-```
+- **Hosted**, Loopable's own GitHub OAuth app has the callback `https://loop.goodone.si/api/connectors/github/callback`. Signing in comes back to `/api/connectors/github/callback/signin`, beneath it, so one registration covers both. Setup is in [hosting.md](hosting.md).
+- **Locally** (`pnpm dev`), the app shipped in this repo has a loopback callback, `http://127.0.0.1/api/connectors/github/callback`, registered without a port: GitHub matches loopback on host and path only.
 
-Register that URL without a port: GitHub matches loopback on host and path only.
-
-Login is the OAuth 2.0 authorization code flow with PKCE (S256) over a loopback redirect. A LAN `LOOPABLE_BASE_URL` is only the address runners join; Connect GitHub still uses `127.0.0.1` on this machine.
+Login is the OAuth 2.0 authorization code flow with PKCE (S256).
 
 **Treat the shipped client secret as public, not as a credential.** GitHub lists `client_secret` as required at the token endpoint and does not distinguish between public and confidential clients, so a browser-redirect login cannot hide one. The GitHub CLI embeds its secret for the same reason.
 
 PKCE is what actually protects a login: an intercepted authorization code cannot be redeemed by anyone else, because the exchange must present the verifier held only by the process that started the flow.
 
-What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored on a user's computer.
+What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored.
 
 To use your own registration (GitHub Enterprise, or a private app), set `LOOPABLE_GITHUB_CLIENT_ID` and `LOOPABLE_GITHUB_CLIENT_SECRET`, or put them in gitignored `config/oauth-app.json`.
 
@@ -58,7 +55,7 @@ A loop fires when someone messages the bot, and the answer goes back to whoever 
 
 ## Gmail
 
-Gmail is connected by signing in with Google, from `http://127.0.0.1:4321` on the Loopable host.
+Gmail is connected by signing in with Google. Hosted, Google sends the browser back to `https://loop.goodone.si/api/connectors/gmail/callback`.
 
 - **Starts when an email arrives.** A custom loop on “An email arrives” checks the inbox every 30 minutes. It can be narrowed with Gmail search terms, skip mail the account sent, and skip mail that needs nothing, after one quick look at what arrived.
 - **Email this account.** As an answer, Gmail sends to the connected account itself, the way a bot answers whoever asked. When the run started from an email in the same inbox, the answer joins that thread.
@@ -67,7 +64,7 @@ Gmail asks for `gmail.readonly` and `gmail.send`. A connection made before sendi
 
 ## Slack bot
 
-The Slack connection is a **bot in a Slack app**, not a Slack user login. Loopable does not ship a Slack app, because an office Mac has no public URL for Slack OAuth or Events. The team creates a Slack app, installs it in their workspace, and pastes the Bot User OAuth Token (`xoxb-…`). That token is not a person's Slack account. Loopable polls. Slack never has to reach this machine.
+The Slack connection is a **bot in a Slack app**, not a Slack user login. For now you create the Slack app yourself, install it in your Slack workspace, and paste the Bot User OAuth Token (`xoxb-…`). That token is not a person's Slack account. Loopable polls, so Slack never has to send it anything. An "Add to Slack" button, with Slack sending events, is planned now that Loopable has a public address.
 
 Bot scopes to add before Install to Workspace:
 
@@ -83,7 +80,7 @@ Invite the bot to any channel it should watch. A loop fires on an @mention in th
 
 ## Feishu / Lark bot
 
-The Feishu connection is a **bot in a custom Feishu or Lark app**, not a Feishu user login. Loopable does not ship a Feishu app, because an office Mac has no public URL for Feishu events. The team creates a custom app, enables Bot, publishes a version, and pastes App ID and App Secret. That is not a person's Feishu account. Loopable polls groups the bot is in. Feishu never has to reach this machine.
+The Feishu connection is a **bot in a custom Feishu or Lark app**, not a Feishu user login. You create a custom app, enable Bot, publish a version, and paste App ID and App Secret. That is not a person's Feishu account. Loopable polls the groups the bot is in, so Feishu never has to send it anything.
 
 Open platform:
 
