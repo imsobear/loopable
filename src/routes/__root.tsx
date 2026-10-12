@@ -33,8 +33,10 @@ const Devtools = import.meta.env.DEV ? lazy(() => import("@/components/devtools"
 const BARE = new Set(["/", "/welcome"]);
 
 function AppLayout() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  if (BARE.has(pathname)) return <Outlet />;
+  // The page on screen, not the address being loaded: while the front page
+  // loads, the app page it is leaving keeps its sidebar until it is replaced.
+  const routeId = useRouterState({ select: (state) => state.matches.at(-1)?.routeId });
+  if (routeId && BARE.has(routeId)) return <Outlet />;
   return (
     <SidebarProvider>
       <AppSidebar />
