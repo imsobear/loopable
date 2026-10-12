@@ -10,11 +10,17 @@ const UNTIL_KEY = "dispatcher.leaseUntil";
 const HEARTBEAT_KEY = "dispatcher.heartbeatAt";
 const LEASE_MS = 20_000;
 
-function ownerId(): string {
-  return process.env.LOOPABLE_DISPATCHER_ID ?? process.env.LOOPABLE_ENGINE_ID ?? randomUUID();
-}
+let owner: string | undefined;
 
-const owner = ownerId();
+/**
+ * Who holds the lease: this process, named once. Worked out on first use, not
+ * when the module loads, because the App Worker imports this file too and
+ * Cloudflare refuses random values while a module is loading.
+ */
+function ownerId(): string {
+  owner ??= process.env.LOOPABLE_DISPATCHER_ID ?? process.env.LOOPABLE_ENGINE_ID ?? randomUUID();
+  return owner;
+}
 
 /**
  * Two dispatchers on one database would fight over every task. A lease in the
@@ -24,10 +30,10 @@ export async function claimSingleInstance(): Promise<{ ok: true } | { ok: false;
   const now = Date.now();
   const until = Number(await readSettingRenamed<number>(UNTIL_KEY, "engine.leaseUntil", 0));
   const current = await readSettingRenamed<string>(OWNER_KEY, "engine.leaseOwner", "");
-  if (until > now && current && current !== owner) {
+  if (until > now && current && current !== ownerId()) {
     return { ok: false, owner: current };
   }
-  await writeSetting(OWNER_KEY, owner);
+  await writeSetting(OWNER_KEY, ownerId());
   await writeSetting(UNTIL_KEY, now + LEASE_MS);
   await writeSetting(HEARTBEAT_KEY, now);
   return { ok: true };
@@ -35,14 +41,14 @@ export async function claimSingleInstance(): Promise<{ ok: true } | { ok: false;
 
 export async function touchDispatcher(): Promise<void> {
   const now = Date.now();
-  await writeSetting(OWNER_KEY, owner);
+  await writeSetting(OWNER_KEY, ownerId());
   await writeSetting(UNTIL_KEY, now + LEASE_MS);
   await writeSetting(HEARTBEAT_KEY, now);
 }
 
 export async function releaseSingleInstance(): Promise<void> {
   const current = await readSettingRenamed<string>(OWNER_KEY, "engine.leaseOwner", "");
-  if (current !== owner) return;
+  if (current !== ownerId()) return;
   for (const key of [OWNER_KEY, UNTIL_KEY, "engine.leaseOwner", "engine.leaseUntil"]) {
     await deleteSystemSetting(key);
   }
