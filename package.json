@@ -1,6 +1,6 @@
 {
   "name": "loopable-cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Connect your machine to Loopable: a runner that does your workspace's jobs with your own coding agent.",
   "license": "MIT",
   "type": "module",
