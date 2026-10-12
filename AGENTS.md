@@ -1,6 +1,6 @@
 # Loopable
 
-Loopable is workflows for the coding agent you already have. It is hosted at loop.goodone.si; the agent runs on the user's own machine.
+Loopable puts your coding agent on a loop: workflows set up in the browser that run on the user's own machine. It is hosted at loop.goodone.si.
 
 Work comes in from GitHub, Slack, Lark, email, or the clock. A loop says what to do. Codex, Claude Code, or Cursor Agent does it on a runner on the user's machine, and the answer is written back where it was asked. Every run is recorded. The story is in `docs/narrative.md`.
 

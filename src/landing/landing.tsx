@@ -7,9 +7,9 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { signInHref } from "@/components/sign-in";
 import { Button } from "@/components/ui/button";
 
-const TITLE = "Loopable — workflows for your coding agent";
+const TITLE = "Loopable — put your coding agent on a loop";
 const DESCRIPTION =
-  "Workflows for the coding agent you already have. Set them up in the browser; they run on your machine, with Codex, Claude Code, or Cursor Agent.";
+  "Set up workflows in the browser. They run on your machine with Codex or Claude Code, and the answer goes back where it was asked.";
 const ORIGIN = "https://loop.goodone.si";
 const REPO = "https://github.com/imsobear/loopable";
 
@@ -147,13 +147,9 @@ function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
       <div>
         <p className="text-sm font-medium text-muted-foreground">Workflows for your coding agent</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-          Put the coding agent you already have to work.
+          Put your coding agent on a loop.
         </h1>
-        <p className="mt-5 text-lg text-muted-foreground text-pretty">
-          Set up workflows in the browser. They run on your machine with Codex, Claude Code, or Cursor
-          Agent, so the agent reaches what you reach. The answer goes back to GitHub, Slack, Lark, or email,
-          and every run is recorded.
-        </p>
+        <p className="mt-5 text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>
         <div className="mt-8">
           {signedIn ? (
             <Button size="lg" nativeButton={false} render={<Link to="/inbox" />}>
@@ -256,17 +252,17 @@ function HowItWorks() {
   const steps = [
     {
       title: "Something happens",
-      body: "A review is requested, a chat bot is mentioned, an email arrives, or the time comes round.",
+      body: "A review is requested, a chat bot is mentioned, or the time comes round.",
       icons: ["Github", "Slack", "Feishu", "Gmail", "Clock"],
     },
     {
       title: "Your agent does the work",
-      body: "Loopable hands the job to a runner on your machine. It runs your agent there, in your repository, with your tools and logins.",
-      icons: ["Codex", "ClaudeCode", "Cursor"],
+      body: "A runner on your machine picks up the job and runs your agent there, with your code, tools and logins.",
+      icons: ["Codex", "ClaudeCode"],
     },
     {
       title: "The answer goes back",
-      body: "A review on the pull request, a reply in the thread, an email. The Inbox keeps every run: what came in, what the agent did, what it wrote.",
+      body: "A review, a reply in the thread. Every run is kept in the Inbox.",
       icons: [],
     },
   ];
@@ -275,7 +271,7 @@ function HowItWorks() {
       id="how"
       kicker="How it works"
       title="Set it up once. It runs on its own."
-      lead="A loop says what starts it, what to ask, and where to answer. Start from a ready-made workflow, or write your own prompt."
+      lead="A loop is what starts it, what to ask, and where to answer. Start from a ready-made workflow, or write your own."
     >
       <ol className="grid gap-4 md:grid-cols-3">
         {steps.map((step, index) => (
@@ -308,8 +304,8 @@ const WORKFLOWS: Array<{ icon: string; from: string; name: string; answer: strin
   { icon: "Slack", from: "Slack bot", name: "Do what I ask the Slack bot", answer: "A reply in the thread" },
   { icon: "Feishu", from: "Lark bot", name: "Do what I ask the Lark bot", answer: "A reply in the thread" },
   { icon: "Wechat", from: "WeChat", name: "Do what I ask the WeChat bot", answer: "A reply in the chat" },
-  { icon: "Gmail", from: "Gmail", name: "When an email arrives", answer: "An email back, or anywhere" },
-  { icon: "Clock", from: "Schedule", name: "Do something on a schedule", answer: "Inbox, or a Slack, Lark, or GitHub thread" },
+  { icon: "Gmail", from: "Gmail", name: "When an email arrives", answer: "An email back" },
+  { icon: "Clock", from: "Schedule", name: "Do something on a schedule", answer: "The Inbox, or any thread" },
 ];
 
 function Workflows() {
@@ -318,7 +314,7 @@ function Workflows() {
       id="workflows"
       kicker="Workflows"
       title="Ready to turn on today."
-      lead="Or write a custom loop on any of these triggers, and send its answer to any of these places."
+      lead="Or write your own loop on any of these, and send the answer anywhere."
     >
       <div className="divide-y rounded-xl border">
         {WORKFLOWS.map((flow) => (
@@ -352,12 +348,12 @@ function OnYourMachine() {
     },
     {
       title: "Choose",
-      body: "Codex, Claude Code, or Cursor Agent, and the model you want, on the plan you already pay for.",
+      body: "Codex or Claude Code, with the model you want, on the plan you already pay for.",
       hosted: "one vendor",
     },
     {
       title: "Keep local",
-      body: "Your code, logs, and network access stay on your machine. Connection tokens stay encrypted in Loopable, and the agent never sees them.",
+      body: "Your code and logs stay on your machine. Connection tokens stay encrypted in Loopable; the agent never sees them.",
       hosted: "your work runs in their cloud",
     },
   ];
@@ -386,7 +382,7 @@ function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
       id="start"
       kicker="Get started"
       title="Sign in, connect your machine, turn on a loop."
-      lead="Your machine needs Node 22+ and Codex, Claude Code, or Cursor Agent signed in."
+      lead="Your machine needs Node 22+ and Codex or Claude Code signed in."
     >
       <ol className="grid gap-4 md:grid-cols-3">
         <li className="rounded-xl border p-5">
@@ -417,7 +413,7 @@ function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
           <span className="text-sm text-muted-foreground">3</span>
           <h3 className="mt-1 font-medium">Turn on a loop</h3>
           <p className="mt-4 text-sm text-muted-foreground">
-            Connect GitHub, a Slack bot, a Lark bot, or Gmail, and pick a workflow, or write your own.
+            Connect GitHub or a chat bot, and pick a workflow.
           </p>
         </li>
       </ol>
@@ -433,7 +429,7 @@ function Footer() {
           <LoopableMark className="size-4" />
           Loopable
         </span>
-        <span>Workflows for your coding agent</span>
+        <span>Put your coding agent on a loop</span>
         <span className="ml-auto flex gap-5">
           <a href={REPO} className="hover:text-foreground">
             GitHub
