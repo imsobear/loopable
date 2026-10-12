@@ -3,8 +3,9 @@ import { Landing, landingHead } from "@/landing/landing";
 import { getViewer } from "@/server/functions/account.ts";
 
 /**
- * The front door. Signed in, or on a local install where nobody signs in,
- * there is nothing to see here and the app opens at the Inbox.
+ * The front page. Signed in, it is still here to read, with a way into the
+ * app; a link that sent someone to sign in first (`?next=`) goes on to where
+ * it was heading. A local install has nobody to sign in, so it opens the app.
  */
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { next?: string; error?: string } => ({
@@ -13,7 +14,10 @@ export const Route = createFileRoute("/")({
   }),
   beforeLoad: async ({ search }) => {
     const { hosted, viewer } = await getViewer();
-    if (!hosted || viewer) throw redirect({ to: search.next && search.next.startsWith("/") ? search.next : "/inbox" });
+    const next = search.next?.startsWith("/") && !search.next.startsWith("//") ? search.next : null;
+    if (!hosted) throw redirect({ to: next ?? "/inbox" });
+    if (viewer && next) throw redirect({ to: next });
+    return { signedIn: Boolean(viewer) };
   },
   head: landingHead,
   component: Front,
@@ -21,5 +25,6 @@ export const Route = createFileRoute("/")({
 
 function Front() {
   const { next, error } = Route.useSearch();
-  return <Landing next={next} error={error} />;
+  const { signedIn } = Route.useRouteContext();
+  return <Landing signedIn={signedIn} next={next} error={error} />;
 }

@@ -109,8 +109,9 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-1">
+          {/* Home is the front page, which a signed-in visitor can read too. */}
           <Link
-            to="/connectors"
+            to="/"
             className="flex min-w-0 flex-1 items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:hidden"
           >
             {/* Its own mark, not the icon the Loops item uses: a logo that is
