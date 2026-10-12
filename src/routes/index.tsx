@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { SignInPanel } from "@/components/sign-in";
+import { Landing, landingHead } from "@/landing/landing";
 import { getViewer } from "@/server/functions/account.ts";
 
 /**
@@ -15,10 +15,11 @@ export const Route = createFileRoute("/")({
     const { hosted, viewer } = await getViewer();
     if (!hosted || viewer) throw redirect({ to: search.next && search.next.startsWith("/") ? search.next : "/inbox" });
   },
+  head: landingHead,
   component: Front,
 });
 
 function Front() {
   const { next, error } = Route.useSearch();
-  return <SignInPanel next={next} error={error} />;
+  return <Landing next={next} error={error} />;
 }

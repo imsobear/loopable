@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as ConnectorsIndexRouteImport } from './routes/connectors/index'
 import { Route as ConnectorsConnectorIdRouteImport } from './routes/connectors/$connectorId'
@@ -37,6 +38,11 @@ import { Route as ApiRunnersJobsTaskIdLogRouteImport } from './routes/api/runner
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsIndexRoute = AgentsIndexRouteImport.update({
@@ -161,6 +167,7 @@ const ApiRunnersJobsTaskIdLogRoute = ApiRunnersJobsTaskIdLogRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/welcome': typeof WelcomeRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
   '/inbox/$taskId': typeof InboxTaskIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/welcome': typeof WelcomeRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
   '/inbox/$taskId': typeof InboxTaskIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
@@ -214,6 +222,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/welcome': typeof WelcomeRoute
   '/connectors/$connectorId': typeof ConnectorsConnectorIdRoute
   '/inbox/$taskId': typeof InboxTaskIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/welcome'
     | '/connectors/$connectorId'
     | '/inbox/$taskId'
     | '/loops/$loopId'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/welcome'
     | '/connectors/$connectorId'
     | '/inbox/$taskId'
     | '/loops/$loopId'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/welcome'
     | '/connectors/$connectorId'
     | '/inbox/$taskId'
     | '/loops/$loopId'
@@ -321,6 +333,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  WelcomeRoute: typeof WelcomeRoute
   ConnectorsConnectorIdRoute: typeof ConnectorsConnectorIdRoute
   InboxTaskIdRoute: typeof InboxTaskIdRoute
   LoopsLoopIdRoute: typeof LoopsLoopIdRoute
@@ -353,6 +366,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/': {
@@ -521,6 +541,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  WelcomeRoute: WelcomeRoute,
   ConnectorsConnectorIdRoute: ConnectorsConnectorIdRoute,
   InboxTaskIdRoute: InboxTaskIdRoute,
   LoopsLoopIdRoute: LoopsLoopIdRoute,
