@@ -32,7 +32,7 @@ A GitHub App was considered and set aside for now. An App cannot be requested as
 
 Nobody using Loopable registers an OAuth app. They click Connect.
 
-- **Hosted**, Loopable's own GitHub OAuth app has the callback `https://loop.goodone.si/api/connectors/github/callback`. Signing in comes back to `/api/connectors/github/callback/signin`, beneath it, so one registration covers both. Setup is in [hosting.md](hosting.md).
+- **Hosted**, Loopable's own GitHub OAuth app has the callback `https://loop.goodone.si/api/connectors/github/callback`. Signing in with GitHub comes back to the same address, so one registration covers both. Setup is in [hosting.md](hosting.md).
 - **Locally** (`pnpm dev`), the app shipped in this repo has a loopback callback, `http://127.0.0.1/api/connectors/github/callback`, registered without a port: GitHub matches loopback on host and path only.
 
 Login is the OAuth 2.0 authorization code flow with PKCE (S256).

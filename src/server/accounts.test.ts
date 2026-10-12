@@ -15,6 +15,7 @@ const {
   safeReturnTo,
   sessionFor,
   sessionTokenFrom,
+  signInProviderFor,
   signOut,
   startSignIn,
   viewerInScope,
@@ -50,11 +51,11 @@ async function signIn(profile = maya, returnTo?: string) {
 }
 
 describe("signing in", () => {
-  it("asks GitHub only who you are, and comes back under the GitHub callback", async () => {
+  it("asks GitHub only who you are, and comes back to the GitHub callback", async () => {
     const url = new URL(await startSignIn({ origin: "https://loop.example" }));
     expect(url.searchParams.get("scope")).toBe("read:user");
     expect(url.searchParams.get("redirect_uri")).toBe(
-      "https://loop.example/api/connectors/github/callback/signin",
+      "https://loop.example/api/connectors/github/callback",
     );
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
   });
@@ -73,13 +74,13 @@ describe("signing in", () => {
     expect(theirs.workspaceId).not.toBe(mine.workspaceId);
   });
 
-  it("asks Google only who you are, and comes back beside the Gmail callback", async () => {
+  it("asks Google only who you are, and comes back to the Gmail callback", async () => {
     const url = new URL(await startSignIn({ provider: "google", origin: "https://loop.example" }));
     expect(url.origin).toBe("https://accounts.google.com");
     expect(url.searchParams.get("scope")).toBe("openid email profile");
     expect(url.searchParams.get("access_type")).toBeNull();
     expect(url.searchParams.get("redirect_uri")).toBe(
-      "https://loop.example/api/connectors/gmail/callback/signin",
+      "https://loop.example/api/connectors/gmail/callback",
     );
   });
 
@@ -91,6 +92,13 @@ describe("signing in", () => {
     expect(onGoogle.workspaceId).not.toBe(onGithub.workspaceId);
     expect(again.user.id).toBe(onGoogle.user.id);
     expect(onGoogle.user.email).toBe("maya@example.com");
+  });
+
+  it("is told apart from a connection by its state", async () => {
+    const url = new URL(await startSignIn({ provider: "google", origin: "https://loop.example" }));
+    expect(await signInProviderFor(url.searchParams.get("state"))).toBe("google");
+    expect(await signInProviderFor("a-connection-state")).toBeNull();
+    expect(await signInProviderFor(null)).toBeNull();
   });
 
   it("will not finish one provider's sign-in at the other's callback", async () => {

@@ -20,10 +20,8 @@ The Worker wakes the dispatcher on every request and once a minute from a cron t
    - Homepage URL: `https://loop.goodone.si`
    - Authorization callback URL: `https://loop.goodone.si/api/connectors/github/callback`
 
-   That one callback covers both signing in and connecting GitHub: sign-in comes back to `/api/connectors/github/callback/signin`, which GitHub accepts because it is beneath the registered URL.
-3. **Google OAuth client** (for signing in with Google, and for Gmail). In Google Cloud, create a client of type *Web application* with two authorized redirect URIs:
-   - `https://loop.goodone.si/api/connectors/gmail/callback/signin` (signing in)
-   - `https://loop.goodone.si/api/connectors/gmail/callback` (connecting Gmail)
+   That one callback covers both signing in and connecting GitHub. The callback tells them apart by the `state` it gets back.
+3. **Google OAuth client** (for signing in with Google, and for Gmail). In Google Cloud, create a client of type *Web application* with the authorized redirect URI `https://loop.goodone.si/api/connectors/gmail/callback`. It covers both signing in with Google and connecting Gmail.
 
    Enable the Gmail API. On the OAuth consent screen, add the scopes `openid`, `email` and `profile` beside the Gmail ones, and publish the app; while it is in *Testing*, only the test users listed there can sign in.
 4. **Secrets on the Worker.** From a checkout, signed in to wrangler:

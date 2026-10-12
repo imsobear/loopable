@@ -3,11 +3,19 @@ import { connectorRuntime } from "@/connectors/runtimes.ts";
 import { saveAuthorizedConnection, takeAuthAttempt } from "@/server/connections.ts";
 import { appOrigin } from "@/lib/callback.ts";
 import { withWorkspace } from "@/server/workspace.ts";
+import { signInProviderFor } from "@/server/accounts.ts";
+import { finishSignIn } from "@/server/sign-in-callback.ts";
 
 export const Route = createFileRoute("/api/connectors/$connectorId/callback")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
+        // Signing in comes back here too, so one registered address covers
+        // both: GitHub and Google match a loopback callback only exactly.
+        // The state says which it was.
+        const signIn = await signInProviderFor(new URL(request.url).searchParams.get("state"));
+        if (signIn) return finishSignIn(request, signIn);
+
         const origin = appOrigin(request.url);
         const url = new URL(request.url);
         const done = (query: string) => Response.redirect(`${origin}/connectors?${query}`, 302);

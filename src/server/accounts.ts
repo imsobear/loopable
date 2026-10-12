@@ -51,9 +51,9 @@ type Provider = {
   /** Which app registration this uses; Google sign-in shares the Gmail client. */
   registration: string;
   /**
-   * Beneath the connection's own callback, so one registration covers both:
-   * GitHub accepts any path under the registered one, and Google's loopback
-   * clients accept any path at all. A hosted Google client lists it exactly.
+   * The connection's own callback, shared so one registered address covers
+   * both: GitHub and Google match a loopback callback only exactly. The
+   * callback tells a sign-in apart by its state.
    */
   callbackPath: string;
   authorizeUrl(input: { clientId: string; redirectUri: string; state: string; challenge: string }): string;
@@ -64,7 +64,7 @@ const PROVIDERS: Record<SignInProvider, Provider> = {
   github: {
     label: "GitHub",
     registration: "github",
-    callbackPath: "/api/connectors/github/callback/signin",
+    callbackPath: "/api/connectors/github/callback",
     authorizeUrl: (input) => github.buildAuthorizeUrl({ ...input, scopes: ["read:user"] }),
     async profile(input) {
       const credential = await github.exchangeCode(input);
@@ -82,7 +82,7 @@ const PROVIDERS: Record<SignInProvider, Provider> = {
   google: {
     label: "Google",
     registration: "gmail",
-    callbackPath: "/api/connectors/gmail/callback/signin",
+    callbackPath: "/api/connectors/gmail/callback",
     authorizeUrl: (input) => google.buildSignInUrl(input),
     async profile(input) {
       const credential = await google.exchangeCode(input);
@@ -137,6 +137,20 @@ export async function startSignIn(input: {
     })
     .run();
   return PROVIDERS[provider].authorizeUrl({ clientId: app.clientId, redirectUri, state, challenge });
+}
+
+/**
+ * Which provider a callback's state started a sign-in with, or null when it is
+ * not a sign-in (it is then a connection being made, or nothing at all).
+ */
+export async function signInProviderFor(state: string | null): Promise<SignInProvider | null> {
+  if (!state) return null;
+  const attempt = await db()
+    .select({ provider: signInAttempts.provider })
+    .from(signInAttempts)
+    .where(eq(signInAttempts.state, state))
+    .get();
+  return attempt?.provider ?? null;
 }
 
 /** Only a path on this site, so a sign-in link cannot be used to send someone elsewhere. */
