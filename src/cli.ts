@@ -1,32 +1,35 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
+/**
+ * The loopable command. Loopable itself is hosted; what runs on your machine
+ * is a runner, which takes jobs from your workspace and runs your coding agent
+ * here, with your code, your tools and your logins.
+ */
 const here = dirname(fileURLToPath(import.meta.url));
 const fromSource = here.endsWith("/src");
 const root = join(here, "..");
 const node = process.execPath;
 
-type Flags = {
-  host: string;
-  port: string;
-  url?: string;
-  token?: string;
-};
+const DEFAULT_URL = "https://loop.goodone.si";
+
+type Flags = { url?: string; token?: string };
 
 function usage(): string {
   return `Usage:
-  loopable start [--host 0.0.0.0] [--port 4321]
-      App and Dispatcher (production build).
+  loopable login [--url URL]
+      Connect this machine to your Loopable workspace. Opens the browser to
+      approve it, then remembers it here.
 
   loopable runner [--url URL] [--token TOKEN]
-      Join this machine as a runner. URL and token also come from
-      LOOPABLE_URL and LOOPABLE_RUNNER_TOKEN.
+      Run agents for your workspace on this machine. Uses what login saved,
+      or a join token from the Runners page.
 
-  loopable dispatcher
-      Dispatcher only.
+  loopable logout
+      Forget the workspace this machine was connected to.
 
   loopable --version
 `;
@@ -47,10 +50,7 @@ function fail(message: string): never {
 }
 
 function parse(argv: string[]): { command: string; flags: Flags } {
-  const flags: Flags = {
-    host: process.env.HOST ?? "0.0.0.0",
-    port: process.env.PORT ?? "4321",
-  };
+  const flags: Flags = {};
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -61,9 +61,7 @@ function parse(argv: string[]): { command: string; flags: Flags } {
     };
     if (arg === "-h" || arg === "--help") return { command: "help", flags };
     if (arg === "-v" || arg === "--version") return { command: "version", flags };
-    if (arg === "--host") flags.host = next();
-    else if (arg === "--port") flags.port = next();
-    else if (arg === "--url") flags.url = next();
+    if (arg === "--url") flags.url = next();
     else if (arg === "--token") flags.token = next();
     else if (arg.startsWith("-")) fail(`Unknown flag: ${arg}`);
     else rest.push(arg);
@@ -71,111 +69,124 @@ function parse(argv: string[]): { command: string; flags: Flags } {
   return { command: rest[0] ?? "help", flags };
 }
 
-function prefixLines(label: string, stream: NodeJS.ReadableStream, write: (line: string) => void): void {
-  createInterface({ input: stream }).on("line", (line) => write(`[${label}] ${line}\n`));
+/** What `loopable login` saved: where your workspace is and how to join it. */
+type Saved = { url: string; joinToken: string; workspace?: string };
+
+function savedPath(): string {
+  return join(process.env.LOOPABLE_HOME ?? join(homedir(), ".loopable"), "runner.json");
 }
 
-function run(label: string, file: string, args: string[], env: NodeJS.ProcessEnv = {}): ChildProcess {
-  const child = spawn(file, args, {
-    cwd: root,
-    env: { ...process.env, ...env },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (child.stdout) prefixLines(label, child.stdout, (line) => process.stdout.write(line));
-  if (child.stderr) prefixLines(label, child.stderr, (line) => process.stderr.write(line));
-  return child;
-}
-
-function stop(children: ChildProcess[]): void {
-  for (const child of children) {
-    if (child.pid && !child.killed) child.kill("SIGTERM");
+function readSaved(): Saved | null {
+  const path = savedPath();
+  if (!existsSync(path)) return null;
+  try {
+    const saved = JSON.parse(readFileSync(path, "utf8")) as Saved;
+    return saved.url && saved.joinToken ? saved : null;
+  } catch {
+    return null;
   }
 }
 
-async function supervise(children: ChildProcess[]): Promise<void> {
-  const shutdown = () => stop(children);
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-  const code = await new Promise<number>((resolve) => {
-    let settled = false;
-    for (const child of children) {
-      child.on("exit", (exitCode, signal) => {
-        if (settled) return;
-        settled = true;
-        stop(children);
-        if (signal) resolve(0);
-        else resolve(exitCode ?? 1);
-      });
-    }
+function writeSaved(saved: Saved): void {
+  const path = savedPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(saved, null, 2)}\n`, { mode: 0o600 });
+  // The join token is a credential: only you can read this file.
+  chmodSync(path, 0o600);
+}
+
+function baseUrl(flags: Flags): string {
+  return (flags.url ?? process.env.LOOPABLE_URL ?? DEFAULT_URL).replace(/\/$/, "");
+}
+
+/** Best effort: if no browser opens, the link is printed anyway. */
+function openBrowser(url: string): void {
+  if (process.env.LOOPABLE_NO_BROWSER === "1") return;
+  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  try {
+    const child = spawn(command, args, { stdio: "ignore", detached: true });
+    child.on("error", () => {});
+    child.unref();
+  } catch {
+    // printed above; nothing more to do
+  }
+}
+
+async function post<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  process.exit(code);
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`${url} answered ${res.status}: ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) throw new Error((parsed as { error?: string }).error ?? `${url} answered ${res.status}`);
+  return parsed as T;
 }
 
-function appEntry(): string {
-  const entry = join(root, ".output/server/index.mjs");
-  if (!existsSync(entry)) fail("App build missing. From a checkout run: pnpm build");
-  return entry;
+async function login(flags: Flags): Promise<void> {
+  const url = baseUrl(flags);
+  const started = await post<{ code: string; pollSecret: string; expiresInMs: number; url: string }>(
+    `${url}/api/runners/login/start`,
+    {},
+  );
+  process.stdout.write(
+    `\nTo connect this machine, open:\n\n  ${started.url}\n\nand check it shows this code:\n\n  ${started.code}\n\n`,
+  );
+  openBrowser(started.url);
+
+  const deadline = Date.now() + started.expiresInMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    const answer = await post<{ state: string; joinToken?: string; workspace?: string }>(
+      `${url}/api/runners/login/poll`,
+      { code: started.code, pollSecret: started.pollSecret },
+    );
+    if (answer.state === "approved" && answer.joinToken) {
+      writeSaved({ url, joinToken: answer.joinToken, workspace: answer.workspace });
+      process.stdout.write(
+        `Connected to ${answer.workspace ?? "your workspace"}. Start the runner with:\n\n  loopable runner\n\n`,
+      );
+      return;
+    }
+    if (answer.state === "expired") fail("The code expired before it was approved. Run loopable login again.");
+  }
+  fail("The code expired before it was approved. Run loopable login again.");
 }
 
-function pickEntry(kind: "dispatcher" | "runner"): string {
-  const source = join(root, `src/${kind}/main.ts`);
-  const bundled = join(root, `dist/${kind}.mjs`);
+function runnerEntry(): string {
+  const source = join(root, "src/runner/main.ts");
+  const bundled = join(root, "dist/runner.mjs");
   if (fromSource && existsSync(source)) return source;
   if (existsSync(bundled)) return bundled;
   if (existsSync(source)) return source;
-  fail(`${kind} build missing. From a checkout run: pnpm build`);
+  fail("Runner build missing. From a checkout run: pnpm build");
 }
 
-function nodeArgs(entry: string): string[] {
-  return entry.endsWith(".ts") ? ["--experimental-strip-types", entry] : [entry];
-}
+async function runner(flags: Flags): Promise<number> {
+  const saved = readSaved();
+  const url = flags.url ?? process.env.LOOPABLE_URL ?? saved?.url;
+  const token = flags.token ?? process.env.LOOPABLE_RUNNER_TOKEN ?? saved?.joinToken;
+  if (!url || !token) fail("This machine is not connected yet. Run loopable login first.");
 
-function dispatcher(): ChildProcess {
-  return run("dispatcher", node, nodeArgs(pickEntry("dispatcher")), {
-    PORT: "",
-    LOOPABLE_DISPATCHER_PORT: "",
+  const entry = runnerEntry();
+  const child = spawn(node, entry.endsWith(".ts") ? ["--experimental-strip-types", entry] : [entry], {
+    cwd: root,
+    env: { ...process.env, LOOPABLE_URL: url, LOOPABLE_RUNNER_TOKEN: token },
+    stdio: "inherit",
   });
-}
-
-async function waitFor(child: ChildProcess): Promise<number> {
+  const stop = () => child.kill("SIGTERM");
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
   return await new Promise<number>((resolve) => {
     child.on("exit", (code, signal) => resolve(signal ? 0 : (code ?? 1)));
   });
-}
-
-async function waitForApp(port: string): Promise<void> {
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    try {
-      await fetch(`http://127.0.0.1:${port}`, { redirect: "manual" });
-      return;
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-  }
-}
-
-async function printRunnerHint(flags: Flags): Promise<void> {
-  await waitForApp(flags.port);
-  const { lanIPv4 } = await import("./lib/lan.ts");
-  const { getJoinToken } = await import("./server/runners.ts");
-  const ip = lanIPv4() ?? "127.0.0.1";
-  const url = `http://${ip}:${flags.port}`;
-  let token = "<from Runners>";
-  for (let i = 0; i < 40; i++) {
-    try {
-      token = await getJoinToken();
-      break;
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    }
-  }
-  process.stdout.write(
-    `\nLoopable is at http://127.0.0.1:${flags.port}\n` +
-      `Start a runner (this machine or another on the LAN):\n\n` +
-      `  loopable runner --url ${url} --token ${token}\n\n` +
-      `Connect GitHub from http://127.0.0.1:${flags.port} on this computer.\n\n`,
-  );
 }
 
 async function main(): Promise<void> {
@@ -185,59 +196,31 @@ async function main(): Promise<void> {
     process.stdout.write(usage());
     return;
   }
-
   if (command === "version") {
     process.stdout.write(`${cliVersion()}\n`);
     return;
   }
-
-  if (command === "runner") {
-    if (flags.url) process.env.LOOPABLE_URL = flags.url;
-    if (flags.token) process.env.LOOPABLE_RUNNER_TOKEN = flags.token;
-    process.exit(
-      await waitFor(
-        spawn(node, nodeArgs(pickEntry("runner")), {
-          cwd: root,
-          env: process.env,
-          stdio: "inherit",
-        }),
-      ),
-    );
-  }
-
-  if (command === "dispatcher") {
-    process.exit(
-      await waitFor(
-        spawn(node, nodeArgs(pickEntry("dispatcher")), {
-          cwd: root,
-          env: { ...process.env, PORT: "", LOOPABLE_DISPATCHER_PORT: "" },
-          stdio: "inherit",
-        }),
-      ),
-    );
-  }
-
-  if (command === "start") {
-    const children = [
-      run("app", node, [appEntry()], {
-        PORT: flags.port,
-        HOST: flags.host,
-        NITRO_PORT: flags.port,
-        NITRO_HOST: flags.host,
-        LOOPABLE_SKIP_MIGRATE: "1",
-      }),
-      dispatcher(),
-    ];
-    void printRunnerHint(flags).catch((error) => {
-      process.stderr.write(
-        `Could not print runner hint: ${error instanceof Error ? error.message : String(error)}\n`,
-      );
-    });
-    await supervise(children);
+  if (command === "login") {
+    await login(flags);
     return;
+  }
+  if (command === "runner") {
+    process.exit(await runner(flags));
+  }
+  if (command === "logout") {
+    const path = savedPath();
+    if (existsSync(path)) rmSync(path);
+    process.stdout.write("This machine is no longer connected to a workspace.\n");
+    return;
+  }
+  if (command === "start" || command === "dispatcher") {
+    fail(
+      `Loopable is hosted now, at ${DEFAULT_URL}, so there is nothing to start here.\n` +
+        `Sign in there, then connect this machine with: loopable login`,
+    );
   }
 
   fail(`Unknown command: ${command}\n\n${usage()}`);
 }
 
-await main();
+await main().catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));

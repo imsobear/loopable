@@ -26,14 +26,43 @@ function agentsOn(runner: RunnerView): string {
     .join(", ");
 }
 
+/** A block of commands with a copy button. */
+function Commands({ lines }: { lines: string[] }) {
+  const text = lines.join("\n");
+  return (
+    <div className="flex items-start gap-2 rounded-xl bg-muted p-1 pl-3">
+      <pre className="min-w-0 flex-1 overflow-x-auto py-1.5 text-xs leading-relaxed">{text}</pre>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Copy"
+        onClick={async () => {
+          await navigator.clipboard.writeText(text);
+          toast.success("Copied");
+        }}
+      >
+        <Copy />
+      </Button>
+    </div>
+  );
+}
+
 function RunnersPage() {
-  const { runners, joinToken, origin } = Route.useLoaderData();
+  const { runners, joinToken, origin, hosted } = Route.useLoaderData();
   const router = useRouter();
   useLiveRefresh();
-  const commands = [
-    "npm install -g loopable-cli",
-    `loopable runner --url ${origin} --token ${joinToken}`,
-  ].join("\n");
+  const withToken = `loopable runner --url ${origin} --token ${joinToken}`;
+
+  const rotate = async () => {
+    if (!window.confirm("Rotate the join token? Runners already joined keep working.")) return;
+    try {
+      await rotateRunnerJoinToken();
+      await router.invalidate();
+      toast.success("Join token rotated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,44 +72,43 @@ function RunnersPage() {
       />
 
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium">Join a runner</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={async () => {
-              if (!window.confirm("Rotate the join token? Runners already joined keep working.")) return;
-              try {
-                await rotateRunnerJoinToken();
-                await router.invalidate();
-                toast.success("Join token rotated");
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : String(error));
-              }
-            }}
-          >
-            <RotateCcw />
-            Rotate token
-          </Button>
-        </div>
-        <div className="flex items-start gap-2 rounded-xl bg-muted p-1 pl-3">
-          <pre className="min-w-0 flex-1 overflow-x-auto py-1.5 text-xs leading-relaxed">{commands}</pre>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Copy"
-            onClick={async () => {
-              await navigator.clipboard.writeText(commands);
-              toast.success("Copied");
-            }}
-          >
-            <Copy />
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Needs Node 22+ and an agent CLI signed in on that machine. Skip the first line if the CLI
-          is already installed.
-        </p>
+        <h2 className="text-sm font-medium">Join a runner</h2>
+        {hosted ? (
+          <>
+            {/* login opens this site to approve the machine, so nobody copies a token. */}
+            <Commands lines={["npm install -g loopable-cli", "loopable login", "loopable runner"]} />
+            <p className="text-xs text-muted-foreground">
+              Needs Node 22+ and an agent CLI signed in on that machine.
+            </p>
+            <details className="group text-xs" suppressHydrationWarning>
+              <summary className="w-fit cursor-pointer list-none text-muted-foreground hover:text-foreground">
+                Or join with a token, for a machine with no browser
+              </summary>
+              <div className="mt-2 flex flex-col gap-2">
+                <Commands lines={[withToken]} />
+                <Button variant="ghost" size="sm" className="w-fit" onClick={rotate}>
+                  <RotateCcw />
+                  Rotate token
+                </Button>
+              </div>
+            </details>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">On this machine or another on the network:</span>
+              <Button variant="ghost" size="sm" onClick={rotate}>
+                <RotateCcw />
+                Rotate token
+              </Button>
+            </div>
+            <Commands lines={["npm install -g loopable-cli", withToken]} />
+            <p className="text-xs text-muted-foreground">
+              Needs Node 22+ and an agent CLI signed in on that machine. Skip the first line if the
+              CLI is already installed.
+            </p>
+          </>
+        )}
       </div>
 
       {runners.length === 0 ? (

@@ -38,11 +38,6 @@ await Promise.all([
   }),
   esbuild.build({
     ...shared,
-    entryPoints: [join(root, "src/dispatcher/main.ts")],
-    outfile: join(root, "dist/dispatcher.mjs"),
-  }),
-  esbuild.build({
-    ...shared,
     entryPoints: [join(root, "src/runner/main.ts")],
     outfile: join(root, "dist/runner.mjs"),
   }),

@@ -1,16 +1,15 @@
 {
   "name": "loopable-cli",
   "version": "0.3.0",
-  "description": "CLI to run Loopable: App, Dispatcher, and Runner.",
+  "description": "Connect your machine to Loopable: a runner that does your workspace's jobs with your own coding agent.",
   "license": "MIT",
   "type": "module",
   "bin": {
     "loopable": "./dist/cli.mjs"
   },
   "files": [
-    ".output",
-    "dist",
-    "drizzle"
+    "dist/cli.mjs",
+    "dist/runner.mjs"
   ],
   "engines": {
     "node": ">=22"
@@ -32,8 +31,7 @@
   },
   "scripts": {
     "dev": "node --experimental-strip-types scripts/dev.ts",
-    "start": "node dist/cli.mjs start",
-    "dispatcher": "LOOPABLE_DEV=1 node --experimental-strip-types src/cli.ts dispatcher",
+    "dispatcher": "LOOPABLE_DEV=1 node --experimental-strip-types src/dispatcher/main.ts",
     "runner": "LOOPABLE_DEV=1 node --experimental-strip-types src/cli.ts runner",
     "generate-routes": "tsr generate",
     "build": "vite build && node scripts/build-cli.mjs",

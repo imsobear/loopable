@@ -58,14 +58,38 @@ function watchLog(path: string, onChunk: (chunk: string) => void): () => void {
   };
 }
 
+/**
+ * Joining, again until it works: Loopable restarting, a network blip or a busy
+ * database is not a reason for a runner to give up. A token Loopable does not
+ * know is, because waiting will not change it.
+ */
+async function joinLoopable(
+  url: string,
+  joinToken: string,
+  inventory: Awaited<ReturnType<typeof detectAgents>>,
+  log: (m: string) => void,
+): Promise<Hello> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return (await json(url, joinToken, "/api/runners/hello", {
+        hostname: osHostname(),
+        inventory,
+        ...BUILD,
+      })) as Hello;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/join token is not valid/i.test(message)) throw error;
+      const wait = Math.min(30_000, 1_000 * 2 ** Math.min(attempt, 5));
+      log(`could not join (${message.split("\n")[0]}); trying again in ${Math.round(wait / 1000)}s`);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+}
+
 export async function runRemoteLoop(input: { url: string; joinToken: string; log: (m: string) => void }) {
   const url = input.url.replace(/\/$/, "");
   const inventory = await detectAgents();
-  const hello = (await json(url, input.joinToken, "/api/runners/hello", {
-    hostname: osHostname(),
-    inventory,
-    ...BUILD,
-  })) as Hello;
+  const hello = await joinLoopable(url, input.joinToken, inventory, input.log);
   input.log(`joined as ${hello.name} (${hello.runnerId})`);
   const token = hello.runnerToken;
 
