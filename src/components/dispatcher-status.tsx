@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export type DispatcherState = {
   alive: boolean;
   paused: boolean;
+  hosted: boolean;
   maxConcurrentRuns: number;
   onlineRunners: number;
 };
@@ -92,7 +93,7 @@ export function DispatcherStatus() {
         <span className="flex-1 truncate group-data-[collapsible=icon]:hidden">
           {down ? "Dispatcher not running" : dispatcher.paused ? "Paused" : "Dispatcher running"}
         </span>
-        {down ? null : (
+        {down || dispatcher.hosted ? null : (
           <Button
             size="icon-sm"
             variant="ghost"
@@ -113,6 +114,14 @@ export function DispatcherStatus() {
           </>
         ) : dispatcher.paused ? (
           "Nothing will run until you start it again."
+        ) : dispatcher.hosted ? (
+          // Hosted, how many runs the dispatcher takes at once is everyone's,
+          // not yours; your runners are the part you can see.
+          dispatcher.onlineRunners > 0 ? (
+            `${dispatcher.onlineRunners} runner${dispatcher.onlineRunners === 1 ? "" : "s"} online.`
+          ) : (
+            "No runner online yet."
+          )
         ) : (
           `${dispatcher.maxConcurrentRuns} run${dispatcher.maxConcurrentRuns === 1 ? "" : "s"} at a time${
             dispatcher.onlineRunners > 0

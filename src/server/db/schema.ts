@@ -438,6 +438,8 @@ export const signInAttempts = sqliteTable("sign_in_attempts", {
   state: text("state").primaryKey(),
   verifier: text("verifier").notNull(),
   redirectUri: text("redirect_uri").notNull(),
+  /** Where to go after signing in, such as the page that asked for it. */
+  returnTo: text("return_to"),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
 });
 

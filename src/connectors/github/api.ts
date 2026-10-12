@@ -198,6 +198,7 @@ export async function pullForBranch(
 
 export type GithubUser = {
   login: string;
+  name?: string | null;
   id: number;
   html_url: string;
   avatar_url: string;

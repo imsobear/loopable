@@ -1,5 +1,6 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Bot, Inbox, Plug, Server, Settings, Workflow } from "lucide-react";
+import { Link, useLoaderData, useRouterState } from "@tanstack/react-router";
+import { Bot, Inbox, LogOut, Plug, Server, Settings, Workflow } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LoopableMark } from "@/components/brand";
 import { DispatcherStatus } from "@/components/dispatcher-status";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +76,32 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   );
 }
 
+/** Who is signed in, and the way out. Absent on a local install, where nobody signs in. */
+function SignedIn() {
+  const { viewer } = useLoaderData({ from: "__root__" });
+  if (!viewer) return null;
+  const { user } = viewer;
+  return (
+    <div className="flex items-center gap-2 border-t px-1 pt-2 group-data-[collapsible=icon]:hidden">
+      <Avatar className="size-6">
+        <AvatarImage src={user.avatarUrl ?? undefined} alt={user.login} />
+        <AvatarFallback>{user.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <span className="min-w-0 flex-1 truncate text-sm">{user.name ?? user.login}</span>
+      <form method="post" action="/api/auth/signout">
+        <button
+          type="submit"
+          aria-label="Sign out"
+          title="Sign out"
+          className="rounded-md p-1 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+        >
+          <LogOut className="size-4" />
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export function AppSidebar() {
   return (
     // Collapsing to icons rather than off screen, so the toggle in the header
@@ -104,6 +131,7 @@ export function AppSidebar() {
         {/* The dispatcher is what makes every page true, so it is reported once
             here rather than repeated on the pages that happen to care. */}
         <DispatcherStatus />
+        <SignedIn />
       </SidebarFooter>
     </Sidebar>
   );

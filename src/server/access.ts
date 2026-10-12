@@ -45,7 +45,14 @@ export function assertAppAccess(request: Request): void {
   }
 }
 
-/** Runner pull and OAuth callbacks have their own tokens. */
+/**
+ * Paths that bring their own proof: a runner's token, an OAuth state, or
+ * nothing at all because they are how you sign in.
+ */
 export function isPublicApiPath(pathname: string): boolean {
-  return pathname.startsWith("/api/runners/") || pathname.startsWith("/api/connectors/");
+  return (
+    pathname.startsWith("/api/runners/") ||
+    pathname.startsWith("/api/connectors/") ||
+    pathname.startsWith("/api/auth/")
+  );
 }

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { isHosted } from "#/lib/hosted.ts";
 import { dispatcherIsAlive } from "../../dispatcher/instance.ts";
 import { enqueuePrompt, enqueueTask, getTask, listRunnableAgents, listTasks, readTaskLog, requestCancel } from "../tasks.ts";
 import { dispatcherSettings, setDispatcherPaused } from "../settings.ts";
@@ -37,9 +38,14 @@ export const stopTask = createServerFn({ method: "POST" })
 export const getDispatcherState = createServerFn({ method: "GET" }).handler(async () => ({
   alive: await dispatcherIsAlive(),
   onlineRunners: await onlineRunnerCount(),
+  hosted: isHosted(),
   ...(await dispatcherSettings()),
 }));
 
+/** Local only: hosted, the dispatcher is shared, and pausing it would pause everyone. */
 export const pauseDispatcher = createServerFn({ method: "POST" })
   .validator((data: { paused: boolean }) => data)
-  .handler(async ({ data }) => await setDispatcherPaused(data.paused));
+  .handler(async ({ data }) => {
+    if (isHosted()) throw new Error("The hosted dispatcher cannot be paused.");
+    return await setDispatcherPaused(data.paused);
+  });

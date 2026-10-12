@@ -23,11 +23,13 @@ export function buildAuthorizeUrl(input: {
   redirectUri: string;
   state: string;
   challenge: string;
+  /** Signing in to Loopable asks for less than connecting GitHub does. */
+  scopes?: string[];
 }): string {
   const query = new URLSearchParams({
     client_id: input.clientId,
     redirect_uri: input.redirectUri,
-    scope: GITHUB_SCOPES.join(" "),
+    scope: (input.scopes ?? GITHUB_SCOPES).join(" "),
     state: input.state,
     code_challenge: input.challenge,
     code_challenge_method: "S256",

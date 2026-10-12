@@ -211,6 +211,20 @@
       "when": 1789100000014,
       "tag": "0029_workspaces",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1789100000015,
+      "tag": "0030_sign_in_return",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1789100000016,
+      "tag": "0031_secrets_table",
+      "breakpoints": true
     }
   ]
 }

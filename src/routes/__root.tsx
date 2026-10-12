@@ -1,9 +1,10 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
+import { HeadContent, Outlet, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { getViewer } from "@/server/functions/account.ts";
 
 import appCss from "../styles.css?url";
 
@@ -20,11 +21,19 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
+  // Who is signed in, for the sidebar and for the front page to decide
+  // whether to show itself or go straight to the app.
+  loader: () => getViewer(),
   shellComponent: RootDocument,
   component: AppLayout,
 });
 
+/** Pages that stand on their own, with no app around them. */
+const BARE = new Set(["/", "/welcome"]);
+
 function AppLayout() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (BARE.has(pathname)) return <Outlet />;
   return (
     <SidebarProvider>
       <AppSidebar />

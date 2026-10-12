@@ -20,11 +20,14 @@ import { Route as LoopsLoopIdRouteImport } from './routes/loops/$loopId'
 import { Route as LoopsNewRouteImport } from './routes/loops/new'
 import { Route as MachinesIndexRouteImport } from './routes/machines/index'
 import { Route as RunnersIndexRouteImport } from './routes/runners/index'
+import { Route as ApiAuthSigninRouteImport } from './routes/api/auth/signin'
+import { Route as ApiAuthSignoutRouteImport } from './routes/api/auth/signout'
 import { Route as ApiRunnersClaimRouteImport } from './routes/api/runners/claim'
 import { Route as ApiRunnersHeartbeatRouteImport } from './routes/api/runners/heartbeat'
 import { Route as ApiRunnersHelloRouteImport } from './routes/api/runners/hello'
 import { Route as ApiConnectorsConnectorIdAuthorizeRouteImport } from './routes/api/connectors/$connectorId/authorize'
 import { Route as ApiConnectorsConnectorIdCallbackRouteImport } from './routes/api/connectors/$connectorId/callback'
+import { Route as ApiConnectorsGithubCallbackSigninRouteImport } from './routes/api/connectors/github/callback/signin'
 import { Route as ApiRunnersJobsTaskIdCompleteRouteImport } from './routes/api/runners/jobs/$taskId/complete'
 import { Route as ApiRunnersJobsTaskIdLogRouteImport } from './routes/api/runners/jobs/$taskId/log'
 
@@ -83,6 +86,16 @@ const RunnersIndexRoute = RunnersIndexRouteImport.update({
   path: '/runners/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSigninRoute = ApiAuthSigninRouteImport.update({
+  id: '/api/auth/signin',
+  path: '/api/auth/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSignoutRoute = ApiAuthSignoutRouteImport.update({
+  id: '/api/auth/signout',
+  path: '/api/auth/signout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRunnersClaimRoute = ApiRunnersClaimRouteImport.update({
   id: '/api/runners/claim',
   path: '/api/runners/claim',
@@ -110,6 +123,12 @@ const ApiConnectorsConnectorIdCallbackRoute =
     path: '/api/connectors/$connectorId/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiConnectorsGithubCallbackSigninRoute =
+  ApiConnectorsGithubCallbackSigninRouteImport.update({
+    id: '/api/connectors/github/callback/signin',
+    path: '/api/connectors/github/callback/signin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiRunnersJobsTaskIdCompleteRoute =
   ApiRunnersJobsTaskIdCompleteRouteImport.update({
     id: '/api/runners/jobs/$taskId/complete',
@@ -134,11 +153,14 @@ export interface FileRoutesByFullPath {
   '/loops/': typeof LoopsIndexRoute
   '/machines/': typeof MachinesIndexRoute
   '/runners/': typeof RunnersIndexRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/runners/claim': typeof ApiRunnersClaimRoute
   '/api/runners/heartbeat': typeof ApiRunnersHeartbeatRoute
   '/api/runners/hello': typeof ApiRunnersHelloRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
+  '/api/connectors/github/callback/signin': typeof ApiConnectorsGithubCallbackSigninRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -154,11 +176,14 @@ export interface FileRoutesByTo {
   '/loops': typeof LoopsIndexRoute
   '/machines': typeof MachinesIndexRoute
   '/runners': typeof RunnersIndexRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/runners/claim': typeof ApiRunnersClaimRoute
   '/api/runners/heartbeat': typeof ApiRunnersHeartbeatRoute
   '/api/runners/hello': typeof ApiRunnersHelloRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
+  '/api/connectors/github/callback/signin': typeof ApiConnectorsGithubCallbackSigninRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -175,11 +200,14 @@ export interface FileRoutesById {
   '/loops/': typeof LoopsIndexRoute
   '/machines/': typeof MachinesIndexRoute
   '/runners/': typeof RunnersIndexRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/runners/claim': typeof ApiRunnersClaimRoute
   '/api/runners/heartbeat': typeof ApiRunnersHeartbeatRoute
   '/api/runners/hello': typeof ApiRunnersHelloRoute
   '/api/connectors/$connectorId/authorize': typeof ApiConnectorsConnectorIdAuthorizeRoute
   '/api/connectors/$connectorId/callback': typeof ApiConnectorsConnectorIdCallbackRoute
+  '/api/connectors/github/callback/signin': typeof ApiConnectorsGithubCallbackSigninRoute
   '/api/runners/jobs/$taskId/complete': typeof ApiRunnersJobsTaskIdCompleteRoute
   '/api/runners/jobs/$taskId/log': typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -197,11 +225,14 @@ export interface FileRouteTypes {
     | '/loops/'
     | '/machines/'
     | '/runners/'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
     | '/api/runners/claim'
     | '/api/runners/heartbeat'
     | '/api/runners/hello'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
+    | '/api/connectors/github/callback/signin'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   fileRoutesByTo: FileRoutesByTo
@@ -217,11 +248,14 @@ export interface FileRouteTypes {
     | '/loops'
     | '/machines'
     | '/runners'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
     | '/api/runners/claim'
     | '/api/runners/heartbeat'
     | '/api/runners/hello'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
+    | '/api/connectors/github/callback/signin'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   id:
@@ -237,11 +271,14 @@ export interface FileRouteTypes {
     | '/loops/'
     | '/machines/'
     | '/runners/'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
     | '/api/runners/claim'
     | '/api/runners/heartbeat'
     | '/api/runners/hello'
     | '/api/connectors/$connectorId/authorize'
     | '/api/connectors/$connectorId/callback'
+    | '/api/connectors/github/callback/signin'
     | '/api/runners/jobs/$taskId/complete'
     | '/api/runners/jobs/$taskId/log'
   fileRoutesById: FileRoutesById
@@ -258,11 +295,14 @@ export interface RootRouteChildren {
   LoopsIndexRoute: typeof LoopsIndexRoute
   MachinesIndexRoute: typeof MachinesIndexRoute
   RunnersIndexRoute: typeof RunnersIndexRoute
+  ApiAuthSigninRoute: typeof ApiAuthSigninRoute
+  ApiAuthSignoutRoute: typeof ApiAuthSignoutRoute
   ApiRunnersClaimRoute: typeof ApiRunnersClaimRoute
   ApiRunnersHeartbeatRoute: typeof ApiRunnersHeartbeatRoute
   ApiRunnersHelloRoute: typeof ApiRunnersHelloRoute
   ApiConnectorsConnectorIdAuthorizeRoute: typeof ApiConnectorsConnectorIdAuthorizeRoute
   ApiConnectorsConnectorIdCallbackRoute: typeof ApiConnectorsConnectorIdCallbackRoute
+  ApiConnectorsGithubCallbackSigninRoute: typeof ApiConnectorsGithubCallbackSigninRoute
   ApiRunnersJobsTaskIdCompleteRoute: typeof ApiRunnersJobsTaskIdCompleteRoute
   ApiRunnersJobsTaskIdLogRoute: typeof ApiRunnersJobsTaskIdLogRoute
 }
@@ -346,6 +386,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunnersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/signin': {
+      id: '/api/auth/signin'
+      path: '/api/auth/signin'
+      fullPath: '/api/auth/signin'
+      preLoaderRoute: typeof ApiAuthSigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/signout': {
+      id: '/api/auth/signout'
+      path: '/api/auth/signout'
+      fullPath: '/api/auth/signout'
+      preLoaderRoute: typeof ApiAuthSignoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/runners/claim': {
       id: '/api/runners/claim'
       path: '/api/runners/claim'
@@ -381,6 +435,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConnectorsConnectorIdCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/connectors/github/callback/signin': {
+      id: '/api/connectors/github/callback/signin'
+      path: '/api/connectors/github/callback/signin'
+      fullPath: '/api/connectors/github/callback/signin'
+      preLoaderRoute: typeof ApiConnectorsGithubCallbackSigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/runners/jobs/$taskId/complete': {
       id: '/api/runners/jobs/$taskId/complete'
       path: '/api/runners/jobs/$taskId/complete'
@@ -410,12 +471,16 @@ const rootRouteChildren: RootRouteChildren = {
   LoopsIndexRoute: LoopsIndexRoute,
   MachinesIndexRoute: MachinesIndexRoute,
   RunnersIndexRoute: RunnersIndexRoute,
+  ApiAuthSigninRoute: ApiAuthSigninRoute,
+  ApiAuthSignoutRoute: ApiAuthSignoutRoute,
   ApiRunnersClaimRoute: ApiRunnersClaimRoute,
   ApiRunnersHeartbeatRoute: ApiRunnersHeartbeatRoute,
   ApiRunnersHelloRoute: ApiRunnersHelloRoute,
   ApiConnectorsConnectorIdAuthorizeRoute:
     ApiConnectorsConnectorIdAuthorizeRoute,
   ApiConnectorsConnectorIdCallbackRoute: ApiConnectorsConnectorIdCallbackRoute,
+  ApiConnectorsGithubCallbackSigninRoute:
+    ApiConnectorsGithubCallbackSigninRoute,
   ApiRunnersJobsTaskIdCompleteRoute: ApiRunnersJobsTaskIdCompleteRoute,
   ApiRunnersJobsTaskIdLogRoute: ApiRunnersJobsTaskIdLogRoute,
 }

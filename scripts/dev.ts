@@ -67,8 +67,17 @@ async function waitForApp(): Promise<void> {
   finish(1);
 }
 
-const { getJoinToken } = await import("../src/server/runners.ts");
 await waitForApp();
+// Trying the hosted service locally: there is no workspace until someone
+// signs in, so the runner joins the way a user's would, with loopable login.
+if (process.env.LOOPABLE_HOSTED === "1") {
+  process.stdout.write(
+    `\nHosted mode at ${appUrl}. Sign in, then join a runner:\n\n` +
+      `  node --experimental-strip-types src/cli.ts login --url ${appUrl}\n\n`,
+  );
+  await new Promise(() => {});
+}
+const { getJoinToken } = await import("../src/server/runners.ts");
 const joinToken = await getJoinToken();
 // --watch for the same reason: a newly added agent is only detected by a
 // runner that has loaded it. It rejoins by hostname, so it stays one runner.
