@@ -20,6 +20,8 @@ export const connections = sqliteTable(
   "connections",
   {
     id: text("id").primaryKey(),
+    /** Whose this is. Every query is filtered by it; see server/workspace.ts. */
+    workspaceId: text("workspace_id").notNull().default("local"),
     connectorId: text("connector_id").notNull(),
     status: text("status").$type<ConnectionStatus>().notNull().default("connected"),
     accountId: text("account_id").notNull(),
@@ -39,8 +41,8 @@ export const connections = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (table) => [
-    uniqueIndex("connections_account_unique").on(table.connectorId, table.accountId),
-    index("connections_connector_idx").on(table.connectorId),
+    uniqueIndex("connections_account_unique").on(table.workspaceId, table.connectorId, table.accountId),
+    index("connections_connector_idx").on(table.workspaceId, table.connectorId),
   ],
 );
 
@@ -51,6 +53,8 @@ export const connections = sqliteTable(
  */
 export const authAttempts = sqliteTable("auth_attempts", {
   state: text("state").primaryKey(),
+  /** The workspace that started it, so the callback saves the connection there. */
+  workspaceId: text("workspace_id").notNull().default("local"),
   connectorId: text("connector_id").notNull(),
   verifier: text("verifier").notNull(),
   redirectUri: text("redirect_uri").notNull(),
@@ -70,6 +74,8 @@ export const tasks = sqliteTable(
   "tasks",
   {
     id: text("id").primaryKey(),
+    /** Whose this is. Every query is filtered by it; see server/workspace.ts. */
+    workspaceId: text("workspace_id").notNull().default("local"),
     loopId: text("loop_id").references(() => loops.id, { onDelete: "cascade" }),
     connectorId: text("connector_id").notNull(),
     state: text("state").$type<TaskState>().notNull().default("queued"),
@@ -150,7 +156,7 @@ export const tasks = sqliteTable(
   },
   (table) => [
     index("tasks_loop_idx").on(table.loopId),
-    index("tasks_created_idx").on(table.createdAt),
+    index("tasks_created_idx").on(table.workspaceId, table.createdAt),
     /** The dispatcher's only question: what can I claim right now? */
     index("tasks_claim_idx").on(table.state, table.runAfter),
     uniqueIndex("tasks_dedupe_idx").on(table.dedupeKey),
@@ -167,6 +173,8 @@ export const loops = sqliteTable(
   "loops",
   {
     id: text("id").primaryKey(),
+    /** Whose this is. Every query is filtered by it; see server/workspace.ts. */
+    workspaceId: text("workspace_id").notNull().default("local"),
     name: text("name").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     /** Lowest first. The first matching loop wins, so order is meaningful. */
@@ -236,7 +244,7 @@ export const loops = sqliteTable(
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (table) => [index("loops_priority_idx").on(table.priority)],
+  (table) => [index("loops_priority_idx").on(table.workspaceId, table.priority)],
 );
 
 /**
@@ -288,24 +296,35 @@ export const signals = sqliteTable(
  * Agents are discovered on each runner, so nothing about their presence is
  * stored here. Only the choices a person makes live in this table.
  */
-export const agentSettings = sqliteTable("agent_settings", {
-  agentId: text("agent_id").primaryKey(),
-  permissionMode: text("permission_mode").$type<PermissionMode>().notNull(),
-  model: text("model"),
-  timeoutMs: integer("timeout_ms").notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
+export const agentSettings = sqliteTable(
+  "agent_settings",
+  {
+    workspaceId: text("workspace_id").notNull().default("local"),
+    agentId: text("agent_id").notNull(),
+    permissionMode: text("permission_mode").$type<PermissionMode>().notNull(),
+    model: text("model"),
+    timeoutMs: integer("timeout_ms").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.agentId] })],
+);
 
 /** Small key/value store for single settings such as the default agent. */
-export const appSettings = sqliteTable("app_settings", {
-  key: text("key").primaryKey(),
-  value: text("value", { mode: "json" }).$type<JsonValue>().notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
+export const appSettings = sqliteTable(
+  "app_settings",
+  {
+    /** A workspace's own settings, or "_system" for the dispatcher's. */
+    workspaceId: text("workspace_id").notNull().default("local"),
+    key: text("key").notNull(),
+    value: text("value", { mode: "json" }).$type<JsonValue>().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.key] })],
+);
 
 /**
  * A joined runner that can run agents.
@@ -324,6 +343,13 @@ export const secrets = sqliteTable("secrets", {
 
 export const runners = sqliteTable("runners", {
   id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull().default("local"),
+  /**
+   * SHA-256 of the runner's token, so a request is matched to its runner with
+   * one lookup instead of reading every runner's secret. Null for runners
+   * that joined before this, which are matched the old way.
+   */
+  tokenHash: text("token_hash"),
   name: text("name").notNull(),
   hostname: text("hostname").notNull(),
   status: text("status").$type<"online" | "offline">().notNull().default("offline"),
@@ -346,3 +372,89 @@ export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;
 export type AuthAttempt = typeof authAttempts.$inferSelect;
 export type Runner = typeof runners.$inferSelect;
+
+/** A person, as GitHub knows them. Signing in with GitHub is the only way in. */
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  githubId: text("github_id").notNull().unique(),
+  login: text("login").notNull(),
+  name: text("name"),
+  avatarUrl: text("avatar_url"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
+ * Everything a person sets up lives in a workspace. Each person gets one when
+ * they first sign in; sharing one with a team comes later, through members.
+ */
+export const workspaces = sqliteTable("workspaces", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  /** SHA-256 of the join token runners use, so a join finds its workspace in one lookup. */
+  joinTokenHash: text("join_token_hash").unique(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const members = sqliteTable(
+  "members",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").$type<"owner" | "member">().notNull().default("owner"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.userId] })],
+);
+
+/** A signed-in browser. The id is the SHA-256 of the cookie, never the cookie itself. */
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("sessions_user_idx").on(table.userId)],
+);
+
+/** A sign-in that is mid-flight at GitHub: the CSRF state and the PKCE verifier. */
+export const signInAttempts = sqliteTable("sign_in_attempts", {
+  state: text("state").primaryKey(),
+  verifier: text("verifier").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+/**
+ * `loopable login` on someone's machine, waiting for them to approve it in
+ * the browser. The code is what they see on both screens; the poll secret is
+ * what only the CLI holds, so a code read over someone's shoulder is useless.
+ */
+export const runnerLogins = sqliteTable("runner_logins", {
+  code: text("code").primaryKey(),
+  pollSecretHash: text("poll_secret_hash").notNull(),
+  /** Set when someone approves it, to the workspace they approved it into. */
+  workspaceId: text("workspace_id"),
+  approvedAt: integer("approved_at", { mode: "timestamp_ms" }),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export type User = typeof users.$inferSelect;
+export type Workspace = typeof workspaces.$inferSelect;
+export type Session = typeof sessions.$inferSelect;

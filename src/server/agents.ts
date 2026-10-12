@@ -1,26 +1,32 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { AGENT_MANIFESTS, agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
 import type { AgentRunResult, AgentSettingsValues } from "#/agents/types.ts";
 import type { AgentView } from "#/lib/domain.ts";
 import { isHosted } from "#/lib/hosted.ts";
 import { db } from "./db/client.ts";
-import { agentSettings, appSettings } from "./db/schema.ts";
+import { agentSettings } from "./db/schema.ts";
+import { readSetting, writeSetting } from "./settings.ts";
+import { workspaceId } from "./workspace.ts";
 
 const DEFAULT_AGENT_KEY = "defaultAgentId";
 
 async function storedSetting(key: string): Promise<string | null> {
-  const row = await db().select().from(appSettings).where(eq(appSettings.key, key)).get();
-  return typeof row?.value === "string" ? row.value : null;
+  const value = await readSetting<string | null>(key, null);
+  return typeof value === "string" ? value : null;
 }
 
 export async function settingsFor(agentId: string): Promise<AgentSettingsValues> {
   const manifest = agentManifest(agentId);
   if (!manifest) throw new Error(`Unknown agent: ${agentId}`);
-  const row = await db().select().from(agentSettings).where(eq(agentSettings.agentId, agentId)).get();
+  const row = await db()
+    .select()
+    .from(agentSettings)
+    .where(and(eq(agentSettings.workspaceId, workspaceId()), eq(agentSettings.agentId, agentId)))
+    .get();
   if (!row) return manifest.defaults;
   return { permissionMode: row.permissionMode, model: row.model, timeoutMs: row.timeoutMs };
 }
@@ -92,9 +98,15 @@ export async function saveAgentSettings(agentId: string, values: AgentSettingsVa
   const model = values.model?.trim() ? values.model.trim() : null;
   await db()
     .insert(agentSettings)
-    .values({ agentId, permissionMode: values.permissionMode, model, timeoutMs: values.timeoutMs })
+    .values({
+      workspaceId: workspaceId(),
+      agentId,
+      permissionMode: values.permissionMode,
+      model,
+      timeoutMs: values.timeoutMs,
+    })
     .onConflictDoUpdate({
-      target: agentSettings.agentId,
+      target: [agentSettings.workspaceId, agentSettings.agentId],
       set: {
         permissionMode: values.permissionMode,
         model,
@@ -107,14 +119,7 @@ export async function saveAgentSettings(agentId: string, values: AgentSettingsVa
 
 export async function setDefaultAgent(agentId: string): Promise<void> {
   if (!agentManifest(agentId)) throw new Error(`Unknown agent: ${agentId}`);
-  await db()
-    .insert(appSettings)
-    .values({ key: DEFAULT_AGENT_KEY, value: agentId })
-    .onConflictDoUpdate({
-      target: appSettings.key,
-      set: { value: agentId, updatedAt: new Date() },
-    })
-    .run();
+  await writeSetting(DEFAULT_AGENT_KEY, agentId);
 }
 
 const TEST_WORD = "loopable-ok";

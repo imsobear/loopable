@@ -12,7 +12,7 @@ process.env.LOOPABLE_DB = join(home, "test.sqlite");
 const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { loops, tasks } = await import("./db/schema.ts");
 const { createWorker } = await import("./worker.ts");
-const { writeSetting } = await import("./settings.ts");
+const { writeSystemSetting } = await import("./settings.ts");
 const { TransientError } = await import("#/connectors/errors.ts");
 const { TaskCancelled } = await import("./tasks.ts");
 const { eq } = await import("drizzle-orm");
@@ -79,8 +79,8 @@ beforeEach(async () => {
   await db().delete(tasks).run();
   await db().delete(loops).run();
   await givenLoop();
-  await writeSetting("dispatcher.paused", false);
-  await writeSetting("dispatcher.maxConcurrentRuns", 1);
+  await writeSystemSetting("dispatcher.paused", false);
+  await writeSystemSetting("dispatcher.maxConcurrentRuns", 1);
 });
 
 describe("worker", () => {
@@ -118,7 +118,7 @@ describe("worker", () => {
     await givenTask();
     await givenTask();
     await givenTask();
-    await writeSetting("dispatcher.maxConcurrentRuns", 2);
+    await writeSystemSetting("dispatcher.maxConcurrentRuns", 2);
 
     let release = () => {};
     const holding = new Promise<void>((resolve) => {
@@ -139,7 +139,7 @@ describe("worker", () => {
 
   it("starts nothing while paused", async () => {
     await givenTask();
-    await writeSetting("dispatcher.paused", true);
+    await writeSystemSetting("dispatcher.paused", true);
     const agent = fakeRun(() => {});
 
     expect(await createWorker({ runTask: agent.run }).tick()).toBe(0);

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
@@ -32,6 +32,16 @@ import { db } from "./db/client.ts";
 import { availableAgentIds, pickRunner } from "./runners.ts";
 import { dataDir, runDir } from "./paths.ts";
 import { loops, tasks, type Loop, type Task } from "./db/schema.ts";
+import { workspaceId } from "./workspace.ts";
+
+/** This workspace's tasks only. */
+function mine() {
+  return eq(tasks.workspaceId, workspaceId());
+}
+
+function byId(id: string) {
+  return and(mine(), eq(tasks.id, id));
+}
 
 /**
  * The agent says this when the honest answer is "nothing". Without it a loop
@@ -119,6 +129,7 @@ function select() {
       createdAt: tasks.createdAt,
       startedAt: tasks.startedAt,
       updatedAt: tasks.updatedAt,
+      workspaceId: tasks.workspaceId,
       loopName: loops.name,
     })
     .from(tasks)
@@ -128,25 +139,25 @@ function select() {
 export async function listTasks(options: { loopId?: string; limit?: number } = {}): Promise<TaskView[]> {
   const query = select().orderBy(desc(tasks.createdAt)).limit(options.limit ?? 100);
   const rows = options.loopId
-    ? await query.where(eq(tasks.loopId, options.loopId)).all()
-    : await query.all();
+    ? await query.where(and(mine(), eq(tasks.loopId, options.loopId))).all()
+    : await query.where(mine()).all();
   return rows.map(toView);
 }
 
 export async function getTask(id: string): Promise<TaskView | null> {
-  const row = await select().where(eq(tasks.id, id)).get();
+  const row = await select().where(byId(id)).get();
   return row ? toView(row) : null;
 }
 
 export async function taskRow(id: string): Promise<Task | undefined> {
-  return await db().select().from(tasks).where(eq(tasks.id, id)).get();
+  return await db().select().from(tasks).where(byId(id)).get();
 }
 
 export async function updateTask(id: string, values: Partial<Task>): Promise<void> {
   await db()
     .update(tasks)
     .set({ ...values, updatedAt: new Date() })
-    .where(eq(tasks.id, id))
+    .where(byId(id))
     .run();
 }
 
@@ -165,6 +176,7 @@ async function queue(input: {
     .insert(tasks)
     .values({
       id,
+      workspaceId: workspaceId(),
       loopId: input.loop.id,
       connectorId: input.loop.connectorId,
       state: "queued",
@@ -210,6 +222,7 @@ export async function enqueuePrompt(input: { prompt: string; agentId: string }):
     .insert(tasks)
     .values({
       id,
+      workspaceId: workspaceId(),
       loopId: null,
       connectorId: "prompt",
       state: "queued",
@@ -239,7 +252,11 @@ export async function listRunnableAgents(): Promise<{ agentId: string; name: str
 
 /** Everything a loop needs before it can produce a task, or a reason it cannot. */
 async function runnable(loopId: string): Promise<Loop> {
-  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
+  const loop = await db()
+    .select()
+    .from(loops)
+    .where(and(eq(loops.workspaceId, workspaceId()), eq(loops.id, loopId)))
+    .get();
   if (!loop) throw new Error("Loop not found");
 
   const manifest = connectorManifest(loop.connectorId);
@@ -497,7 +514,11 @@ async function loadWork(id: string, signal?: AbortSignal) {
   if (isPromptTask(task)) throw new Error("A prompt run has no work item to load.");
   if (!task.loopId) throw new Error("The loop behind this task has been deleted.");
 
-  const loop = await db().select().from(loops).where(eq(loops.id, task.loopId)).get();
+  const loop = await db()
+    .select()
+    .from(loops)
+    .where(and(eq(loops.workspaceId, workspaceId()), eq(loops.id, task.loopId)))
+    .get();
   if (!loop) throw new Error("The loop behind this task has been deleted.");
   const workflow = connectorWorkflow(loop.connectorId, loop.workflowId);
   if (!workflow) {

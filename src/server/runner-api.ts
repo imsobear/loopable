@@ -6,7 +6,30 @@ import { isHosted } from "#/lib/hosted.ts";
 import { jobMinProtocol, jobRequiresHost, type AgentJob } from "./agent-job.ts";
 import { db, rowsChanged } from "./db/client.ts";
 import { tasks } from "./db/schema.ts";
-import { getRunner, heartbeatRunner, isRunnerOnline, protocolOf, type RunnerBuild } from "./runners.ts";
+import {
+  getRunner,
+  heartbeatRunner,
+  isRunnerOnline,
+  protocolOf,
+  runnerForToken,
+  type RunnerBuild,
+} from "./runners.ts";
+import { bearer } from "./access.ts";
+import { withWorkspace, workspaceId } from "./workspace.ts";
+
+/**
+ * Every runner request: who it is, from its token, and everything after that
+ * inside the runner's own workspace. A runner can only ever see and touch its
+ * workspace's work.
+ */
+export async function asRunner(
+  request: Request,
+  work: (runnerId: string) => Promise<Response>,
+): Promise<Response> {
+  const runner = await runnerForToken(bearer(request));
+  if (!runner) return Response.json({ error: "Unknown runner." }, { status: 401 });
+  return await withWorkspace(runner.workspaceId, () => work(runner.id));
+}
 import { runDir } from "./paths.ts";
 import { absorbAgentOutput, jobForTask, taskRow, updateTask } from "./tasks.ts";
 import type { RunnerInventoryEntry } from "#/lib/domain.ts";
@@ -20,6 +43,7 @@ export async function claimAgentJob(runnerId: string): Promise<AgentJob | null> 
     .from(tasks)
     .where(
       and(
+        eq(tasks.workspaceId, workspaceId()),
         eq(tasks.state, "awaiting_agent"),
         eq(tasks.runnerId, runnerId),
         or(isNull(tasks.leaseUntil), lte(tasks.leaseUntil, new Date())),

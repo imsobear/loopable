@@ -183,8 +183,9 @@ export async function deleteCredential(connectionId: string): Promise<void> {
   await secretStore().delete(connectionSecretKey(connectionId));
 }
 
-export function joinTokenKey(): string {
-  return "runners.join";
+/** A workspace's runner join token. The local workspace keeps the name it always had. */
+export function joinTokenKey(workspace: string): string {
+  return workspace === "local" ? "runners.join" : `runners.join.${workspace}`;
 }
 
 export function runnerTokenKey(runnerId: string): string {

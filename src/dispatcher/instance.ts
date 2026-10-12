@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { db } from "#/server/db/client.ts";
-import { appSettings } from "#/server/db/schema.ts";
-import { readSettingRenamed, writeSetting } from "#/server/settings.ts";
+import {
+  deleteSystemSetting,
+  readSystemSettingRenamed as readSettingRenamed,
+  writeSystemSetting as writeSetting,
+} from "#/server/settings.ts";
 
 const OWNER_KEY = "dispatcher.leaseOwner";
 const UNTIL_KEY = "dispatcher.leaseUntil";
@@ -42,10 +43,9 @@ export async function touchDispatcher(): Promise<void> {
 export async function releaseSingleInstance(): Promise<void> {
   const current = await readSettingRenamed<string>(OWNER_KEY, "engine.leaseOwner", "");
   if (current !== owner) return;
-  await db().delete(appSettings).where(eq(appSettings.key, OWNER_KEY)).run();
-  await db().delete(appSettings).where(eq(appSettings.key, UNTIL_KEY)).run();
-  await db().delete(appSettings).where(eq(appSettings.key, "engine.leaseOwner")).run();
-  await db().delete(appSettings).where(eq(appSettings.key, "engine.leaseUntil")).run();
+  for (const key of [OWNER_KEY, UNTIL_KEY, "engine.leaseOwner", "engine.leaseUntil"]) {
+    await deleteSystemSetting(key);
+  }
 }
 
 /** True when a dispatcher has renewed its lease recently. */

@@ -54,11 +54,17 @@ const { asc, eq } = await import("drizzle-orm");
 
 await migrateIfNeeded();
 
-async function givenLoop(id: string, priority: number, repositories: string[] = []): Promise<void> {
+async function givenLoop(
+  id: string,
+  priority: number,
+  repositories: string[] = [],
+  workspaceId = "local",
+): Promise<void> {
   await db()
     .insert(loops)
     .values({
       id,
+      workspaceId,
       name: `Loop ${id}`,
       connectorId: "github",
       workflowId: "github.review_requested",
@@ -221,6 +227,24 @@ describe("two loops wanting the same thing", () => {
 
     expect(await tasksFor("second")).toHaveLength(0);
     expect((await signalsFor("second")).map((row) => row.outcome)).toEqual(["superseded"]);
+  });
+});
+
+describe("loops in different workspaces", () => {
+  it("each get a run for the same thing, since one workspace's claim is not another's", async () => {
+    await givenLoop("mine", 1, [], "local");
+    await givenLoop("theirs", 1, [], "someone-else");
+    answer = [pull(1)];
+    await pollAllLoops();
+    answer = [pull(1), pull(2)];
+    await pollAllLoops();
+
+    const mine = await tasksFor("mine");
+    const theirs = await tasksFor("theirs");
+    expect(mine).toHaveLength(1);
+    expect(theirs).toHaveLength(1);
+    expect(mine[0]!.workspaceId).toBe("local");
+    expect(theirs[0]!.workspaceId).toBe("someone-else");
   });
 });
 

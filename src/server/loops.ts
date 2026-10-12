@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { agentManifest } from "#/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import type { SettingField } from "#/connectors/types.ts";
@@ -10,6 +10,17 @@ import { db } from "./db/client.ts";
 import { connections, loops, type Loop } from "./db/schema.ts";
 import { folderIsLegacy, normalizeFolder } from "./agent-job.ts";
 import { FOLDER_JOB_PROTOCOL } from "#/lib/version.ts";
+import { loopLimitReached } from "./limits.ts";
+import { workspaceId } from "./workspace.ts";
+
+/** This workspace's loops only. */
+function mine() {
+  return eq(loops.workspaceId, workspaceId());
+}
+
+function byId(id: string) {
+  return and(mine(), eq(loops.id, id));
+}
 
 const NAME_LIMIT = 80;
 const PROMPT_LIMIT = 8000;
@@ -134,25 +145,31 @@ function validate(draft: LoopDraft): LoopDraft {
 }
 
 export async function listLoops(): Promise<LoopView[]> {
-  return (await db().select().from(loops).orderBy(asc(loops.priority)).all()).map(toView);
+  return (await db().select().from(loops).where(mine()).orderBy(asc(loops.priority)).all()).map(
+    toView,
+  );
 }
 
 export async function getLoop(id: string): Promise<LoopView | null> {
-  const row = await db().select().from(loops).where(eq(loops.id, id)).get();
+  const row = await db().select().from(loops).where(byId(id)).get();
   return row ? toView(row) : null;
 }
 
 export async function createLoop(draft: LoopDraft): Promise<LoopView> {
   const checked = validate(draft);
+  const limit = await loopLimitReached();
+  if (limit) throw new Error(limit);
   const last = await db()
     .select({ value: sql<number | null>`max(${loops.priority})` })
     .from(loops)
+    .where(mine())
     .get();
   const id = randomUUID();
   await db()
     .insert(loops)
     .values({
       id,
+      workspaceId: workspaceId(),
       name: checked.name,
       enabled: checked.enabled,
       priority: (last?.value ?? 0) + 1,
@@ -191,19 +208,19 @@ export async function updateLoop(id: string, draft: LoopDraft): Promise<LoopView
       pollEveryMs: checked.pollEveryMs,
       updatedAt: new Date(),
     })
-    .where(eq(loops.id, id))
+    .where(byId(id))
     .run();
   return (await getLoop(id))!;
 }
 
 export async function setLoopEnabled(id: string, enabled: boolean): Promise<LoopView> {
   if (!(await getLoop(id))) throw new Error("Loop not found");
-  await db().update(loops).set({ enabled, updatedAt: new Date() }).where(eq(loops.id, id)).run();
+  await db().update(loops).set({ enabled, updatedAt: new Date() }).where(byId(id)).run();
   return (await getLoop(id))!;
 }
 
 export async function deleteLoop(id: string): Promise<void> {
-  await db().delete(loops).where(eq(loops.id, id)).run();
+  await db().delete(loops).where(byId(id)).run();
 }
 
 /**
@@ -211,7 +228,7 @@ export async function deleteLoop(id: string): Promise<void> {
  * first. Swapping with the neighbour keeps that to one obvious gesture.
  */
 export async function moveLoop(id: string, direction: "up" | "down"): Promise<LoopView[]> {
-  const ordered = await db().select().from(loops).orderBy(asc(loops.priority)).all();
+  const ordered = await db().select().from(loops).where(mine()).orderBy(asc(loops.priority)).all();
   const index = ordered.findIndex((row) => row.id === id);
   if (index === -1) throw new Error("Loop not found");
   const target = direction === "up" ? index - 1 : index + 1;
@@ -220,8 +237,8 @@ export async function moveLoop(id: string, direction: "up" | "down"): Promise<Lo
   const moving = ordered[index]!;
   const neighbour = ordered[target]!;
   await db().transaction(async (tx) => {
-    await tx.update(loops).set({ priority: neighbour.priority }).where(eq(loops.id, moving.id)).run();
-    await tx.update(loops).set({ priority: moving.priority }).where(eq(loops.id, neighbour.id)).run();
+    await tx.update(loops).set({ priority: neighbour.priority }).where(byId(moving.id)).run();
+    await tx.update(loops).set({ priority: moving.priority }).where(byId(neighbour.id)).run();
   });
   return await listLoops();
 }
@@ -235,6 +252,7 @@ export async function loopReadiness(): Promise<LoopReadiness> {
   const connected = await db()
     .selectDistinct({ connectorId: connections.connectorId })
     .from(connections)
+    .where(eq(connections.workspaceId, workspaceId()))
     .all();
   const available = await availableAgentIds();
   const host = await availableAgentIds(true);

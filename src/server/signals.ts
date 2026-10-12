@@ -11,6 +11,13 @@ import { db } from "./db/client.ts";
 import { loops, signals, type Loop } from "./db/schema.ts";
 import { defaultAgentFor, enqueueSignal } from "./tasks.ts";
 import { triage, type Triage } from "./triage.ts";
+import { pollInterval } from "./limits.ts";
+import { withWorkspace, workspaceId } from "./workspace.ts";
+
+/** A loop of the workspace in scope, by id. */
+function loopById(id: string) {
+  return and(eq(loops.workspaceId, workspaceId()), eq(loops.id, id));
+}
 
 export type PollReport = {
   loopId: string;
@@ -167,13 +174,13 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
         pollError: null,
         ...(answer.cursor !== undefined ? { pollCursor: answer.cursor } : {}),
       })
-      .where(eq(loops.id, loop.id))
+      .where(loopById(loop.id))
       .run();
   } catch (error) {
     report.error = error instanceof Error ? error.message : String(error);
     // polledAt is deliberately left alone: a look that failed told us nothing
     // about the backlog, and moving the mark would silently swallow it.
-    await db().update(loops).set({ pollError: report.error }).where(eq(loops.id, loop.id)).run();
+    await db().update(loops).set({ pollError: report.error }).where(loopById(loop.id)).run();
   }
 
   return report;
@@ -186,8 +193,9 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
  * hour does not mean waiting an hour before finding out the loop works.
  */
 export function isDue(loop: Loop, now: number): boolean {
-  if (!loop.pollEveryMs || !loop.polledAt) return true;
-  return now - loop.polledAt.getTime() >= loop.pollEveryMs;
+  const every = pollInterval(loop.pollEveryMs);
+  if (!every || !loop.polledAt) return true;
+  return now - loop.polledAt.getTime() >= every;
 }
 
 /**
@@ -201,18 +209,28 @@ export function isDue(loop: Loop, now: number): boolean {
  */
 export async function pollAllLoops(): Promise<PollReport[]> {
   const now = Date.now();
+  // Across every workspace: the dispatcher serves all of them. Each one's
+  // loops are then looked at inside its own scope, and what one workspace
+  // claims says nothing about another's, which may want the same thing.
   const enabled = await db()
     .select()
     .from(loops)
     .where(eq(loops.enabled, true))
-    .orderBy(asc(loops.priority))
+    .orderBy(asc(loops.workspaceId), asc(loops.priority))
     .all();
 
-  const claimed = new Set<string>();
-  const reports: PollReport[] = [];
+  const byWorkspace = new Map<string, Loop[]>();
   for (const loop of enabled) {
     if (!isDue(loop, now)) continue;
-    reports.push(await pollLoop(loop, claimed));
+    byWorkspace.set(loop.workspaceId, [...(byWorkspace.get(loop.workspaceId) ?? []), loop]);
+  }
+
+  const reports: PollReport[] = [];
+  for (const [workspace, due] of byWorkspace) {
+    await withWorkspace(workspace, async () => {
+      const claimed = new Set<string>();
+      for (const loop of due) reports.push(await pollLoop(loop, claimed));
+    });
   }
   return reports;
 }
@@ -222,7 +240,7 @@ export async function pollAllLoops(): Promise<PollReport[]> {
  * asks for this when waiting for the dispatcher is the thing being tested.
  */
 export async function lookNow(loopId: string): Promise<PollReport> {
-  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
+  const loop = await db().select().from(loops).where(loopById(loopId)).get();
   if (!loop) throw new Error("Loop not found");
   if (!loop.enabled) throw new Error("This loop is off");
   return await pollLoop(loop, new Set());
@@ -250,7 +268,10 @@ const WAITING = ["backlog", "held"] as const;
 
 /** What the loop page needs to say whether the loop is actually watching. */
 export async function loopPollState(loopId: string): Promise<LoopPollState> {
-  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
+  const loop = await db().select().from(loops).where(loopById(loopId)).get();
+  // Signals are reached through their loop, so another workspace's loop id
+  // shows nothing.
+  if (!loop) return { polledAt: null, pollError: null, backlog: [] };
   const backlog = await db()
     .select()
     .from(signals)
@@ -270,7 +291,7 @@ export async function loopPollState(loopId: string): Promise<LoopPollState> {
  * being run against the connector's advice.
  */
 export async function runBacklog(loopId: string, key?: string): Promise<number> {
-  const loop = await db().select().from(loops).where(eq(loops.id, loopId)).get();
+  const loop = await db().select().from(loops).where(loopById(loopId)).get();
   if (!loop) throw new Error("Loop not found");
 
   const waiting = await db()

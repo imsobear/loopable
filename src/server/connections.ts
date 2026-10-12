@@ -6,6 +6,16 @@ import { needsAccount } from "#/connectors/manifests.ts";
 import { db } from "./db/client.ts";
 import { authAttempts, connections, type Connection } from "./db/schema.ts";
 import { deleteCredential, readCredential, writeCredential } from "./secrets.ts";
+import { workspaceId } from "./workspace.ts";
+
+/** This workspace's connections only. */
+function mine() {
+  return eq(connections.workspaceId, workspaceId());
+}
+
+function byId(id: string) {
+  return and(mine(), eq(connections.id, id));
+}
 import type { ConnectionSettings, ConnectionView } from "#/lib/domain.ts";
 
 const ATTEMPT_TTL_MS = 10 * 60 * 1000;
@@ -27,11 +37,13 @@ function toView(row: Connection): ConnectionView {
 }
 
 export async function listConnections(): Promise<ConnectionView[]> {
-  return (await db().select().from(connections).orderBy(asc(connections.createdAt)).all()).map(toView);
+  return (
+    await db().select().from(connections).where(mine()).orderBy(asc(connections.createdAt)).all()
+  ).map(toView);
 }
 
 export async function getConnection(id: string): Promise<Connection | undefined> {
-  return await db().select().from(connections).where(eq(connections.id, id)).get();
+  return await db().select().from(connections).where(byId(id)).get();
 }
 
 export async function startAuthAttempt(input: {
@@ -47,6 +59,7 @@ export async function startAuthAttempt(input: {
     .insert(authAttempts)
     .values({
       state: input.state,
+      workspaceId: workspaceId(),
       connectorId: input.connectorId,
       verifier: input.verifier,
       redirectUri: input.redirectUri,
@@ -56,7 +69,10 @@ export async function startAuthAttempt(input: {
     .run();
 }
 
-/** Consumes the attempt: a state value is only ever valid once. */
+/**
+ * Consumes the attempt: a state value is only ever valid once. Not scoped: the
+ * callback arrives before anyone knows whose it is, and the attempt says.
+ */
 export async function takeAuthAttempt(state: string) {
   const attempt = await db().select().from(authAttempts).where(eq(authAttempts.state, state)).get();
   if (attempt) await db().delete(authAttempts).where(eq(authAttempts.state, state)).run();
@@ -82,7 +98,13 @@ export async function saveAuthorizedConnection(
   const existing = await db()
     .select()
     .from(connections)
-    .where(and(eq(connections.connectorId, connectorId), eq(connections.accountId, result.account.id)))
+    .where(
+      and(
+        mine(),
+        eq(connections.connectorId, connectorId),
+        eq(connections.accountId, result.account.id),
+      ),
+    )
     .get();
 
   const id = existing?.id ?? randomUUID();
@@ -101,9 +123,9 @@ export async function saveAuthorizedConnection(
   };
 
   if (existing) {
-    await db().update(connections).set(values).where(eq(connections.id, id)).run();
+    await db().update(connections).set(values).where(byId(id)).run();
   } else {
-    await db().insert(connections).values({ id, ...values }).run();
+    await db().insert(connections).values({ id, workspaceId: workspaceId(), ...values }).run();
   }
   const row = await getConnection(id);
   if (!row) throw new Error("Failed to persist the connection");
@@ -125,7 +147,7 @@ export async function removeConnection(id: string): Promise<void> {
     }
   }
   await deleteCredential(id);
-  await db().delete(connections).where(eq(connections.id, id)).run();
+  await db().delete(connections).where(byId(id)).run();
 }
 
 export async function updateConnectionSettings(
@@ -135,7 +157,7 @@ export async function updateConnectionSettings(
   await db()
     .update(connections)
     .set({ settings, updatedAt: new Date() })
-    .where(eq(connections.id, id))
+    .where(byId(id))
     .run();
   const row = await getConnection(id);
   if (!row) throw new Error("Connection not found");
@@ -157,7 +179,7 @@ export async function credentialForConnector(
   const row = await db()
     .select()
     .from(connections)
-    .where(eq(connections.connectorId, connectorId))
+    .where(and(mine(), eq(connections.connectorId, connectorId)))
     .orderBy(asc(connections.createdAt))
     .get();
   if (!row) throw new Error(`No ${connectorId} account is connected.`);
@@ -185,7 +207,7 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
         lastError: "No credential is stored for this connection.",
         updatedAt: new Date(),
       })
-      .where(eq(connections.id, id))
+      .where(byId(id))
       .run();
     return toView((await getConnection(id))!);
   }
@@ -204,7 +226,7 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
         lastSyncedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(connections.id, id))
+      .where(byId(id))
       .run();
   } catch (error) {
     await db()
@@ -214,7 +236,7 @@ export async function checkConnection(id: string): Promise<ConnectionView> {
         lastError: error instanceof Error ? error.message : String(error),
         updatedAt: new Date(),
       })
-      .where(eq(connections.id, id))
+      .where(byId(id))
       .run();
   }
   return toView((await getConnection(id))!);

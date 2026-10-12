@@ -4,6 +4,7 @@ import { db, rowsChanged } from "./db/client.ts";
 import { tasks } from "./db/schema.ts";
 import { dispatcherSettings } from "./settings.ts";
 import { isCancellation, runTask, updateTask } from "./tasks.ts";
+import { withWorkspace } from "./workspace.ts";
 
 const CLAIMED_STATES = ["preparing", "applying"] as const;
 
@@ -51,7 +52,8 @@ export function createWorker(options: WorkerOptions = {}) {
         .all()
     ).filter((task) => !inFlight.has(task.id));
 
-    for (const task of abandoned) {
+    // The queue serves every workspace; each task is put right inside its own.
+    for (const task of abandoned) await withWorkspace(task.workspaceId, async () => {
       if (task.attempts < maxAttempts) {
         log(`requeue ${task.id}: its worker went away`);
         await updateTask(task.id, {
@@ -68,7 +70,7 @@ export function createWorker(options: WorkerOptions = {}) {
           error: "Loopable stopped while this was running, and it had run out of attempts.",
         });
       }
-    }
+    });
     const abandonedAgent = await db()
       .select()
       .from(tasks)
@@ -80,7 +82,7 @@ export function createWorker(options: WorkerOptions = {}) {
       )
       .all();
 
-    for (const task of abandonedAgent) {
+    for (const task of abandonedAgent) await withWorkspace(task.workspaceId, async () => {
       if (task.attempts < maxAttempts) {
         log(`runner lost ${task.id}: queued for another claim`);
         await updateTask(task.id, {
@@ -95,7 +97,7 @@ export function createWorker(options: WorkerOptions = {}) {
           error: "The runner stopped while this was running, and it had run out of attempts.",
         });
       }
-    }
+    });
     return abandoned.length + abandonedAgent.length;
   }
   async function claimQueued(id: string): Promise<boolean> {
@@ -185,7 +187,12 @@ export function createWorker(options: WorkerOptions = {}) {
     await updateTask(id, { state: "failed", error: message, leaseUntil: null, durationMs });
   }
 
-  function launch(id: string): void {
+  function launch(id: string, workspace: string): void {
+    withWorkspace(workspace, () => launchInScope(id));
+  }
+
+  /** Everything below runs in the task's workspace, timers included. */
+  function launchInScope(id: string): void {
     const abort = new AbortController();
     // Fast enough that Stop feels like a button, rather than as slow as the
     // lease it also renews. A one-row update every couple of seconds is
@@ -218,7 +225,7 @@ export function createWorker(options: WorkerOptions = {}) {
     if (capacity <= 0) return 0;
 
     const queued = await db()
-      .select({ id: tasks.id })
+      .select({ id: tasks.id, workspaceId: tasks.workspaceId })
       .from(tasks)
       .where(and(eq(tasks.state, "queued"), lte(tasks.runAfter, new Date(now()))))
       .orderBy(asc(tasks.createdAt))
@@ -226,7 +233,7 @@ export function createWorker(options: WorkerOptions = {}) {
       .all();
 
     const applying = await db()
-      .select({ id: tasks.id })
+      .select({ id: tasks.id, workspaceId: tasks.workspaceId })
       .from(tasks)
       .where(
         and(
@@ -242,14 +249,14 @@ export function createWorker(options: WorkerOptions = {}) {
     for (const task of queued) {
       if (!(await claimQueued(task.id))) continue;
       log(`started ${task.id}`);
-      launch(task.id);
+      launch(task.id, task.workspaceId);
       started += 1;
     }
     for (const task of applying) {
       if (inFlight.has(task.id)) continue;
       if (!(await claimApplying(task.id))) continue;
       log(`applying ${task.id}`);
-      launch(task.id);
+      launch(task.id, task.workspaceId);
       started += 1;
     }
     return started;

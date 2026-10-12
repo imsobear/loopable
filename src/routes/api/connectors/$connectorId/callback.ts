@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { connectorRuntime } from "@/connectors/runtimes.ts";
 import { saveAuthorizedConnection, takeAuthAttempt } from "@/server/connections.ts";
 import { appOrigin } from "@/lib/callback.ts";
+import { withWorkspace } from "@/server/workspace.ts";
 
 export const Route = createFileRoute("/api/connectors/$connectorId/callback")({
   server: {
@@ -35,7 +36,11 @@ export const Route = createFileRoute("/api/connectors/$connectorId/callback")({
             redirectUri: attempt.redirectUri,
             verifier: attempt.verifier,
           });
-          const connection = await saveAuthorizedConnection(attempt.connectorId, result);
+          // Saved into the workspace that started it, which the attempt
+          // remembers: the callback itself carries nothing that says whose.
+          const connection = await withWorkspace(attempt.workspaceId, () =>
+            saveAuthorizedConnection(attempt.connectorId, result),
+          );
           return done(`connected=${encodeURIComponent(connection.accountLabel)}`);
         } catch (error) {
           return failed(error instanceof Error ? error.message : String(error));
