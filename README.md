@@ -77,7 +77,7 @@ pnpm db:studio
 
 CI runs typecheck, tests, and the build on every pull request and on `main`.
 
-- **The CLI** (`loopable-cli` on npm): from a clean, pushed `main`, `pnpm release minor --dry-run`, then `pnpm release minor`. It checks everything, bumps, commits, tags `vX.Y.Z`, publishes, and pushes.
+- **The CLI** (`loopable-cli` on npm): run the **Release** workflow in GitHub Actions with `patch`, `minor`, `major` or an exact version. It checks everything, bumps, tags `vX.Y.Z`, publishes to npm through trusted publishing (no npm token), pushes, and writes the release notes. `pnpm release` still does the same from a laptop signed in to npm.
 - **The service**: run the **Deploy** workflow in GitHub Actions. Setup and the domain are in [docs/hosting.md](docs/hosting.md).
 
 | Path | Contents |

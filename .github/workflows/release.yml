@@ -1,0 +1,77 @@
+name: Release
+
+# Publishes loopable-cli to npm from main: checks, bumps the version, tags it,
+# publishes, then pushes the commit and tag, so every version on npm is one
+# tagged commit here. Run by hand from the Actions tab.
+#
+# npm trusts this workflow directly (trusted publishing), so there is no npm
+# token anywhere. Set up once on npmjs.com: loopable-cli → Settings → Trusted
+# publishing → GitHub Actions, repository imsobear/loopable, workflow release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "patch, minor, major, or an exact version such as 0.4.0"
+        required: true
+        default: minor
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@latest
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Bump the version and tag it
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          npm version "$BUMP" --no-git-tag-version >/dev/null
+          version="$(node -p 'require("./package.json").version')"
+          if npm view "loopable-cli@$version" version >/dev/null 2>&1; then
+            echo "loopable-cli@$version is already on npm." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -m "Release v$version." -- package.json
+          git tag -a "v$version" -m "Release v$version."
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      # The checks above already ran, so publish skips prepublishOnly.
+      - run: npm publish --ignore-scripts
+
+      - name: Push the release commit and tag
+        run: git push --atomic origin main "${{ steps.version.outputs.tag }}"
+
+      - name: Release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ steps.version.outputs.tag }}" --generate-notes
