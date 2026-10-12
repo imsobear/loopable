@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { PermissionMode } from "#/agents/types.ts";
+import { fallbackAgent } from "#/agents/manifests.ts";
 import type { AgentOnRunner, AgentView } from "#/lib/domain.ts";
 import { listAgents, saveAgentSettings, setDefaultAgent, testAgent } from "../agents.ts";
 import { availableAgentIds, listRunners } from "../runners.ts";
@@ -8,7 +9,8 @@ async function withRunners(agents: AgentView[]): Promise<AgentView[]> {
   const runners = await listRunners();
   const available = await availableAgentIds();
   const stored = agents.find((agent) => agent.isDefault)?.agentId ?? null;
-  const implicit = !stored && available.length === 1 ? available[0]! : null;
+  // Nothing chosen yet: say which one would run, so "Default" is never empty.
+  const implicit = stored ? null : fallbackAgent(null, available);
   return agents.map((agent) => {
     const onRunners: AgentOnRunner[] = runners.flatMap((runner) => {
       const entry = runner.inventory.find((item) => item.agentId === agent.agentId);

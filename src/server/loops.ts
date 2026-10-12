@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { agentManifest } from "#/agents/manifests.ts";
+import { agentManifest, fallbackAgent } from "#/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import type { SettingField } from "#/connectors/types.ts";
 import type { ConnectionSettings, LoopDraft, LoopReadiness, LoopView } from "#/lib/domain.ts";
@@ -258,9 +258,7 @@ export async function loopReadiness(): Promise<LoopReadiness> {
   const host = await availableAgentIds(true);
   const folder = await availableAgentIds(false, FOLDER_JOB_PROTOCOL);
   const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
-  const defaultAgentId =
-    (chosen && available.includes(chosen) ? chosen : null) ??
-    (available.length === 1 ? available[0]! : null);
+  const defaultAgentId = fallbackAgent(chosen, available);
   return {
     connectedConnectorIds: connected.map((row) => row.connectorId),
     defaultAgentId,

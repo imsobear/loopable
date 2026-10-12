@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
-import { agentManifest } from "#/agents/manifests.ts";
+import { agentManifest, fallbackAgent } from "#/agents/manifests.ts";
 import { connectorAction, connectorManifest, connectorWorkflow } from "#/connectors/manifests.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import type {
@@ -767,7 +767,7 @@ export async function defaultAgentFor(pinned: string | null): Promise<string> {
   const available = await availableAgentIds();
   const agents = await listAgents();
   const chosen = agents.find((agent) => agent.isDefault)?.agentId ?? null;
-  if (chosen && available.includes(chosen)) return chosen;
-  if (available.length === 1) return available[0]!;
+  const agent = fallbackAgent(chosen, available);
+  if (agent) return agent;
   throw new Error("No agent is available. Start a runner with an agent signed in.");
 }
