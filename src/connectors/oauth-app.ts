@@ -29,7 +29,17 @@ export function shippedOAuthApp(connectorId: string): OAuthAppRegistration | nul
 }
 
 export function oauthAppRegistration(connectorId: string): OAuthAppRegistration | null {
-  return fromEnv(connectorId) ?? fromFile(connectorId) ?? shippedOAuthApp(connectorId);
+  return fromEnv(connectorId) ?? fromFile(connectorId) ?? shippedForHere(connectorId);
+}
+
+/**
+ * The shipped apps call back to 127.0.0.1, so at a public address they would
+ * send people back somewhere that is not Loopable. There, only a registration
+ * made for that address counts, and a missing one is said plainly.
+ */
+function shippedForHere(connectorId: string): OAuthAppRegistration | null {
+  if (process.env.LOOPABLE_BASE_URL?.startsWith("https://")) return null;
+  return shippedOAuthApp(connectorId);
 }
 
 /** LOOPABLE_GITHUB_CLIENT_ID and friends, for a private or Enterprise app. */

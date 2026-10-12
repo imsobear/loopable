@@ -99,11 +99,10 @@ export const githubManifest = defineManifest({
     kind: "oauth_redirect",
     scopes: GITHUB_SCOPES,
     needsAppRegistration: true,
-    // The Connection is the team's agent on GitHub: whatever it writes appears
-    // under its name, and the work it picks up is whatever the team sends to
-    // it. An account made for this is cleanest, but a teammate's own works too
-    // if they are happy for it to be shared.
-    note: "Connect the account the team will send work to. An account made for this is cleanest, but your own works too if you are happy to share it. Reviews and comments appear under its name, and it sees only the repositories it can access. Sign in to GitHub as that account first; GitHub authorizes whichever account the browser is signed in as.",
+    // The Connection is Loopable on GitHub: whatever it writes appears under
+    // its name, and the work it picks up is whatever is sent to it. Usually
+    // that is the person's own account; a team may make one for this.
+    note: "Connect the GitHub account Loopable should watch and answer as. Your own is simplest: reviews requested from you and issues assigned to you are picked up. A team can use an account made for this instead. GitHub authorizes whichever account the browser is signed in as.",
   },
   triggers: [
     {
