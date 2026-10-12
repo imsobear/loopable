@@ -52,7 +52,7 @@ Each workspace can have up to 20 loops and 5 runners, and a loop is looked at no
 ## Trying hosted mode locally
 
 ```bash
-LOOPABLE_HOSTED=1 LOOPABLE_MASTER_KEY=local LOOPABLE_HOME=$PWD/.hosted PORT=4322 pnpm dev
+LOOPABLE_HOSTED=1 LOOPABLE_MASTER_KEY=local LOOPABLE_HOME=$PWD/.hosted PORT=4321 pnpm dev
 ```
 
-This runs the app, sign-in and workspaces on a local file database. Signing in uses the shipped GitHub app and Google client, which accept `http://127.0.0.1` on any port, so open the app at `http://127.0.0.1:4322`, not `localhost`. Connect a runner with `node --experimental-strip-types src/cli.ts login --url http://127.0.0.1:4322`.
+This runs the app, sign-in and workspaces on a local file database. Signing in uses the shipped GitHub app, whose callback is registered on port 4321, and the shipped Google client. Open the app at `http://127.0.0.1:4321`, not `localhost`, and stop `pnpm dev` first since it uses the same port. Connect a runner with `node --experimental-strip-types src/cli.ts login --url http://127.0.0.1:4321`.
