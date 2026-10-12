@@ -29,12 +29,17 @@ export const Route = createFileRoute("/loops/new")({
     if (search.custom === true || search.custom === "true" || search.custom === 1) result.custom = true;
     return result;
   },
-  loader: async () => ({ loops: (await getLoopsPage()).loops }),
+  loader: async () => {
+    const { loops, readiness } = await getLoopsPage();
+    return { loops, connected: readiness.connectedConnectorIds };
+  },
   component: NewLoopPage,
 });
 
-/** The trigger a custom loop starts on before anything is picked. */
-const CUSTOM_DEFAULT = { connector: "slack", workflow: "slack.ask" };
+/** Whether loops can be made on a connector yet: the clock needs no account. */
+function usable(connector: ConnectorManifest, connected: string[]): boolean {
+  return connector.auth.kind === "none" || connected.includes(connector.id);
+}
 
 function NewLoopPage() {
   const { connector, workflow, custom } = Route.useSearch();
@@ -44,7 +49,8 @@ function NewLoopPage() {
       : null;
 
   if (custom) {
-    const start = chosen ?? CUSTOM_DEFAULT;
+    // Before anything is picked, the first trigger that can actually run.
+    const start = chosen ?? firstUsableTrigger(Route.useLoaderData().connected);
     return <CustomLoop connectorId={start.connector} workflowId={start.workflow} />;
   }
   return chosen ? (
@@ -80,8 +86,17 @@ function ShapeLoop({ connectorId, workflowId }: { connectorId: string; workflowI
  * since a workflow is what knows how to watch for something and read the
  * answer, but it starts with an empty prompt and a trigger you pick.
  */
+function firstUsableTrigger(connected: string[]): { connector: string; workflow: string } {
+  const triggers = allTriggers();
+  const pick = triggers.find(({ connector }) => connector.auth.kind !== "none" && connected.includes(connector.id))
+    ?? triggers.find(({ connector }) => usable(connector, connected))
+    ?? triggers[0]!;
+  return { connector: pick.connector.id, workflow: pick.trigger.id };
+}
+
 function CustomLoop({ connectorId, workflowId }: { connectorId: string; workflowId: string }) {
   const navigate = useNavigate();
+  const { connected } = Route.useLoaderData();
   const draft = {
     ...draftForWorkflow(connectorId, workflowId),
     name: "Custom loop",
@@ -111,11 +126,21 @@ function CustomLoop({ connectorId, workflowId }: { connectorId: string; workflow
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {allTriggers().map(({ connector, trigger }) => (
-            <SelectItem key={`${connector.id}::${trigger.id}`} value={`${connector.id}::${trigger.id}`}>
-              {trigger.when}
-            </SelectItem>
-          ))}
+          {allTriggers().map(({ connector, trigger }) => {
+            const ready = usable(connector, connected);
+            return (
+              <SelectItem
+                key={`${connector.id}::${trigger.id}`}
+                value={`${connector.id}::${trigger.id}`}
+                disabled={!ready}
+              >
+                {trigger.when}
+                {ready ? null : (
+                  <span className="ml-auto text-xs text-muted-foreground">Connect {connector.name}</span>
+                )}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </Field>
@@ -156,14 +181,38 @@ function ChoiceCard({
   title,
   summary,
   note,
+  needs,
   ...link
 }: {
   icon: React.ReactNode;
   title: string;
   summary: string;
   note?: string | null;
+  /** The connector to connect first; the card cannot be chosen until then. */
+  needs?: ConnectorManifest;
   search: Search;
 }) {
+  if (needs) {
+    return (
+      <div
+        aria-disabled="true"
+        className="flex items-start gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+      >
+        <div className="opacity-50">{icon}</div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="mt-1 text-xs text-muted-foreground/70">{summary}</p>
+          <Link
+            to="/connectors/$connectorId"
+            params={{ connectorId: needs.id }}
+            className="mt-2 inline-block text-xs font-medium underline-offset-4 hover:underline"
+          >
+            Connect {needs.name} first
+          </Link>
+        </div>
+      </div>
+    );
+  }
   return (
     <Link
       to="/loops/new"
@@ -184,10 +233,12 @@ function workflowCard(
   connector: ConnectorManifest,
   workflow: WorkflowDescriptor,
   loops: LoopView[],
+  connected: string[],
 ) {
   return (
     <ChoiceCard
       key={workflow.id}
+      needs={usable(connector, connected) ? undefined : connector}
       icon={<ConnectorIcon icon={connector.icon} accent={connector.accent} className="size-8" />}
       title={workflow.name}
       summary={workflow.summary}
@@ -203,10 +254,13 @@ function workflowCard(
  * two not tied to something arriving from a service.
  */
 function ChooseWorkflow() {
-  const { loops } = Route.useLoaderData();
+  const { loops, connected } = Route.useLoaderData();
   const all = allWorkflows();
   const scheduled = all.filter(({ connector }) => connector.id === "schedule");
-  const rest = all.filter(({ connector }) => connector.id !== "schedule");
+  // What can be made now first; the rest wait on a connection.
+  const rest = all
+    .filter(({ connector }) => connector.id !== "schedule")
+    .sort((a, b) => Number(usable(b.connector, connected)) - Number(usable(a.connector, connected)));
 
   return (
     <div className="flex flex-col gap-6">
@@ -223,13 +277,13 @@ function ChooseWorkflow() {
           summary="Pick a trigger and write your own prompt."
           search={{ custom: true }}
         />
-        {scheduled.map(({ connector, workflow }) => workflowCard(connector, workflow, loops))}
+        {scheduled.map(({ connector, workflow }) => workflowCard(connector, workflow, loops, connected))}
       </div>
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">From a connector</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          {rest.map(({ connector, workflow }) => workflowCard(connector, workflow, loops))}
+          {rest.map(({ connector, workflow }) => workflowCard(connector, workflow, loops, connected))}
         </div>
       </div>
     </div>
