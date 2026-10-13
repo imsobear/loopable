@@ -46,7 +46,7 @@ A loop’s answer can go to any connector that accepts it, so a scheduled check 
 ## How it works
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Slack bot, GitHub, and Lark bot into Loopable. A runner pulls the job. Loopable writes back to the same three." width="920" />
+  <img src="docs/architecture.svg" alt="GitHub, Slack, Lark, Gmail and the clock start work in Loopable, which is hosted. A runner on your machine pulls the job and runs Codex or Claude Code. Loopable writes the answer back where it was asked." width="920" />
 </p>
 
 Loopable is hosted: the app and the dispatcher run on Cloudflare. The dispatcher watches your services, matches a loop, and queues the job. Your runner pulls it over HTTPS, runs the agent on your machine, and Loopable writes the answer back.
