@@ -1,12 +1,20 @@
 # Narrative
 
-Put your coding agent on a loop. You set up workflows in the browser at loop.goodone.si; they run on your machine with Codex or Claude Code, and the answer goes back where it was asked.
+Prompt it when you're there. Loop it when you're not.
 
-It is for developers first, and the teams they work in. Work comes in from GitHub, Slack, Lark, email, or the clock. Codex, Claude Code, or Cursor Agent does it on your machine. The answer goes back where it was asked, and every run is recorded.
+Loopable sets up agent workflows for the work that keeps coming back, in minutes. You set them up in the browser at loop.goodone.si; they run on your machine with Codex, Claude Code, or Cursor Agent, and the answer goes back where it was asked.
+
+It is for developers first, and the teams they work in. Work comes in from GitHub, Slack, Lark, email, or the clock, and every run is recorded.
+
+## Alongside your own prompting
+
+Most of the time you still drive your agent yourself: you build the feature, you chase the bug, you decide. That does not change. Some of the work is different: it comes back again and again, and the prompt that handles it already works. A review request, a question in #oncall, a morning look at stale issues. That part becomes a loop.
+
+The two share everything. Same agent, same machine, same repository, same `AGENTS.md` and skills. A loop is a prompt you already trust, given a trigger and a place to answer. Nothing you set up by hand has to be set up again.
 
 ## The problem
 
-**Your agent only works while you are watching it.** A review request. “Why is checkout failing?” in #oncall. A morning look at stale issues. Each one waits until you copy it into your agent, and when you are busy, asleep, or on leave, it stops. Most of these jobs do not need you; they need your agent, your access, and a prompt that already works.
+**The work that repeats keeps pulling you back.** A review request. “Why is checkout failing?” in #oncall. A morning look at stale issues. Each one waits until you stop what you are doing and copy it into your agent, and when you are busy, asleep, or on leave, it waits longer. Most of these jobs do not need you; they need your agent, your access, and a prompt that already works.
 
 **Your setup is scattered.** Prompts live in chat history, skills on one laptop, steps you repeat by hand. The same question gets a different answer each time. Nothing is reused, and nothing is recorded.
 

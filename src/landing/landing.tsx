@@ -7,9 +7,9 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { signInHref } from "@/components/sign-in";
 import { Button } from "@/components/ui/button";
 
-const TITLE = "Loopable — put your coding agent on a loop";
+const TITLE = "Loopable — prompt it when you're there, loop it when you're not";
 const DESCRIPTION =
-  "Set up workflows in the browser. They run on your machine with Codex or Claude Code, and the answer goes back where it was asked.";
+  "Loopable sets up agent workflows for the work that keeps coming back, in minutes. They run on your machine with Codex, Claude Code, or Cursor Agent, and the answer goes back where it was asked.";
 const ORIGIN = "https://loop.goodone.si";
 const REPO = "https://github.com/imsobear/loopable";
 
@@ -145,9 +145,10 @@ function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
   return (
     <section className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-20 md:grid-cols-[1.1fr_1fr] md:py-28">
       <div>
-        <p className="text-sm font-medium text-muted-foreground">Workflows for your coding agent</p>
+        <p className="text-sm font-medium text-muted-foreground">Agent workflows</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-          Put your coding agent on a loop.
+          <span className="block">Prompt it when you&rsquo;re there.</span>
+          <span className="block">Loop it when you&rsquo;re not.</span>
         </h1>
         <p className="mt-5 text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>
         <div className="mt-8">
@@ -223,7 +224,7 @@ function Problem() {
   const items = [
     {
       title: "It waits for you",
-      body: "A review request, a question in #oncall, a morning check. Nothing happens until you copy it into your agent, and when you are busy or away, it stops.",
+      body: "A review request, a question in #oncall, a morning check. Each one waits until you stop what you are doing and copy it into your agent, and when you are busy or away, it waits longer.",
     },
     {
       title: "Your setup is scattered",
@@ -235,7 +236,7 @@ function Problem() {
     },
   ];
   return (
-    <Section kicker="The problem" title="Your agent only works while you are watching it.">
+    <Section kicker="The problem" title="The work that repeats keeps pulling you back.">
       <div className="grid gap-4 md:grid-cols-3">
         {items.map((item) => (
           <div key={item.title} className="rounded-xl border p-5">
