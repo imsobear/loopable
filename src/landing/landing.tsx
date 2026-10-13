@@ -7,9 +7,9 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { signInHref } from "@/components/sign-in";
 import { Button } from "@/components/ui/button";
 
-const TITLE = "Loopable — prompt it when you're there, loop it when you're not";
+const TITLE = "Loopable — prompt it when you're here, loop it when you're not";
 const DESCRIPTION =
-  "Loopable sets up agent workflows for the work that keeps coming back, in minutes. They run on your machine with Codex, Claude Code, or Cursor Agent, and the answer goes back where it was asked.";
+  "Loopable turns the work that keeps coming back into agent workflows, in minutes. They run on your machine with Codex, Claude Code, or Cursor Agent, and answer where they were asked.";
 const ORIGIN = "https://loop.goodone.si";
 const REPO = "https://github.com/imsobear/loopable";
 
@@ -143,11 +143,11 @@ function SignInButtons({ next }: { next?: string }) {
 
 function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
   return (
-    <section className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-20 md:grid-cols-[1.1fr_1fr] md:py-28">
+    <section className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-20 md:grid-cols-[1.6fr_1fr] md:py-28">
       <div>
         <p className="text-sm font-medium text-muted-foreground">Agent workflows</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-          <span className="block">Prompt it when you&rsquo;re there.</span>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance lg:text-[2.75rem] lg:leading-tight">
+          <span className="block">Prompt it when you&rsquo;re here.</span>
           <span className="block">Loop it when you&rsquo;re not.</span>
         </h1>
         <p className="mt-5 text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>
