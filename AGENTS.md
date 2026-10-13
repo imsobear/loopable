@@ -1,6 +1,6 @@
 # Loopable
 
-Prompt it when you're here; loop it when you're not. Loopable turns the work that keeps coming back into agent workflows, set up in the browser at loop.goodone.si. They run on the user's own machine with Codex or Claude Code, and answer where they were asked.
+Prompt it when you're there; loop it when you're not. Loopable turns the work that keeps coming back into agent workflows, set up in the browser at loop.goodone.si. They run on the user's own machine with Codex or Claude Code, and answer where they were asked.
 
 Work comes in from GitHub, Slack, Lark, email, or the clock. A loop says what to do. Codex, Claude Code, or Cursor Agent does it on a runner on the user's machine, and the answer is written back where it was asked. Every run is recorded. The story is in `docs/narrative.md`.
 
