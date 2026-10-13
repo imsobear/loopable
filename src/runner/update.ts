@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 
 /**
  * Whether this runner came from `npm install -g loopable-cli`, and so can
@@ -13,6 +14,8 @@ export function isUpdatable(entry = process.argv[1] ?? ""): boolean {
 export function install(version: string): string | null {
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const result = spawnSync(npm, ["install", "-g", `loopable-cli@${version}`], {
+    // Not from inside the package npm is about to replace.
+    cwd: homedir(),
     encoding: "utf8",
     timeout: 5 * 60_000,
   });
@@ -34,6 +37,7 @@ export function restart(): void {
   const pidFile = process.env.LOOPABLE_RUNNER_PIDFILE;
   if (pidFile) {
     const child = spawn(process.execPath, [entry], {
+      cwd: homedir(),
       detached: true,
       stdio: ["ignore", "inherit", "inherit"],
       env: process.env,
@@ -42,7 +46,7 @@ export function restart(): void {
     if (child.pid) writeFileSync(pidFile, `${child.pid}\n`);
     process.exit(0);
   }
-  const child = spawn(process.execPath, [entry], { stdio: "inherit", env: process.env });
+  const child = spawn(process.execPath, [entry], { cwd: homedir(), stdio: "inherit", env: process.env });
   const forward = (signal: NodeJS.Signals) => () => child.kill(signal);
   process.on("SIGINT", forward("SIGINT"));
   process.on("SIGTERM", forward("SIGTERM"));
