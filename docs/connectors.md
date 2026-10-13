@@ -92,4 +92,4 @@ im:message.group_msg
 im:message:send_as_bot
 ```
 
-Invite the bot to any group it should watch. A loop fires on an @mention in those groups and replies in the thread. Feishu does not list p2p chats for a bot, so DMs are not polled.
+Invite the bot to any group it should watch. A loop fires on an @mention in those groups and answers in a thread under it, so the group itself stays readable. An @mention inside that thread is answered there too, with what was said earlier in the thread; threads go unread after a week without a message. Feishu does not list p2p chats for a bot, so DMs are not polled.
