@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filesFromWorkItem,
   isAgentNothing,
+  jobMinProtocol,
   jobRequiresHost,
   normalizeFolder,
   resolveFolder,
@@ -12,6 +13,15 @@ describe("jobRequiresHost", () => {
     expect(jobRequiresHost({})).toBe(false);
     expect(jobRequiresHost({ cwd: "code/web" })).toBe(false);
     expect(jobRequiresHost({ cwd: "/Users/me/code" })).toBe(true);
+  });
+});
+
+describe("jobMinProtocol", () => {
+  it("asks for a runner that passes allowed MCP servers on", () => {
+    expect(jobMinProtocol({})).toBe(0);
+    expect(jobMinProtocol({ cwd: "code/web" })).toBe(2);
+    expect(jobMinProtocol({ mcpServers: [] })).toBe(0);
+    expect(jobMinProtocol({ cwd: "code/web", mcpServers: ["sentry"] })).toBe(3);
   });
 });
 

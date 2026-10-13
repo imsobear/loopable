@@ -21,10 +21,10 @@ import {
   WORKSPACE,
   folderIsLegacy,
   isAgentNothing,
+  jobMinProtocol,
   normalizeFolder,
   type AgentJob,
 } from "./agent-job.ts";
-import { FOLDER_JOB_PROTOCOL } from "#/lib/version.ts";
 import { listAgents, settingsFor } from "./agents.ts";
 import { branchFor } from "./checkout.ts";
 import { credentialForConnector } from "./connections.ts";
@@ -586,8 +586,9 @@ async function prepareTask(id: string, signal?: AbortSignal): Promise<TaskView> 
   const runnerId = await pickRunner({
     agentId,
     requiresHost: folder !== null && folderIsLegacy(folder),
-    // A relative folder needs a runner that resolves it under its own home.
-    minProtocol: folder !== null && !folderIsLegacy(folder) ? FOLDER_JOB_PROTOCOL : 0,
+    // A relative folder needs a runner that resolves it under its own home,
+    // and allowed MCP servers one that passes them on to the agent.
+    minProtocol: jobMinProtocol({ cwd: folder ?? undefined, mcpServers: loop.mcpServers }),
   });
   await updateTask(id, {
     state: "awaiting_agent",
@@ -641,6 +642,7 @@ export async function jobForTask(id: string): Promise<AgentJob> {
     settings,
     files: item.context.map((file) => ({ name: file.name, body: file.body })),
     ...(cwd ? { cwd } : {}),
+    ...(loop.mcpServers.length ? { mcpServers: loop.mcpServers } : {}),
   };
 }
 

@@ -1,4 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { defineAgentRuntime } from "../define.ts";
 import { firstLine, probe, resolveBinary } from "../discover.ts";
 import { runProcess } from "../process.ts";
@@ -11,7 +13,25 @@ async function binary(): Promise<string> {
   return found;
 }
 
-function args(input: AgentRunInput): string[] {
+/**
+ * The allowed servers this host's codex actually has. Naming one it does not
+ * have is worse than leaving it out: codex reads the override as half a
+ * server and refuses to start at all.
+ */
+function configuredServers(names: string[]): string[] {
+  if (names.length === 0) return [];
+  let config = "";
+  try {
+    config = readFileSync(join(process.env.CODEX_HOME || join(homedir(), ".codex"), "config.toml"), "utf8");
+  } catch {
+    return [];
+  }
+  return names.filter((name) =>
+    new RegExp(`^\\s*\\[\\s*mcp_servers\\.("?)${name}\\1\\s*[.\\]]`, "m").test(config),
+  );
+}
+
+function args(input: AgentRunInput, mcpServers = input.mcpServers ?? []): string[] {
   const list = [
     "exec",
     "--sandbox",
@@ -26,6 +46,11 @@ function args(input: AgentRunInput): string[] {
     input.cwd,
   ];
   if (input.settings.model) list.push("-m", input.settings.model);
+  // exec never asks, so an MCP call that needs approval is refused. These
+  // servers' tools are approved up front instead.
+  for (const server of mcpServers) {
+    list.push("-c", `mcp_servers.${server}.default_tools_approval_mode="approve"`);
+  }
   if (input.outputFile) list.push("-o", input.outputFile);
   list.push(input.prompt);
   return list;
@@ -55,7 +80,7 @@ export const codexRuntime = defineAgentRuntime({
 
   async run(input) {
     const bin = await binary();
-    const argv = args(input);
+    const argv = args(input, configuredServers(input.mcpServers ?? []));
     const command = `${bin} ${argv.join(" ")}`;
     const outcome = await runProcess({
       bin,

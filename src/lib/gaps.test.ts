@@ -22,6 +22,7 @@ function loop(over: Partial<LoopView> = {}): LoopView {
     prompt: "Review it.",
     guidance: null,
     agentId: null,
+    mcpServers: [],
     actionConnectorId: "github",
     actionId: "github.submit_review",
     actionTarget: {},

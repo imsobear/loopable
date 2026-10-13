@@ -32,6 +32,7 @@ async function edited(id: string, changes: Record<string, unknown>) {
     prompt: loop.prompt,
     guidance: loop.guidance,
     agentId: loop.agentId,
+    mcpServers: loop.mcpServers,
     settings: loop.settings,
     actionConnectorId: loop.actionConnectorId,
     actionId: loop.actionId,
@@ -160,6 +161,30 @@ describe("a loop that has to work somewhere", () => {
 
   it("does not ask for a local clone when the agent will clone the repository", async () => {
     await expect(added("github", "github.issue_assigned")).resolves.toBeTruthy();
+  });
+});
+
+describe("MCP servers a loop allows", () => {
+  it("are none unless somebody names one", async () => {
+    expect((await added("github", "github.review_requested")).mcpServers).toEqual([]);
+  });
+
+  it("are kept trimmed and once each", async () => {
+    const loop = await added("github", "github.review_requested", {
+      mcpServers: [" sentry ", "sub2tok-admin", "sentry", ""],
+    });
+
+    expect(loop.mcpServers).toEqual(["sentry", "sub2tok-admin"]);
+    expect((await edited(loop.id, { mcpServers: [] })).mcpServers).toEqual([]);
+  });
+
+  it("refuse a name that would mean something else to the agent", async () => {
+    // Each agent puts the name into a rule or a config key of its own.
+    for (const name of ["a:b", "x)", 'say"hi', "two words"]) {
+      await expect(added("github", "github.review_requested", { mcpServers: [name] })).rejects.toThrow(
+        /not an MCP server name/,
+      );
+    }
   });
 });
 

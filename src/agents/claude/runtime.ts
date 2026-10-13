@@ -32,6 +32,9 @@ function args(input: AgentRunInput): string[] {
     // which is how the container runs.
     list.push("--permission-mode", "acceptEdits", "--allowedTools", "Bash");
   }
+  // Neither mode lets an MCP tool through on its own. A rule naming just the
+  // server allows every tool it has.
+  for (const server of input.mcpServers ?? []) list.push("--allowedTools", `mcp__${server}`);
   if (input.settings.model) list.push("--model", input.settings.model);
   // The prompt follows a variadic option, so it has to be marked as the
   // positional argument or --allowedTools would swallow it.

@@ -60,6 +60,11 @@ export type AgentRunInput = {
   signal?: AbortSignal;
   /** Where to write everything the agent prints, while it prints it. */
   logFile?: string;
+  /**
+   * MCP servers the agent may call without asking, in either permission mode.
+   * Print mode has nobody to ask, so every other server's tools are refused.
+   */
+  mcpServers?: string[];
 };
 
 export type AgentInvocation = { bin: string; args: string[] };

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { defineAgentRuntime } from "../define.ts";
 import { firstLine, probe, resolveBinary } from "../discover.ts";
 import { runProcess } from "../process.ts";
@@ -9,6 +12,22 @@ async function binary(): Promise<string> {
   const found = await resolveBinary(cursorAgentManifest.binaries);
   if (!found) throw new Error("The cursor-agent binary was not found on this host.");
   return found;
+}
+
+/**
+ * Where to start the agent from, when a read-only run has MCP servers to
+ * allow. There is no flag for that, but the agent reads permissions from a
+ * .cursor/cli.json between the git root and where it was started, on top of
+ * the person's own. Started from a directory of its own, the rule lasts one run
+ * and never touches the checkout. --force already allows everything else.
+ */
+function permissionsDir(input: AgentRunInput): string | null {
+  if (input.settings.permissionMode !== "read_only" || !input.mcpServers?.length) return null;
+  const dir = mkdtempSync(join(tmpdir(), "loopable-cursor-"));
+  mkdirSync(join(dir, ".cursor"));
+  const allow = input.mcpServers.map((server) => `Mcp(${server}:*)`);
+  writeFileSync(join(dir, ".cursor", "cli.json"), JSON.stringify({ permissions: { allow, deny: [] } }));
+  return dir;
 }
 
 function args(input: AgentRunInput): string[] {
@@ -32,6 +51,8 @@ function args(input: AgentRunInput): string[] {
   } else {
     list.push("--force");
   }
+  // Otherwise a server nobody has approved on this machine is not started.
+  if (input.mcpServers?.length) list.push("--approve-mcps");
   if (input.settings.model) list.push("--model", input.settings.model);
   list.push(input.prompt);
   return list;
@@ -63,14 +84,18 @@ export const cursorAgentRuntime = defineAgentRuntime({
   async run(input) {
     const bin = await binary();
     const argv = args(input);
+    const permissions = permissionsDir(input);
     const outcome = await runProcess({
       bin,
       args: argv,
-      cwd: input.cwd,
+      // --workspace says where to work, so starting elsewhere changes nothing else.
+      cwd: permissions ?? input.cwd,
       timeoutMs: input.settings.timeoutMs,
       signal: input.signal,
       logPath: input.logFile,
       logLine: (line) => describeEvent(line, input.cwd),
+    }).finally(() => {
+      if (permissions) rmSync(permissions, { recursive: true, force: true });
     });
     const command = `${bin} ${argv.join(" ")}`;
     const answer = answerFrom(outcome.stdout);

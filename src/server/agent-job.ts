@@ -1,5 +1,5 @@
 import { isAbsolute, join } from "node:path";
-import { FOLDER_JOB_PROTOCOL } from "#/lib/version.ts";
+import { FOLDER_JOB_PROTOCOL, MCP_JOB_PROTOCOL } from "#/lib/version.ts";
 import type { AgentSettingsValues } from "#/agents/types.ts";
 
 export type AgentJobFile = { name: string; body: string };
@@ -16,6 +16,8 @@ export type AgentJob = {
    * runner works in a throwaway directory that holds the files.
    */
   cwd?: string;
+  /** MCP servers the agent may call without asking. Absent means none. */
+  mcpServers?: string[];
 };
 
 export type AgentJobResult = {
@@ -74,9 +76,12 @@ export function jobRequiresHost(job: Pick<AgentJob, "cwd">): boolean {
 /**
  * The oldest runner protocol that can do this job. A relative folder and the
  * workspace placeholder are both protocol 2; an older runner would run the
- * agent in the wrong place and hand it a path that does not exist.
+ * agent in the wrong place and hand it a path that does not exist. Allowed MCP
+ * servers are protocol 3; an older runner would drop them, and the agent would
+ * be refused every call the loop was set up to make.
  */
-export function jobMinProtocol(job: Pick<AgentJob, "cwd">): number {
+export function jobMinProtocol(job: Pick<AgentJob, "cwd" | "mcpServers">): number {
+  if (job.mcpServers?.length) return MCP_JOB_PROTOCOL;
   return job.cwd && !folderIsLegacy(job.cwd) ? FOLDER_JOB_PROTOCOL : 0;
 }
 

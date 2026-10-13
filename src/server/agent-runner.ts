@@ -15,6 +15,7 @@ export type RunAgentJobOptions = {
     outputFile: string;
     logFile: string;
     signal?: AbortSignal;
+    mcpServers?: string[];
   }) => Promise<AgentRunResult>;
   signal?: AbortSignal;
   /** Joined runners work in a throwaway directory; the host uses the run dir. */
@@ -58,6 +59,7 @@ export async function runAgentJob(
     outputFile,
     logFile,
     signal: options.signal,
+    ...(job.mcpServers?.length ? { mcpServers: job.mcpServers } : {}),
   });
   return {
     ok: result.ok,
