@@ -5,9 +5,12 @@ import { ConnectorIcon } from "@/components/connector-icon";
 import { cn } from "@/lib/utils";
 
 /**
- * The hero's picture: one job going round. A signal comes in from GitHub,
- * Slack or the clock, a loop matches it, an agent runs it on someone's
+ * The hero's picture: one job going round. A signal comes in from GitHub, a
+ * chat bot or the clock, a loop matches it, an agent runs it on someone's
  * machine, and the answer goes back where it came from. Then the next one.
+ * Each source brings a different kind of work, so the five together tell the
+ * story: a review, an incident, a question in a group, a quick ask from the
+ * phone, and a morning chore.
  */
 type Job = {
   source: string;
@@ -45,6 +48,28 @@ const JOBS: Job[] = [
     answer: "Replied in the thread: redis timeouts since the 15:52 deploy",
   },
   {
+    source: "Feishu",
+    from: "Lark · Release group",
+    signal: "@loopable what's going out in 2.4 this week?",
+    loop: "Do what I ask the Feishu / Lark bot",
+    rules: ["bot mentioned", "Release group"],
+    agent: "Codex",
+    agentName: "Codex",
+    work: ["Reading 14 PRs merged since 2.3", "Writing the notes, grouped by area"],
+    answer: "Replied in the thread: draft release notes for 2.4",
+  },
+  {
+    source: "Wechat",
+    from: "WeChat · direct message",
+    signal: "Pricing page still says $19, it should be $29. Fix it?",
+    loop: "Do what I ask the WeChat bot",
+    rules: ["bot messaged", "from Maya"],
+    agent: "Cursor",
+    agentName: "Cursor Agent",
+    work: ["Finding the price in pricing.tsx", "Opening #491 with the change"],
+    answer: "Replied in the chat with a link to #491",
+  },
+  {
     source: "Clock",
     from: "Schedule · weekdays 9:00",
     signal: "Monday, 9:00",
@@ -57,7 +82,7 @@ const JOBS: Job[] = [
   },
 ];
 
-const SOURCES = ["Github", "Slack", "Clock"];
+const SOURCES = ["Github", "Slack", "Feishu", "Wechat", "Clock"];
 
 /** How long each step is held: signal, matched, running, written, back, and a fade before the next. */
 const HOLD = [1300, 1300, 2200, 1400, 1600, 450];
@@ -105,7 +130,7 @@ export function HeroFlow() {
         ) : null}
       </div>
 
-      <div className="flex items-center gap-2 pr-6">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pr-6">
         {SOURCES.map((source) => {
           const active = source === current.source;
           return (
@@ -125,7 +150,7 @@ export function HeroFlow() {
             </span>
           );
         })}
-        <span className="ml-auto text-xs text-muted-foreground">{current.from}</span>
+        <span className="ml-auto text-right text-xs text-muted-foreground">{current.from}</span>
       </div>
       <div className={cn("transition-opacity duration-400", step === FADE ? "opacity-0" : "opacity-100")}>
       <p
