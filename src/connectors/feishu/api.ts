@@ -31,6 +31,8 @@ export type FeishuMessage = {
   senderId?: string;
   senderType?: string;
   mentionIds: string[];
+  /** The thread it is in, or the thread it starts. */
+  threadId?: string;
 };
 
 type Envelope = {
@@ -178,17 +180,44 @@ function mentionsOf(raw: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * A group's messages newer than `oldestMs`, oldest first. In an ordinary group
+ * that is only the first message of each thread: what is said inside one is
+ * read with `threadHistory`.
+ */
 export async function history(
   credential: FeishuCredential,
   chatId: string,
   oldestMs: string,
 ): Promise<FeishuMessage[]> {
+  return await messagesIn(credential, { type: "chat", id: chatId, chatId }, oldestMs);
+}
+
+/** What was said in one thread after `oldestMs`, oldest first. */
+export async function threadHistory(
+  credential: FeishuCredential,
+  thread: { threadId: string; chatId: string },
+  oldestMs: string,
+): Promise<FeishuMessage[]> {
+  return await messagesIn(
+    credential,
+    { type: "thread", id: thread.threadId, chatId: thread.chatId },
+    oldestMs,
+  );
+}
+
+async function messagesIn(
+  credential: FeishuCredential,
+  container: { type: "chat" | "thread"; id: string; chatId: string },
+  oldestMs: string,
+): Promise<FeishuMessage[]> {
+  const chatId = container.chatId;
   const parsed: FeishuMessage[] = [];
   let pageToken = "";
   do {
     const query: Record<string, string> = {
-      container_id_type: "chat",
-      container_id: chatId,
+      container_id_type: container.type,
+      container_id: container.id,
       sort_type: "ByCreateTimeAsc",
       page_size: "50",
       start_time: String(Math.floor(Number(oldestMs) / 1000)),
@@ -209,6 +238,7 @@ export async function history(
       const message = raw as {
         message_id?: string;
         chat_id?: string;
+        thread_id?: string;
         create_time?: string;
         msg_type?: string;
         deleted?: boolean;
@@ -225,6 +255,7 @@ export async function history(
         ...(message.sender?.id ? { senderId: message.sender.id } : {}),
         ...(message.sender?.sender_type ? { senderType: message.sender.sender_type } : {}),
         mentionIds: mentionsOf(message.mentions),
+        ...(message.thread_id ? { threadId: message.thread_id } : {}),
       });
     }
     pageToken = data.has_more === true && typeof data.page_token === "string" ? data.page_token : "";
@@ -232,6 +263,23 @@ export async function history(
   return parsed.sort((a, b) => Number(a.createTime) - Number(b.createTime));
 }
 
+/**
+ * The thread a message is in or starts, or null while it has none. A message
+ * the bot was asked in only gets one once the answer is posted.
+ */
+export async function threadOf(credential: FeishuCredential, messageId: string): Promise<string | null> {
+  const data = dataOf(
+    await call(credential.host, `/im/v1/messages/${messageId}`, { token: credential.tenantAccessToken }),
+  );
+  const items = Array.isArray(data.items) ? data.items : [];
+  const message = (items[0] ?? {}) as { thread_id?: unknown };
+  return typeof message.thread_id === "string" && message.thread_id ? message.thread_id : null;
+}
+
+/**
+ * Answers in a thread under the message, or in the thread it is already in,
+ * so a conversation with the bot does not fill the group.
+ */
 export async function replyMessage(
   credential: FeishuCredential,
   messageId: string,
@@ -240,7 +288,7 @@ export async function replyMessage(
   const body = await call(credential.host, `/im/v1/messages/${messageId}/reply`, {
     token: credential.tenantAccessToken,
     method: "POST",
-    body: { msg_type: "text", content: JSON.stringify({ text }) },
+    body: { msg_type: "text", content: JSON.stringify({ text }), reply_in_thread: true },
   });
   const data = dataOf(body);
   const id = typeof data.message_id === "string" ? data.message_id : "";

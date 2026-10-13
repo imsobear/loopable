@@ -177,6 +177,7 @@ describe("replyMessage", () => {
       expect(JSON.parse(String(init.body))).toEqual({
         msg_type: "text",
         content: "{\"text\":\"Cause: redis timeout\"}",
+        reply_in_thread: true,
       });
       return ok({
         code: 0,
