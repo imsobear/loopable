@@ -4,7 +4,7 @@ How a change gets from a branch to loop.goodone.si and to npm. The workflows are
 
 ```text
 branch → pull request → CI → merge to main → CI → Deploy (migrate, then deploy)
-                                             → Release (by hand, CLI only, after pnpm bump in a pull request)
+                                                     → Release (CLI to npm, only when pnpm bump changed the version)
 ```
 
 ## Changing code
@@ -33,9 +33,12 @@ The GitHub **production** environment lists every deploy and its commit, so what
 
 Release a new CLI when the runner or the `loopable` command changed. A service-only change needs no release.
 
-1. On a branch, `pnpm bump minor` (or `patch`, `major`, an exact version). It commits the new version.
-2. Merge that pull request, and wait for its deploy to finish.
-3. Run **Release** from the Actions tab. It refuses unless `main` is the commit that is deployed, so the service always knows about a new runner before any runner is out. It checks, builds, publishes the version in `package.json` to npm through trusted publishing, tags `vX.Y.Z`, and writes the release notes. It never pushes to `main`.
+1. In the pull request, `pnpm bump minor` (or `patch`, `major`, an exact version). It commits the new version.
+2. Merge it. Once its deploy has finished, **Release** runs by itself: it checks, builds, publishes the version in `package.json` to npm through trusted publishing, tags `vX.Y.Z`, and writes the release notes. It never pushes to `main`.
+
+Release waits for the deploy, so the service always knows about a new runner before any runner is out. A merge that did not change the version publishes nothing. A Deploy run by hand, which may be a rollback, never releases.
+
+If a release fails, fix it in a pull request, or run **Release** from the Actions tab once the cause is gone. By hand it refuses unless `main` is the commit that is deployed and its version is not on npm yet.
 
 Runners on 0.7.0 or later can then be updated from the Runners page.
 

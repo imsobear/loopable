@@ -1,5 +1,6 @@
 // Bumps loopable-cli's version on the current branch, as its own commit, for
-// the pull request that releases it. Publishing is the Release workflow's.
+// the pull request that releases it. Publishing is the Release workflow's,
+// which runs by itself once that pull request is merged and deployed.
 //
 //   pnpm bump patch|minor|major|<x.y.z>
 import { execFileSync } from "node:child_process";
@@ -37,4 +38,4 @@ const version = next(pkg.version);
 pkg.version = version;
 writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
 git("commit", "--quiet", "-m", `Bump loopable-cli to v${version}.`, "--", "package.json");
-console.log(`✓ v${version}, committed. Merge the pull request, wait for the deploy, then run Release.`);
+console.log(`✓ v${version}, committed. Merge the pull request; it is published once it is deployed.`);
