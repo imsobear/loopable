@@ -26,7 +26,7 @@ describe("callback URLs", () => {
   it("keeps loopback when BASE_URL is unset", () => {
     delete process.env.LOOPABLE_BASE_URL;
     expect(registrableCallbackUrl("github")).toBe(
-      "http://127.0.0.1/api/connectors/github/callback",
+      "http://127.0.0.1:4321/api/connectors/github/callback",
     );
     expect(appOrigin("http://localhost:4321/x")).toBe("http://127.0.0.1:4321");
   });
@@ -60,7 +60,7 @@ describe("callback URLs", () => {
     );
     expect(appOrigin("http://192.168.1.10:4321/x")).toBe("http://127.0.0.1:4321");
     expect(registrableCallbackUrl("github")).toBe(
-      "http://127.0.0.1/api/connectors/github/callback",
+      "http://127.0.0.1:4321/api/connectors/github/callback",
     );
     expect(loopableOrigin()).toBe("http://192.168.1.10:4321");
     delete process.env.LOOPABLE_BASE_URL;

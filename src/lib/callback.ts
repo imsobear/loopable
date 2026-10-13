@@ -59,5 +59,7 @@ export function callbackUrl(requestUrl: string, connectorId: string): string {
 export function registrableCallbackUrl(connectorId: string): string {
   const hosted = publicConfiguredOrigin();
   if (hosted) return `${hosted}/api/connectors/${connectorId}/callback`;
-  return `http://127.0.0.1/api/connectors/${connectorId}/callback`;
+  // GitHub matches a loopback callback with its port, so the development
+  // apps are registered on the port pnpm dev serves.
+  return `http://127.0.0.1:${process.env.PORT ?? "4321"}/api/connectors/${connectorId}/callback`;
 }

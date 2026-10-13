@@ -29,7 +29,7 @@ const at: SettingField = {
   key: "at",
   kind: "text",
   label: "At",
-  help: "24-hour time, in this host's time zone.",
+  help: "24-hour time, in UTC.",
   placeholder: "09:00",
 };
 

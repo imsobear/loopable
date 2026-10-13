@@ -13,15 +13,15 @@ export type Poller = ReturnType<typeof createPoller>;
 /**
  * Asks every loop's connector what matches, over and over.
  *
- * Polling rather than webhooks because Loopable runs on a laptop: there is no
- * address for GitHub to call back, and asking is something a laptop can do
- * from behind any network. Two minutes is slow enough to stay far inside
- * GitHub's search limit and fast enough that a review request feels picked up
- * rather than found later.
+ * Polling rather than webhooks for now: it needs nothing registered with each
+ * service, and works the same for every connector. Each loop is only asked
+ * when it is due, so this runs every minute, as often as a loop may ask; that
+ * stays far inside GitHub's search limit and picks a review request up while
+ * it is still fresh.
  */
 export function createPoller(options: PollerOptions = {}) {
   const run = options.poll ?? pollAllLoops;
-  const intervalMs = options.intervalMs ?? 120_000;
+  const intervalMs = options.intervalMs ?? 60_000;
   const log = options.log ?? (() => {});
 
   let timer: ReturnType<typeof setInterval> | undefined;

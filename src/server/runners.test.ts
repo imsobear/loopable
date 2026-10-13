@@ -57,11 +57,11 @@ describe("pickRunner", () => {
     );
   });
 
-  it("refuses folder jobs when no runner is on this host", async () => {
+  it("refuses an old absolute-folder job when no runner is on this host, and says to edit the loop", async () => {
     await givenRunner("other-box");
     await expect(
       pickRunner({ agentId: "codex", requiresHost: true }),
-    ).rejects.toThrow("same host as Loopable");
+    ).rejects.toThrow("absolute path from an older version");
   });
 
   it("prefers an idle runner that has the agent", async () => {

@@ -24,7 +24,9 @@ const fromSource = here.endsWith("/src");
 const root = join(here, "..");
 const node = process.execPath;
 
-const DEFAULT_URL = "https://loop.goodone.si";
+/** pnpm runner from a checkout: a second runner for pnpm dev, kept apart from a real one. */
+const DEV = process.env.LOOPABLE_DEV === "1";
+const DEFAULT_URL = DEV ? "http://127.0.0.1:4321" : "https://loop.goodone.si";
 
 type Flags = { url?: string; token?: string; foreground?: boolean; follow?: boolean };
 
@@ -92,7 +94,7 @@ function parse(argv: string[]): { command: string; flags: Flags } {
 type Saved = { url: string; joinToken: string };
 
 function home(): string {
-  return process.env.LOOPABLE_HOME ?? join(homedir(), ".loopable");
+  return process.env.LOOPABLE_HOME ?? join(homedir(), DEV ? ".loopable-dev/runner" : ".loopable");
 }
 
 function savedPath(): string {
