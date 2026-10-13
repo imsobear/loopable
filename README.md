@@ -76,10 +76,7 @@ pnpm db:studio
 
 ### Release and deploy
 
-CI runs typecheck, tests, and the build on every pull request and on `main`.
-
-- **The CLI** (`loopable-cli` on npm): run the **Release** workflow in GitHub Actions with `patch`, `minor`, `major` or an exact version. It checks everything, bumps, tags `vX.Y.Z`, publishes to npm through trusted publishing (no npm token), pushes, and writes the release notes. `pnpm release` still does the same from a laptop signed in to npm.
-- **The service**: run the **Deploy** workflow in GitHub Actions. Setup and the domain are in [docs/hosting.md](docs/hosting.md).
+Changes go through a pull request; CI must pass before it merges. Merging to `main` deploys the service by itself, migrations first. The CLI is released by hand with the **Release** workflow. All of it, and how to roll back, is in [docs/release.md](docs/release.md).
 
 | Path | Contents |
 | --- | --- |

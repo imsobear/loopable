@@ -18,4 +18,4 @@ Everything a user sets up belongs to a workspace, and every query is filtered by
 
 ## Working agreement
 
-Commit as soon as a feature is finished, one feature per commit.
+Commit as soon as a feature is finished, one feature per commit, on a branch. Changes reach `main` through a pull request once CI passes; merging deploys. Migrations run before the new code is live, so they only ever add. See `docs/release.md`.

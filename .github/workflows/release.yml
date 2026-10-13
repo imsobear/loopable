@@ -1,25 +1,22 @@
 name: Release
 
-# Publishes loopable-cli to npm from main: checks, bumps the version, tags it,
-# publishes, then pushes the commit and tag, so every version on npm is one
-# tagged commit here. Run by hand from the Actions tab.
+# Publishes loopable-cli to npm: the version main's package.json says, once
+# that commit is live. The version is bumped in a pull request like any other
+# change (pnpm bump minor), so this never pushes to main; it adds the tag.
+# Run by hand from the Actions tab.
 #
 # npm trusts this workflow directly (trusted publishing), so there is no npm
 # token anywhere. Set up once on npmjs.com: loopable-cli → Settings → Trusted
 # publishing → GitHub Actions, repository imsobear/loopable, workflow release.yml.
 on:
   workflow_dispatch:
-    inputs:
-      bump:
-        description: "patch, minor, major, or an exact version such as 0.4.0"
-        required: true
-        default: minor
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: write
   id-token: write
 
@@ -32,6 +29,32 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+
+      - name: Check main is what is deployed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head="$(git rev-parse HEAD)"
+          live="$(gh run list --workflow deploy.yml --status success --limit 1 --json headSha -q '.[0].headSha')"
+          if [ "$head" != "$live" ]; then
+            echo "main is at $head but the last successful deploy was $live." >&2
+            echo "Wait for the deploy of main to finish, or run Deploy, then release." >&2
+            exit 1
+          fi
+
+      - name: Check the version is new
+        id: version
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if npm view "loopable-cli@$version" version >/dev/null 2>&1; then
+            echo "loopable-cli@$version is already on npm. Bump it in a pull request first: pnpm bump minor" >&2
+            exit 1
+          fi
+          if git rev-parse "v$version" >/dev/null 2>&1; then
+            echo "The tag v$version already exists." >&2
+            exit 1
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -46,34 +69,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
-
-      - name: Bump the version and tag it
-        id: version
-        env:
-          BUMP: ${{ inputs.bump }}
-        run: |
-          npm version "$BUMP" --no-git-tag-version >/dev/null
-          version="$(node -p 'require("./package.json").version')"
-          if npm view "loopable-cli@$version" version >/dev/null 2>&1; then
-            echo "loopable-cli@$version is already on npm." >&2
-            exit 1
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit --quiet -m "Release v$version." -- package.json
-          git tag -a "v$version" -m "Release v$version."
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
-
-      # After the bump: the bundle carries the version it was built as, and a
-      # runner reports that version, so building first would publish 0.6.0
-      # that calls itself 0.5.0.
       - run: pnpm build
 
       # The checks above already ran, so publish skips prepublishOnly.
       - run: npm publish --ignore-scripts
 
-      - name: Push the release commit and tag
-        run: git push --atomic origin main "${{ steps.version.outputs.tag }}"
+      - name: Tag the release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}."
+          git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Release notes
         env:
