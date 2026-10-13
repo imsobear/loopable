@@ -3,7 +3,8 @@
 How a change gets from a branch to loop.goodone.si and to npm. The workflows are in `.github/workflows/`.
 
 ```text
-branch → pull request → CI → merge to main → CI → Deploy (migrate, then deploy) → Release (by hand, CLI only)
+branch → pull request → CI → merge to main → CI → Deploy (migrate, then deploy)
+                                             → Release (by hand, CLI only, after pnpm bump in a pull request)
 ```
 
 ## Changing code
@@ -30,9 +31,13 @@ The GitHub **production** environment lists every deploy and its commit, so what
 
 ## Releasing the CLI
 
-Run **Release** from the Actions tab with `patch`, `minor`, `major` or an exact version. It refuses unless `main` is the commit that is deployed, so the service always knows about a new runner before any runner is out. It checks, bumps, builds, publishes to npm through trusted publishing, tags `vX.Y.Z`, pushes, and writes the release notes.
+Release a new CLI when the runner or the `loopable` command changed. A service-only change needs no release.
 
-Release a new CLI when the runner or the `loopable` command changed. A service-only change needs no release. Runners on 0.7.0 or later can then be updated from the Runners page.
+1. On a branch, `pnpm bump minor` (or `patch`, `major`, an exact version). It commits the new version.
+2. Merge that pull request, and wait for its deploy to finish.
+3. Run **Release** from the Actions tab. It refuses unless `main` is the commit that is deployed, so the service always knows about a new runner before any runner is out. It checks, builds, publishes the version in `package.json` to npm through trusted publishing, tags `vX.Y.Z`, and writes the release notes. It never pushes to `main`.
+
+Runners on 0.7.0 or later can then be updated from the Runners page.
 
 ## Rolling back
 
