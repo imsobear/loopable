@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { LoopableMark } from "@/components/brand";
 import { ConnectorIcon } from "@/components/connector-icon";
 import { signInHref } from "@/components/sign-in";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { HeroFlow } from "./hero-flow";
 import { LoopFooter } from "./loop-footer";
@@ -109,6 +110,7 @@ export function Nav({ signedIn }: { signedIn: boolean }) {
           </a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" size="icon" nativeButton={false} render={<a href={REPO} aria-label="GitHub" />}>
             <GithubMark />
           </Button>

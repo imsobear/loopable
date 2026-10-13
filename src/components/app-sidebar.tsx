@@ -3,6 +3,7 @@ import { Bot, Inbox, LogOut, Plug, Server, Settings, Workflow } from "lucide-rea
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LoopableMark } from "@/components/brand";
 import { DispatcherStatus } from "@/components/dispatcher-status";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -121,6 +122,7 @@ export function AppSidebar() {
             </span>
             <span className="truncate font-medium">Loopable</span>
           </Link>
+          <ThemeToggle className="size-7 shrink-0 group-data-[collapsible=icon]:hidden" />
           <SidebarTrigger className="shrink-0" />
         </div>
       </SidebarHeader>

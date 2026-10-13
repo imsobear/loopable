@@ -1,4 +1,5 @@
 import { HeadContent, Outlet, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
 import { Suspense, lazy } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { NavigationProgress } from "@/components/navigation-progress";
@@ -63,14 +64,18 @@ function AppLayout() {
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The theme sets a class on <html> before React loads, so the server's
+    // markup and the browser's differ there on purpose.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        <NavigationProgress />
-        {children}
-        <Toaster />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <NavigationProgress />
+          {children}
+          <Toaster />
+        </ThemeProvider>
         <Suspense fallback={null}>
           <Devtools />
         </Suspense>

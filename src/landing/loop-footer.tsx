@@ -3,8 +3,8 @@ import { useEffect, useRef } from "react";
 /**
  * The front page's tall footer: a loop to play with. Signals come in from the
  * edges, go round the loop, run at the centre, and go back where they came
- * from. Clicking sends one from where you clicked. Always dark, whatever the
- * page's theme, so it reads as the page's last word.
+ * from. Clicking sends one from where you clicked. It follows the page's
+ * theme, and redraws in the other one when the theme changes.
  */
 export function LoopFooter({ links }: { links: React.ReactNode }) {
   const stage = useRef<HTMLDivElement>(null);
@@ -17,28 +17,28 @@ export function LoopFooter({ links }: { links: React.ReactNode }) {
   }, []);
 
   return (
-    <footer className="overflow-hidden bg-[#070708] text-[#9b968c]">
+    <footer className="overflow-hidden border-t bg-background text-muted-foreground">
       <div ref={stage} className="relative h-[clamp(24rem,64vh,40rem)] cursor-crosshair select-none">
         <canvas ref={canvas} aria-hidden className="absolute inset-0 z-[1] size-full" />
-        <p className="pointer-events-none absolute top-5 left-6 z-[2] font-mono text-[11px] tracking-[0.14em] text-[#5e5a54] uppercase max-sm:top-auto max-sm:bottom-[26vw]">
+        <p className="pointer-events-none absolute top-5 left-6 z-[2] font-mono text-[11px] tracking-[0.14em] text-muted-foreground/70 uppercase max-sm:top-auto max-sm:bottom-[26vw]">
           Click anywhere to send a signal
         </p>
         <p className="pointer-events-none absolute top-5 right-6 z-[2] font-mono text-[11px] tracking-[0.14em] uppercase">
-          <b ref={counter} className="font-medium text-[#d4ff3f] tabular-nums">
+          <b ref={counter} className="font-medium text-lime-600 tabular-nums dark:text-[#d4ff3f]">
             0
           </b>{" "}
           runs recorded
         </p>
         <div
           aria-hidden
-          className="pointer-events-none absolute -bottom-[0.16em] left-1/2 -translate-x-1/2 bg-linear-to-b from-[rgba(242,238,230,0.07)] to-transparent to-75% bg-clip-text text-[23vw] leading-none font-semibold tracking-[-0.07em] whitespace-nowrap text-transparent [-webkit-text-stroke:1px_rgba(242,238,230,0.13)]"
+          className="pointer-events-none absolute -bottom-[0.16em] left-1/2 -translate-x-1/2 bg-linear-to-b from-foreground/[0.06] to-transparent to-75% bg-clip-text text-[23vw] leading-none font-semibold tracking-[-0.07em] whitespace-nowrap text-transparent [-webkit-text-stroke:1px_color-mix(in_oklab,var(--foreground)_14%,transparent)]"
         >
           Loopable
         </div>
       </div>
-      <div className="relative z-[2] flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-[rgba(242,238,230,0.1)] bg-[#070708] px-6 py-5 font-mono text-[11px] tracking-[0.1em] text-[#5e5a54] uppercase">
+      <div className="relative z-[2] flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t bg-background px-6 py-5 font-mono text-[11px] tracking-[0.1em] text-muted-foreground/70 uppercase">
         <span className="max-sm:hidden">Signal → Loop → Runner → Written back</span>
-        <span className="flex flex-wrap gap-5 [&_a:hover]:text-[#f2eee6]">{links}</span>
+        <span className="flex flex-wrap gap-5 [&_a:hover]:text-foreground">{links}</span>
       </div>
     </footer>
   );
@@ -49,16 +49,32 @@ type Phase = "in" | "orbit" | "run" | "back";
 type Signal = {
   phase: Phase;
   t: number;
-  color: string;
+  /** Which source it came from, or "live" once it has run. */
+  color: number | "live";
   origin: { x: number; y: number };
   entry: number;
   exit: number;
 };
 
-const INK = "#f2eee6";
-const LIVE = "#d4ff3f";
-/** Slack, Lark, GitHub, and the clock. */
-const COLORS = ["#ecb3c8", "#9fd3f0", "#c9d4e8", LIVE];
+type Palette = { ink: string; live: string; liveGlow: string; sources: string[] };
+
+/** Ink is an "r, g, b" to draw at different strengths. Sources: Slack, Lark, GitHub, the clock. */
+const PALETTES: Record<"light" | "dark", Palette> = {
+  dark: {
+    ink: "242, 238, 230",
+    live: "#d4ff3f",
+    liveGlow: "212, 255, 63",
+    sources: ["#ecb3c8", "#9fd3f0", "#c9d4e8", "#d4ff3f"],
+  },
+  light: {
+    ink: "24, 24, 27",
+    live: "#65a30d",
+    liveGlow: "101, 163, 13",
+    sources: ["#d6457a", "#2f86c4", "#475569", "#65a30d"],
+  },
+};
+
+const currentPalette = () => PALETTES[document.documentElement.classList.contains("dark") ? "dark" : "light"];
 const DURATION: Record<Phase, number> = { in: 900, orbit: 1500, run: 420, back: 1000 };
 const TRAIL = 14;
 const STEP = 16;
@@ -75,6 +91,8 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
   let raf = 0;
 
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let pal = currentPalette();
+  const colorOf = (s: Signal) => (s.color === "live" ? pal.live : pal.sources[s.color]!);
 
   let w = 0;
   let h = 0;
@@ -117,7 +135,7 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
     signals.push({
       phase: "in",
       t: 0,
-      color: COLORS[Math.floor(Math.random() * COLORS.length)]!,
+      color: Math.floor(Math.random() * pal.sources.length),
       origin,
       entry,
       // The mark's arrow points anticlockwise, so work travels that way.
@@ -151,7 +169,7 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
     else if (s.phase === "orbit") s.phase = "run";
     else if (s.phase === "run") {
       s.phase = "back";
-      s.color = LIVE;
+      s.color = "live";
       pulse = 1;
       runs += 1;
       counter.textContent = String(runs);
@@ -164,13 +182,13 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
     const r = radius();
     const top = -Math.PI / 2;
     ctx!.lineWidth = 1.5;
-    ctx!.strokeStyle = "rgba(242, 238, 230, 0.2)";
+    ctx!.strokeStyle = `rgba(${pal.ink}, 0.2)`;
     ctx!.beginPath();
     ctx!.arc(c.x, c.y, r, top + GAP, top + Math.PI * 2 - 0.08);
     ctx!.stroke();
 
     const tip = onRing(top);
-    ctx!.fillStyle = "rgba(242, 238, 230, 0.35)";
+    ctx!.fillStyle = `rgba(${pal.ink}, 0.35)`;
     ctx!.beginPath();
     ctx!.moveTo(tip.x - 12, tip.y);
     ctx!.lineTo(tip.x + 4, tip.y - 7);
@@ -178,24 +196,24 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
     ctx!.closePath();
     ctx!.fill();
 
-    ctx!.strokeStyle = "rgba(242, 238, 230, 0.06)";
+    ctx!.strokeStyle = `rgba(${pal.ink}, 0.07)`;
     ctx!.lineWidth = 1;
     ctx!.beginPath();
     ctx!.arc(c.x, c.y, r * 0.62, 0, Math.PI * 2);
     ctx!.stroke();
 
     const glow = 7 + pulse * 26;
-    ctx!.fillStyle = `rgba(212, 255, 63, ${0.1 + pulse * 0.25})`;
+    ctx!.fillStyle = `rgba(${pal.liveGlow}, ${0.1 + pulse * 0.25})`;
     ctx!.beginPath();
     ctx!.arc(c.x, c.y, glow, 0, Math.PI * 2);
     ctx!.fill();
-    ctx!.fillStyle = pulse > 0.05 ? LIVE : INK;
+    ctx!.fillStyle = pulse > 0.05 ? pal.live : `rgb(${pal.ink})`;
     ctx!.beginPath();
     ctx!.arc(c.x, c.y, 6, 0, Math.PI * 2);
     ctx!.fill();
 
     ctx!.font = '500 10px "Geist Mono", ui-monospace, monospace';
-    ctx!.fillStyle = "rgba(242, 238, 230, 0.4)";
+    ctx!.fillStyle = `rgba(${pal.ink}, 0.45)`;
     ctx!.textAlign = "center";
     ctx!.fillText("RUNNER", c.x, c.y + 26);
   }
@@ -213,13 +231,14 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
   }
 
   function drawSignal(s: Signal) {
+    const color = colorOf(s);
     const trail = trailOf(s);
     const n = trail.length;
     for (let i = 1; i < n; i++) {
       const a = trail[i - 1]!;
       const b = trail[i]!;
       ctx!.globalAlpha = (i / n) * 0.55;
-      ctx!.strokeStyle = s.color;
+      ctx!.strokeStyle = color;
       ctx!.lineWidth = 2;
       ctx!.beginPath();
       ctx!.moveTo(a.x, a.y);
@@ -229,8 +248,8 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
     const head = trail[n - 1];
     if (!head) return;
     ctx!.globalAlpha = s.phase === "back" ? 1 - Math.min(s.t / DURATION.back, 1) * 0.8 : 1;
-    ctx!.fillStyle = s.color;
-    ctx!.shadowColor = s.color;
+    ctx!.fillStyle = color;
+    ctx!.shadowColor = color;
     ctx!.shadowBlur = 12;
     ctx!.beginPath();
     ctx!.arc(head.x, head.y, 3.5, 0, Math.PI * 2);
@@ -267,10 +286,18 @@ function startLoop(stage: HTMLElement, canvas: HTMLCanvasElement, counter: HTMLE
   sizes.observe(stage);
   resize();
 
+  // The theme is a class on <html>; when it changes, draw in the other palette.
+  const themes = new MutationObserver(() => {
+    pal = currentPalette();
+    if (still) draw();
+  });
+  themes.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
   const stop = () => {
     stopped = true;
     cancelAnimationFrame(raf);
     sizes.disconnect();
+    themes.disconnect();
   };
 
   if (still) {
