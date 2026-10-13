@@ -6,7 +6,9 @@ export function getRouter() {
     routeTree,
     scrollRestoration: true,
     defaultPreload: 'intent',
-    defaultPreloadStaleTime: 0,
+    // What was loaded on hovering a link is used when it is clicked, rather
+    // than asked for a second time. Pages that change keep themselves fresh.
+    defaultPreloadStaleTime: 30_000,
   })
 
   return router

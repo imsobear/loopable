@@ -1,6 +1,7 @@
 import { HeadContent, Outlet, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { Suspense, lazy } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { NavigationProgress } from "@/components/navigation-progress";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { getViewer } from "@/server/functions/account.ts";
@@ -23,6 +24,9 @@ export const Route = createRootRoute({
   // Who is signed in, for the sidebar and for the front page to decide
   // whether to show itself or go straight to the app.
   loader: () => getViewer(),
+  // Who is signed in only changes by signing in or out, and both load the
+  // whole page again, so it is not asked for on every move between pages.
+  staleTime: Number.POSITIVE_INFINITY,
   shellComponent: RootDocument,
   component: AppLayout,
 });
@@ -64,6 +68,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <NavigationProgress />
         {children}
         <Toaster />
         <Suspense fallback={null}>
