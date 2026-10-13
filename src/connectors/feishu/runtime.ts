@@ -105,7 +105,7 @@ export const feishuRuntime: ConnectorRuntime = {
     return { ready: true };
   },
 
-  async poll({ workflowId, credential, cursor }) {
+  async poll({ workflowId, credential, cursor, since }) {
     if (workflowId !== "feishu.ask") {
       throw new Error(`Feishu cannot watch for ${workflowId}.`);
     }
@@ -116,16 +116,17 @@ export const feishuRuntime: ConnectorRuntime = {
     const signals: Signal[] = [];
 
     for (const chat of chats) {
-      const oldest = previous[chat.id];
+      // A group seen for the first time is read from when the loop last
+      // looked, so a mention sent before this look is not taken as the start.
+      const oldest = previous[chat.id] ?? String(since);
       const messages = await history(account, chat.id, oldest);
       if (messages.length === 0) {
-        if (!next[chat.id]) next[chat.id] = String(Date.now());
+        next[chat.id] = oldest;
         continue;
       }
       next[chat.id] = messages[messages.length - 1]!.createTime;
-      if (!oldest) continue;
       for (const message of messages) {
-        if (oldest && Number(message.createTime) <= Number(oldest)) continue;
+        if (Number(message.createTime) <= Number(oldest)) continue;
         if (
           !isAsk({
             senderId: message.senderId,
@@ -149,6 +150,7 @@ export const feishuRuntime: ConnectorRuntime = {
           title: summarise(message.text),
           url: permalink(account.host, message.chatId),
           payload: asked as unknown as JsonValue,
+          at: Number(message.createTime),
         });
       }
     }

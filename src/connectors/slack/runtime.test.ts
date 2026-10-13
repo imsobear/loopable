@@ -84,23 +84,27 @@ describe("slack poll", () => {
       settings: {},
       credential: account,
       cursor: cursor as never,
+      since: 95_000,
     });
 
-  it("records where each channel is and does not replay old messages on the first look", async () => {
-    givenSlack({
+  it("reads a channel it has not seen from when the loop last looked", async () => {
+    const sent = givenSlack({
       channels: [
         { id: "Ceng", name: "eng" },
         { id: "Dmaya", is_im: true },
       ],
       history: {
-        Ceng: [{ ts: "90.0", user: "Umaya", text: "<@Ubot> old mention" }],
-        Dmaya: [{ ts: "91.0", user: "Umaya", text: "old dm" }],
+        Ceng: [{ ts: "96.0", user: "Umaya", text: "<@Ubot> sent before the first look" }],
       },
     });
 
     const { signals, cursor } = await poll(null);
-    expect(signals).toEqual([]);
-    expect(cursor).toEqual({ Ceng: "90.0", Dmaya: "91.0" });
+    expect(signals.map((signal) => [signal.key, signal.at])).toEqual([["Ceng:96.0", 96_000]]);
+    expect(cursor).toEqual({ Ceng: "96.0", Dmaya: "95" });
+    const asked = sent
+      .filter((call) => call.url.includes("conversations.history"))
+      .map((call) => new URL(call.url).searchParams.get("oldest"));
+    expect(asked).toEqual(["95", "95"]);
   });
 
   it("keeps a channel mention of the bot and a DM, and skips its own replies", async () => {
@@ -134,6 +138,7 @@ describe("slack poll", () => {
           text: "<@Ubot> checkout 5xx",
           threadTs: "101.0",
         },
+        at: 101_000,
       },
       {
         key: "Dmaya:103.0",
@@ -148,6 +153,7 @@ describe("slack poll", () => {
           text: "what broke checkout",
           threadTs: "103.0",
         },
+        at: 103_000,
       },
     ]);
     expect(cursor).toEqual({ Ceng: "102.0", Dmaya: "103.0" });

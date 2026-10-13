@@ -43,6 +43,7 @@ const poll = (settings: Record<string, unknown> = {}, cursor: string | null = nu
     settings,
     credential: account,
     cursor,
+    since: 0,
   });
 
 afterEach(() => vi.unstubAllGlobals());

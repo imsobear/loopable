@@ -109,14 +109,14 @@ export async function listConversations(credential: SlackCredential): Promise<Sl
 export async function history(
   credential: SlackCredential,
   channelId: string,
-  oldest?: string,
+  oldest: string,
 ): Promise<SlackMessage[]> {
   const query: Record<string, string> = {
     channel: channelId,
     limit: "100",
     inclusive: "false",
+    oldest,
   };
-  if (oldest) query.oldest = oldest;
   const body = await slack("conversations.history", credential.botToken, { query });
   if (!body.ok) {
     if (body.error === "not_in_channel" || body.error === "channel_not_found") return [];

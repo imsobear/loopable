@@ -128,6 +128,19 @@ describe("the first look", () => {
     expect((await signalsFor("a")).map((row) => row.outcome)).toEqual(["backlog", "backlog"]);
   });
 
+  it("runs what was sent after the loop was made, even before it first looked", async () => {
+    await givenLoop("a", 1);
+    const made = (await db().select().from(loops).where(eq(loops.id, "a")).get())!.createdAt.getTime();
+    answer = [
+      { ...pull(1), at: made - 60_000 },
+      { ...pull(2), at: made + 30_000 },
+    ];
+
+    const [report] = await pollAllLoops();
+    expect(report).toMatchObject({ found: 2, queued: 1, backlog: 1 });
+    expect((await tasksFor("a")).map((task) => task.sourceRef)).toEqual(["acme/web#2"]);
+  });
+
   it("acts on everything that turns up after it", async () => {
     await givenLoop("a", 1);
     answer = [pull(1)];

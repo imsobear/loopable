@@ -181,7 +181,7 @@ function mentionsOf(raw: unknown): string[] {
 export async function history(
   credential: FeishuCredential,
   chatId: string,
-  oldestMs?: string,
+  oldestMs: string,
 ): Promise<FeishuMessage[]> {
   const parsed: FeishuMessage[] = [];
   let pageToken = "";
@@ -189,10 +189,10 @@ export async function history(
     const query: Record<string, string> = {
       container_id_type: "chat",
       container_id: chatId,
-      sort_type: oldestMs ? "ByCreateTimeAsc" : "ByCreateTimeDesc",
-      page_size: oldestMs ? "50" : "1",
+      sort_type: "ByCreateTimeAsc",
+      page_size: "50",
+      start_time: String(Math.floor(Number(oldestMs) / 1000)),
     };
-    if (oldestMs) query.start_time = String(Math.floor(Number(oldestMs) / 1000));
     if (pageToken) query.page_token = pageToken;
     const body = await call(credential.host, "/im/v1/messages", {
       token: credential.tenantAccessToken,
@@ -227,8 +227,7 @@ export async function history(
         mentionIds: mentionsOf(message.mentions),
       });
     }
-    pageToken =
-      oldestMs && data.has_more === true && typeof data.page_token === "string" ? data.page_token : "";
+    pageToken = data.has_more === true && typeof data.page_token === "string" ? data.page_token : "";
   } while (pageToken);
   return parsed.sort((a, b) => Number(a.createTime) - Number(b.createTime));
 }

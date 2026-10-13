@@ -110,20 +110,33 @@ describe("feishu poll", () => {
       settings: {},
       credential: account,
       cursor: cursor as never,
+      since: 1690000000000,
     });
 
-  it("records where each group is and does not replay old messages on the first look", async () => {
+  it("reads a group it has not seen from when the loop last looked", async () => {
     givenFeishu({
-      chats: [{ chat_id: "oc_eng", name: "eng" }],
+      chats: [
+        { chat_id: "oc_eng", name: "eng" },
+        { chat_id: "oc_quiet", name: "quiet" },
+      ],
       history: {
         oc_eng: [
           {
-            message_id: "om_old",
+            message_id: "om_before",
             create_time: "1690000000000",
             chat_id: "oc_eng",
             msg_type: "text",
             sender: { id: "ou_maya", sender_type: "user" },
-            body: { content: "{\"text\":\"@_user_1 old\"}" },
+            body: { content: "{\"text\":\"@_user_1 before the loop\"}" },
+            mentions: [{ id: "ou_bot" }],
+          },
+          {
+            message_id: "om_ask",
+            create_time: "1690000030000",
+            chat_id: "oc_eng",
+            msg_type: "text",
+            sender: { id: "ou_maya", sender_type: "user" },
+            body: { content: "{\"text\":\"@_user_1 sent before the first look\"}" },
             mentions: [{ id: "ou_bot" }],
           },
         ],
@@ -131,8 +144,8 @@ describe("feishu poll", () => {
     });
 
     const { signals, cursor } = await poll(null);
-    expect(signals).toEqual([]);
-    expect(cursor).toEqual({ oc_eng: "1690000000000" });
+    expect(signals.map((signal) => [signal.key, signal.at])).toEqual([["oc_eng:om_ask", 1690000030000]]);
+    expect(cursor).toEqual({ oc_eng: "1690000030000", oc_quiet: "1690000000000" });
   });
 
   it("keeps a group mention of the bot and skips chat and its own replies", async () => {
@@ -183,6 +196,7 @@ describe("feishu poll", () => {
           user: "ou_maya",
           text: "@_user_1 checkout 5xx",
         },
+        at: 1700000002000,
       },
     ]);
     expect(cursor).toEqual({ oc_eng: "1700000003000" });
