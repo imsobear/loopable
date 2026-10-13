@@ -147,6 +147,7 @@ async function givenLoop(action: {
   actionConnectorId: string;
   actionId: string;
   actionTarget?: ConnectionSettings;
+  mcpServers?: string[];
 }): Promise<void> {
   await db()
     .insert(loops)
@@ -223,6 +224,18 @@ describe("what the agent is asked", () => {
     expect(job.prompt).toContain("pull/7/head");
     expect(job.prompt).toContain("Do not commit or push");
     expect(job.settings.permissionMode).toBe("workspace_write");
+  });
+
+  it("carries the MCP servers the loop allows, and nothing when it allows none", async () => {
+    await givenLoop({ actionConnectorId: "github", actionId: "github.submit_review" });
+    const plain = await enqueueTask({ loopId: LOOP_ID, url: "https://github.com/acme/web/pull/7", dryRun: true });
+    await runTask(plain.id);
+    expect("mcpServers" in (await jobForTask(plain.id))).toBe(false);
+
+    await db().update(loops).set({ mcpServers: ["sentry"] }).where(eq(loops.id, LOOP_ID)).run();
+    const allowed = await enqueueTask({ loopId: LOOP_ID, url: "https://github.com/acme/web/pull/8", dryRun: true });
+    await runTask(allowed.id);
+    expect((await jobForTask(allowed.id)).mcpServers).toEqual(["sentry"]);
   });
 
   it("names the folder relative to home, and context files by the runner's workspace", async () => {

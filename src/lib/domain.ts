@@ -100,6 +100,8 @@ export type LoopView = {
   prompt: string;
   /** Added after the prompt, for a note not worth editing it over. Usually null. */
   guidance: string | null;
+  /** MCP servers the agent may call without asking. Usually empty. */
+  mcpServers: string[];
   /** Null means whichever agent is the default when the loop runs. */
   agentId: string | null;
   /** Where the answer goes. Starts out the workflow's own and is then the loop's. */
@@ -124,6 +126,7 @@ export type LoopDraft = {
   prompt: string;
   guidance: string | null;
   agentId: string | null;
+  mcpServers: string[];
   settings: ConnectionSettings;
   actionConnectorId: string;
   actionId: string;

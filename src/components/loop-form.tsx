@@ -104,6 +104,7 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
     return saved.startsWith("~/") ? saved.slice(2) : saved;
   });
   const [agentId, setAgentId] = useState(loop.agentId ?? DEFAULT_AGENT);
+  const [mcpServers, setMcpServers] = useState(loop.mcpServers.join(", "));
   const [settings, setSettings] = useState<ConnectionSettings>(() =>
     initialFieldValues(workflow?.settings ?? [], loop.settings),
   );
@@ -153,6 +154,7 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
           prompt,
           guidance: null,
           agentId: agentId === DEFAULT_AGENT ? null : agentId,
+          mcpServers: mcpServers.split(/[\s,]+/).filter(Boolean),
           settings: workflow.runsIn === "folder" ? { ...settings, folder } : settings,
           actionConnectorId,
           actionId,
@@ -236,6 +238,21 @@ export function LoopForm({ loop, trigger }: { loop: LoopEdit; trigger?: React.Re
               ))}
             </SelectContent>
           </Select>
+        </Field>
+
+        <Field
+          label="MCP servers"
+          htmlFor="loop-mcp"
+          hint="Servers the agent may call without asking, named as on the runner, such as sentry. Others are refused."
+          className="sm:max-w-sm"
+        >
+          <Input
+            id="loop-mcp"
+            value={mcpServers}
+            placeholder="None"
+            onChange={(event) => setMcpServers(event.target.value)}
+            className="font-mono"
+          />
         </Field>
 
         {workflow.runsIn === "folder" ? (

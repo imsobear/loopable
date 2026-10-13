@@ -25,6 +25,30 @@ function byId(id: string) {
 const NAME_LIMIT = 80;
 const PROMPT_LIMIT = 8000;
 const GUIDANCE_LIMIT = 4000;
+const MCP_SERVER_LIMIT = 20;
+/**
+ * What all three agents accept as a server name. Each puts the name into
+ * something of its own (a permission rule, a tool name, a config key), so
+ * anything else could change what that something means.
+ */
+const MCP_SERVER_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Trimmed, unique, and only names an agent can be told about. */
+function cleanMcpServers(given: unknown): string[] {
+  const list = Array.isArray(given) ? given.filter((name) => typeof name === "string") : [];
+  const names = [...new Set(list.map((name) => name.trim()).filter(Boolean))];
+  for (const name of names) {
+    if (!MCP_SERVER_NAME.test(name)) {
+      throw new Error(
+        `"${name}" is not an MCP server name. Use letters, numbers, - and _ as the agent shows it.`,
+      );
+    }
+  }
+  if (names.length > MCP_SERVER_LIMIT) {
+    throw new Error(`Allow at most ${MCP_SERVER_LIMIT} MCP servers.`);
+  }
+  return names;
+}
 
 function toView(row: Loop): LoopView {
   return {
@@ -38,6 +62,7 @@ function toView(row: Loop): LoopView {
     prompt: row.prompt,
     guidance: row.guidance,
     agentId: row.agentId,
+    mcpServers: row.mcpServers,
     actionConnectorId: row.actionConnectorId,
     actionId: row.actionId,
     actionTarget: row.actionTarget,
@@ -136,6 +161,7 @@ function validate(draft: LoopDraft): LoopDraft {
     name,
     prompt,
     guidance,
+    mcpServers: cleanMcpServers(draft.mcpServers),
     settings: {
       ...cleanConditions(workflow.settings, draft.settings),
       ...(folder ? { folder } : {}),
@@ -179,6 +205,7 @@ export async function createLoop(draft: LoopDraft): Promise<LoopView> {
       prompt: checked.prompt,
       guidance: checked.guidance,
       agentId: checked.agentId,
+      mcpServers: checked.mcpServers,
       actionConnectorId: checked.actionConnectorId,
       actionId: checked.actionId,
       actionTarget: checked.actionTarget,
@@ -202,6 +229,7 @@ export async function updateLoop(id: string, draft: LoopDraft): Promise<LoopView
       prompt: checked.prompt,
       guidance: checked.guidance,
       agentId: checked.agentId,
+      mcpServers: checked.mcpServers,
       actionConnectorId: checked.actionConnectorId,
       actionId: checked.actionId,
       actionTarget: checked.actionTarget,

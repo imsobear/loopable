@@ -196,6 +196,12 @@ export const loops = sqliteTable(
     prompt: text("prompt").notNull(),
     /** Added after the prompt, for a note that is not worth editing it over. */
     guidance: text("guidance"),
+    /**
+     * MCP servers the agent may call without asking, by the name the runner's
+     * agent knows them by. Empty is the norm: an agent in print mode has nobody
+     * to ask, so a server that is not named here is refused.
+     */
+    mcpServers: text("mcp_servers", { mode: "json" }).$type<string[]>().notNull().default([]),
     /** Null means whichever agent is currently the default. */
     agentId: text("agent_id"),
     /**

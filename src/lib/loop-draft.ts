@@ -25,6 +25,7 @@ export function draftForWorkflow(connectorId: string, workflowId: string): LoopE
     prompt: workflow.prompt,
     guidance: null,
     agentId: null,
+    mcpServers: [],
     settings: {},
     // Where it reads, unless the workflow says otherwise. A connector that
     // only reads has no action of its own to fall back to.

@@ -46,6 +46,8 @@ The first look never acts. Whatever is already waiting when a loop is created is
 
 **Folder.** Loops that read your code (chat bots and schedules) work in a folder, given relative to the runner's home, such as `code/web`. Each runner looks for it under its own home, so any runner with that checkout can take the job.
 
+**MCP servers.** The MCP servers a loop's agent may call, named as the runner's agent knows them, such as `sentry`. An agent run by a loop has nobody to ask, so a call to any server the loop does not name is refused, in either permission mode. The server itself, and its login, live on the runner like everything else the agent uses.
+
 ## What does the work
 
 **Agent.** A coding CLI Loopable knows how to invoke: Codex, Claude Code, Cursor Agent. The list is a catalog in the repo, not discovered from the network. Loopable stores only the choices a person makes: which agent is the default, permission mode, model, timeout. Whether one is installed lives on each runner’s inventory.

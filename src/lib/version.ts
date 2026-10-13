@@ -15,14 +15,18 @@ export const VERSION: string = pkg.version;
  * 1. Up to 0.2.x, which did not report a protocol at all.
  * 2. A folder is relative to the runner's home, and the prompt names context
  *    files by a placeholder the runner fills in with its own workspace.
+ * 3. A job can name MCP servers the agent may call without asking.
  */
-export const RUNNER_PROTOCOL = 2;
+export const RUNNER_PROTOCOL = 3;
 
 /** What a runner that says nothing is assumed to speak. */
 export const LEGACY_RUNNER_PROTOCOL = 1;
 
 /** The lowest protocol a folder job can go to. */
 export const FOLDER_JOB_PROTOCOL = 2;
+
+/** The lowest protocol a job that allows MCP servers can go to. */
+export const MCP_JOB_PROTOCOL = 3;
 
 /** Whether `a` is an older x.y.z than `b`. Anything unreadable counts as older. */
 export function olderThan(a: string | null, b: string): boolean {
