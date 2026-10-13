@@ -31,11 +31,11 @@ The Worker wakes the dispatcher on every request and once a minute from a cron t
    ```
 
    It asks for each value and generates `LOOPABLE_MASTER_KEY`. Keep a copy of the master key: every stored credential is encrypted with it.
-5. **Deploy secrets for GitHub Actions.** In the repository settings, add `CLOUDFLARE_API_TOKEN` (with Workers, Containers and DNS edit) and `CLOUDFLARE_ACCOUNT_ID`.
+5. **Deploy secrets for GitHub Actions.** In the repository settings, add `CLOUDFLARE_API_TOKEN` (with Workers, Containers and DNS edit) and `CLOUDFLARE_ACCOUNT_ID`, and in the **production** environment, `LOOPABLE_DATABASE_URL` and `LOOPABLE_DATABASE_AUTH_TOKEN`, so a deploy can migrate first.
 
 ## Deploying
 
-Run the **Deploy** workflow from the Actions tab. It runs typecheck and tests, builds the Worker and the dispatcher's container image (which needs Docker, so it is built there), and deploys both. Database migrations run when the dispatcher starts.
+Merging to `main` deploys: once CI passes there, the **Deploy** workflow migrates the database, builds the Worker and the dispatcher's container image (which needs Docker, so it is built there), and deploys both. Run it by hand to redeploy or roll back. The whole flow is in [release.md](release.md).
 
 ## Moving loop.goodone.si to the app
 

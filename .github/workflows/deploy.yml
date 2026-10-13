@@ -1,14 +1,29 @@
 name: Deploy
 
 # Deploys the hosted service to Cloudflare: the App Worker at loop.goodone.si
-# and the dispatcher container beside it. Run by hand from the Actions tab.
-# The container image is built here because it needs Docker.
+# and the dispatcher container beside it.
 #
-# Needs repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
-# The service's own secrets live on the Worker; see docs/hosting.md.
+# Runs by itself after CI passes on main, for that exact commit. Run it by
+# hand to redeploy, or to deploy an older commit as a rollback.
+#
+# Database migrations go first, so the app never goes out ahead of the
+# columns it reads. They must therefore suit the code already live too: add
+# a column in one release, stop using an old one in the next.
+#
+# Needs repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and
+# production environment secrets LOOPABLE_DATABASE_URL and
+# LOOPABLE_DATABASE_AUTH_TOKEN. The service's own secrets live on the Worker;
+# see docs/hosting.md.
 on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Commit or tag to deploy (defaults to main)"
+        required: false
       redirect:
         description: "Also deploy the old site address as a redirect to loop.goodone.si"
         type: boolean
@@ -20,18 +35,36 @@ concurrency:
 
 jobs:
   deploy:
+    # After CI only when CI passed on a push to main, not on a pull request.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment:
+      name: production
+      url: https://loop.goodone.si
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref || 'main' }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test
+
+      # CI already checked the commit it hands over; a commit picked by hand
+      # is checked here.
+      - if: github.event_name == 'workflow_dispatch'
+        run: pnpm typecheck && pnpm test
+
+      - name: Migrate the database
+        run: node --experimental-strip-types scripts/migrate.ts
+        env:
+          LOOPABLE_DATABASE_URL: ${{ secrets.LOOPABLE_DATABASE_URL }}
+          LOOPABLE_DATABASE_AUTH_TOKEN: ${{ secrets.LOOPABLE_DATABASE_AUTH_TOKEN }}
 
       - name: Deploy the app and the dispatcher
         run: pnpm run deploy
@@ -45,3 +78,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Check it answers
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://loop.goodone.si/)
+            [ "$code" = 200 ] && echo "loop.goodone.si answers 200" && exit 0
+            sleep 10
+          done
+          echo "loop.goodone.si answered $code" >&2
+          exit 1

@@ -2,7 +2,8 @@ name: Release
 
 # Publishes loopable-cli to npm from main: checks, bumps the version, tags it,
 # publishes, then pushes the commit and tag, so every version on npm is one
-# tagged commit here. Run by hand from the Actions tab.
+# tagged commit here. Run by hand from the Actions tab, after the commit is
+# live: a new runner can rely on what the service it talks to has.
 #
 # npm trusts this workflow directly (trusted publishing), so there is no npm
 # token anywhere. Set up once on npmjs.com: loopable-cli → Settings → Trusted
@@ -20,6 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: write
   id-token: write
 
@@ -32,6 +34,18 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+
+      - name: Check main is what is deployed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head="$(git rev-parse HEAD)"
+          live="$(gh run list --workflow deploy.yml --status success --limit 1 --json headSha -q '.[0].headSha')"
+          if [ "$head" != "$live" ]; then
+            echo "main is at $head but the last successful deploy was $live." >&2
+            echo "Wait for the deploy of main to finish, or run Deploy, then release." >&2
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
