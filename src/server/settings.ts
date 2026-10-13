@@ -50,7 +50,7 @@ export async function deleteSystemSetting(key: string): Promise<void> {
     .run();
 }
 
-/** New key first, then the old engine.* name so a laptop install keeps its pause. */
+/** New key first, then the old engine.* name so a database from before keeps its pause. */
 export async function readSystemSettingRenamed<T extends JsonValue>(
   key: string,
   previous: string,

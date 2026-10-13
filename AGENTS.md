@@ -1,6 +1,6 @@
 # Loopable
 
-Loopable puts your coding agent on a loop: workflows set up in the browser that run on the user's own machine. It is hosted at loop.goodone.si.
+Prompt it when you're here; loop it when you're not. Loopable turns the work that keeps coming back into agent workflows, set up in the browser at loop.goodone.si. They run on the user's own machine with Codex or Claude Code, and answer where they were asked.
 
 Work comes in from GitHub, Slack, Lark, email, or the clock. A loop says what to do. Codex, Claude Code, or Cursor Agent does it on a runner on the user's machine, and the answer is written back where it was asked. Every run is recorded. The story is in `docs/narrative.md`.
 
@@ -9,7 +9,7 @@ Work comes in from GitHub, Slack, Lark, email, or the clock. A loop says what to
 - TanStack Start (React + Vite) for the app, server routes and server functions
 - pnpm
 - Tailwind CSS with shadcn/ui
-- SQLite for state (libSQL when hosted), encrypted secrets when hosted, the OS keychain locally
+- SQLite for state (libSQL when hosted), encrypted secrets when hosted, the macOS keychain (or a file elsewhere) in `pnpm dev`
 - Hosted on Cloudflare: the app as a Worker, the dispatcher as a Container; see `docs/hosting.md`
 
 ## Workspaces

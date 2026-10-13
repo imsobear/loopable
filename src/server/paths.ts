@@ -16,7 +16,7 @@ export function dbPath(): string {
   return process.env.LOOPABLE_DB ?? join(dataDir(), "loopable.sqlite");
 }
 
-/** Keychain service prefix. Dev must not read or write the deploy install's secrets. */
+/** Keychain service prefix. `pnpm dev` must not read or write the secrets of another local profile. */
 export function secretNamespace(): string {
   return process.env.LOOPABLE_SECRET_PREFIX ?? (isDevProfile() ? "loopable-dev" : "loopable");
 }

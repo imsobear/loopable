@@ -1,6 +1,6 @@
 # Concepts
 
-Loopable puts your coding agent on a loop. It is hosted at loop.goodone.si; the agent runs on your machine. It watches the services you already work in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded. Why it exists is in [narrative.md](narrative.md).
+Loopable turns the work that keeps coming back into agent workflows. It is hosted at loop.goodone.si; the agent runs on your machine. It watches the services you already work in and finishes the work with a coding agent: it picks up a signal, does what the loop says, and writes the result back. Every run is recorded. Why it exists is in [narrative.md](narrative.md).
 
 ```text
 Signal → Loop → Task

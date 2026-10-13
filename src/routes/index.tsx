@@ -5,7 +5,7 @@ import { getViewer } from "@/server/functions/account.ts";
 /**
  * The front page. Signed in, it is still here to read, with a way into the
  * app; a link that sent someone to sign in first (`?next=`) goes on to where
- * it was heading. A local install has nobody to sign in, so it opens the app.
+ * it was heading. Under `pnpm dev` nobody signs in, so it opens the app.
  */
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { next?: string; error?: string } => ({

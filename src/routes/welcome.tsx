@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Landing, landingHead } from "@/landing/landing";
 import { getViewer } from "@/server/functions/account.ts";
 
-/** The front page for anyone, and on a local install too. */
+/** The front page for anyone, and under `pnpm dev` too. */
 export const Route = createFileRoute("/welcome")({
   beforeLoad: async () => ({ signedIn: Boolean((await getViewer()).viewer) }),
   head: landingHead,

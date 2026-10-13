@@ -14,7 +14,7 @@ function Privacy() {
     <LegalPage signedIn={signedIn} title="Privacy">
       <section>
         <p>
-          Loopable runs workflows for your coding agent. The service at loop.goodone.si holds your loops,
+          Loopable turns the work that keeps coming back into workflows your coding agent runs. The service at loop.goodone.si holds your loops,
           your connections and the record of each run; the agent itself runs on your own machine. This
           page says what Loopable keeps, why, and how to have it removed.
         </p>

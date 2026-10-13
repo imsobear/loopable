@@ -118,7 +118,7 @@ describe("issuesFor", () => {
     ).toEqual([]);
   });
 
-  it("pins a loop with an old absolute folder to a runner on this host", () => {
+  it("says a loop with an old absolute folder needs editing", () => {
     expect(
       issuesFor(
         { ...ready, hostAgentIds: [] },
@@ -131,7 +131,7 @@ describe("issuesFor", () => {
           actionId: "wechat.reply",
         }),
       ),
-    ).toEqual(["Daily look needs a runner on this host with Cursor Agent signed in."]);
+    ).toEqual(["Daily look works in an absolute folder from an older version. Edit it and give the folder relative to the runner's home."]);
   });
 
   it("asks for an upgrade when only an older runner has the agent", () => {
@@ -147,7 +147,7 @@ describe("issuesFor", () => {
           actionId: "wechat.reply",
         }),
       ),
-    ).toEqual(["Daily look needs a newer runner. Upgrade the runners with npm install -g loopable-cli."]);
+    ).toEqual(["Daily look needs a newer runner. Update the runners from the Runners page."]);
   });
 
   it("lets a loop with a relative folder run on any runner", () => {

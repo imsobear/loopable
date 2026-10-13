@@ -89,7 +89,7 @@ export const gmailManifest = defineManifest({
       pollEveryMs: 30 * 60_000,
     },
   ],
-  // No ready-made job: what to do with mail is the team's to say, in a
+  // No ready-made job: what to do with mail is yours to say, in a
   // custom loop.
   workflows: [],
   actions: [

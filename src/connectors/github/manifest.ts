@@ -91,7 +91,7 @@ const REPLY_PROMPT = [
 export const githubManifest = defineManifest({
   id: "github",
   name: "GitHub",
-  tagline: "Pick up reviews and issues sent to your team's shared GitHub account.",
+  tagline: "Pick up reviews requested from the connected account and issues assigned to it, and answer as it.",
   docsUrl: "https://docs.github.com/rest",
   icon: "Github",
   accent: "bg-neutral-900 text-white",

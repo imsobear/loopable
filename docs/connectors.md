@@ -56,6 +56,8 @@ Gmail is connected by signing in with Google. Hosted, Google sends the browser b
 
 Gmail asks for `gmail.readonly` and `gmail.send`. A connection made before sending was offered has to be reconnected to send.
 
+Google has not verified Loopable yet, because reading mail is a scope it reviews first. Until it does, Google shows a warning when you connect: choose **Advanced**, then **Go to Loopable**. It also limits an unverified app to 100 users.
+
 ## Slack bot
 
 The Slack connection is a **bot in a Slack app**, not a Slack user login. For now you create the Slack app yourself, install it in your Slack workspace, and paste the Bot User OAuth Token (`xoxb-…`). That token is not a person's Slack account. Loopable polls, so Slack never has to send it anything. An "Add to Slack" button, with Slack sending events, is planned now that Loopable has a public address.

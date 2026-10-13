@@ -252,9 +252,9 @@ const WORKFLOWS: Array<{ icon: string; from: string; name: string; answer: strin
   { icon: "Github", from: "GitHub", name: "Review pull requests", answer: "A review, as a comment" },
   { icon: "Github", from: "GitHub", name: "Reply to issues", answer: "A comment on the issue" },
   { icon: "Slack", from: "Slack bot", name: "Do what I ask the Slack bot", answer: "A reply in the thread" },
-  { icon: "Feishu", from: "Lark bot", name: "Do what I ask the Lark bot", answer: "A reply in the thread" },
+  { icon: "Feishu", from: "Lark bot", name: "Do what I ask the Feishu / Lark bot", answer: "A reply in the thread" },
   { icon: "Wechat", from: "WeChat", name: "Do what I ask the WeChat bot", answer: "A reply in the chat" },
-  { icon: "Gmail", from: "Gmail", name: "When an email arrives", answer: "An email back" },
+  { icon: "Gmail", from: "Gmail", name: "Your own loop on an email arriving", answer: "An email back" },
   { icon: "Clock", from: "Schedule", name: "Do something on a schedule", answer: "The Inbox, or any thread" },
 ];
 

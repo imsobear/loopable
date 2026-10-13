@@ -102,9 +102,9 @@ export const githubRuntime = defineRuntime({
     if (oauthAppRegistration("github")) return { ready: true };
     return {
       ready: false,
-      reason: "This build has no GitHub app registration.",
+      reason: "No GitHub app is registered here.",
       fixHint:
-        "Set LOOPABLE_GITHUB_CLIENT_ID and LOOPABLE_GITHUB_CLIENT_SECRET to use your own OAuth app.",
+        "Set LOOPABLE_GITHUB_CLIENT_ID and LOOPABLE_GITHUB_CLIENT_SECRET on the Worker, or add it to config/oauth-app.json when developing.",
     };
   },
   identifyLink(url) {

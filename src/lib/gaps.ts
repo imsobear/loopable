@@ -45,9 +45,9 @@ export function issuesFor(readiness: LoopReadiness, loop: LoopView): string[] {
   } else if (!pool.includes(agentId)) {
     issues.push(
       needs === "host"
-        ? `${loop.name} needs a runner on this host with ${agentName(agentId)} signed in.`
+        ? `${loop.name} works in an absolute folder from an older version. Edit it and give the folder relative to the runner's home.`
         : needs === "folder" && readiness.availableAgentIds.includes(agentId)
-          ? `${loop.name} needs a newer runner. Upgrade the runners with npm install -g loopable-cli.`
+          ? `${loop.name} needs a newer runner. Update the runners from the Runners page.`
           : `${loop.name} uses ${agentName(agentId)}, which no online runner has signed in.`,
     );
   }

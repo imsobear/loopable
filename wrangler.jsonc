@@ -8,7 +8,7 @@
   "vars": {
     // The App Worker never migrates; the dispatcher container does, once.
     "LOOPABLE_SKIP_MIGRATE": "1",
-    // Where OAuth callbacks, sign-in and runner logins come back to.
+    // Where OAuth callbacks and sign-in come back to, and the address runners join.
     "LOOPABLE_BASE_URL": "https://loop.goodone.si"
   },
   // The site lives here now: the front page is the app's /. Secrets

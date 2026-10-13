@@ -22,3 +22,6 @@ scratch-*.ts
 *.sqlite-shm
 *.sqlite-wal
 config/oauth-app.json
+
+# Trying hosted mode locally (docs/hosting.md)
+.hosted/

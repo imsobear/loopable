@@ -69,7 +69,7 @@ export async function claimAgentJob(runnerId: string): Promise<AgentJob | null> 
     if (jobMinProtocol(job) > protocolOf(row)) {
       await updateTask(task.id, {
         state: "failed",
-        error: `${row.name} is too old for this job. Upgrade it with npm install -g loopable-cli, then run this again.`,
+        error: `${row.name} is too old for this job. Update it from the Runners page, then run this again.`,
         leaseUntil: null,
       });
       continue;

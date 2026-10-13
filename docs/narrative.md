@@ -2,7 +2,7 @@
 
 Prompt it when you're here. Loop it when you're not.
 
-Loopable turns the work that keeps coming back into agent workflows, in minutes. You set them up in the browser at loop.goodone.si; they run on your machine with Codex or Claude Code, and the answer goes back where it was asked.
+Loopable turns the work that keeps coming back into agent workflows, in minutes. You set them up in the browser at loop.goodone.si; they run on your machine with Codex or Claude Code, and answer where they were asked.
 
 It is for developers first, and the teams they work in. Work comes in from GitHub, Slack, Lark, email, or the clock, and every run is recorded.
 
@@ -36,7 +36,7 @@ Loopable is hosted, so there is nothing to keep running but the runner. The runn
 
 - **Reach.** Whatever your machine can reach, the agent can reach: the internal network, logs, databases, internal services.
 - **Extend.** Any MCP server, CLI, or login you set up on that machine. No platform decides what is allowed.
-- **Choose.** Codex, Claude Code, or Cursor Agent, and the model you want.
+- **Choose.** Codex or Claude Code (Cursor Agent too), and the model you want.
 - **Keep local.** Your code, logs, and network access stay on your machine. The agent uses the plan you already pay for.
 
 What does pass through the service: connection tokens, which are encrypted and never handed to the agent, and the prompts and answers of each run, which make up the inbox.

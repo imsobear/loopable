@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 
 /**
  * Whether this runner came from `npm install -g loopable-cli`, and so can
- * update itself the same way. One run from a checkout is updated with git.
+ * update itself the same way. One run from a checkout is updated by hand.
  */
 export function isUpdatable(entry = process.argv[1] ?? ""): boolean {
   return /[\\/]node_modules[\\/]loopable-cli[\\/]/.test(entry);

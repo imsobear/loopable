@@ -8,6 +8,7 @@
     "loopable": "dist/cli.mjs"
   },
   "files": [
+    "LICENSE",
     "dist/cli.mjs",
     "dist/runner.mjs"
   ],
@@ -23,6 +24,7 @@
     "url": "https://github.com/imsobear/loopable/issues"
   },
   "homepage": "https://loop.goodone.si",
+  "keywords": ["coding-agent", "codex", "claude-code", "agent-workflows", "runner", "loopable"],
   "publishConfig": {
     "access": "public"
   },

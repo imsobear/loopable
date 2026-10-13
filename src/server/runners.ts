@@ -191,11 +191,13 @@ export async function pickRunner(input: {
   const chosen = idle ?? candidates[0];
   if (chosen) return chosen.id;
   if (input.requiresHost) {
-    throw new Error("This job needs a runner on the same host as Loopable.");
+    throw new Error(
+      "This loop's folder is an absolute path from an older version. Edit the loop and give the folder relative to the runner's home, such as code/web.",
+    );
   }
   if (capable.length > 0) {
     throw new Error(
-      "Every runner with this agent is too old for this job. Upgrade them with npm install -g loopable-cli.",
+      "Every runner with this agent is too old for this job. Update them from the Runners page, or with npm install -g loopable-cli, then loopable stop and loopable runner.",
     );
   }
   throw new Error("No runner is online that can run this agent.");
@@ -241,7 +243,7 @@ async function workspaceForJoinToken(token: string): Promise<string | null> {
     .where(eq(workspaces.joinTokenHash, tokenHash(token)))
     .get();
   if (row) return row.id;
-  // A local install from before workspaces kept its token only in the secret
+  // A database from before workspaces kept its token only in the secret
   // store, so nothing has been hashed yet.
   if (!isHosted() && token === (await secretStore().get(joinTokenKey(LOCAL_WORKSPACE)))) {
     await rememberJoinToken(LOCAL_WORKSPACE, token);
@@ -429,7 +431,7 @@ export async function requestRunnerUpdate(id: string): Promise<void> {
   if (!row || row.forgottenAt) throw new Error("Unknown runner.");
   if (!isRunnerOnline(row)) throw new Error(`${row.name} is offline, so it cannot update now.`);
   if (row.updatable !== true) {
-    throw new Error(`${row.name} cannot update itself. On that machine, run npm install -g loopable-cli.`);
+    throw new Error(`${row.name} cannot update itself. On that machine, run npm install -g loopable-cli, then loopable stop and loopable runner.`);
   }
   const version = await latestRunnerVersion();
   if (!olderThan(row.version, version)) throw new Error(`${row.name} is already on v${row.version}.`);

@@ -77,7 +77,7 @@ function ConnectorDetailPage() {
 
       {!state.readiness.ready ? (
         <Alert variant="destructive">
-          <AlertTitle>Not available in this build</AlertTitle>
+          <AlertTitle>Not set up</AlertTitle>
           <AlertDescription className="flex flex-col gap-1">
             <span>{state.readiness.reason}</span>
             {state.readiness.fixHint ? <span>{state.readiness.fixHint}</span> : null}
