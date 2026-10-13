@@ -64,6 +64,9 @@ export const gmailManifest = defineManifest({
     kind: "oauth_redirect",
     scopes: GMAIL_SCOPES,
     needsAppRegistration: true,
+    // Reading mail is a scope Google reviews before it stops warning, and
+    // Loopable has not been through that review yet.
+    note: "Google will say it hasn't verified Loopable yet, because reading mail is a scope it reviews first. To go on, choose Advanced, then Go to Loopable. Loopable reads the mail its loops watch for and sends what a loop asks it to, nothing else.",
   },
   triggers: [
     {
