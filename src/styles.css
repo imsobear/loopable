@@ -151,3 +151,25 @@ body {
     transform: translateX(300%);
   }
 }
+
+/* The front page's flow: a signal travelling down a pipe, and back up the side. */
+@keyframes flow-down {
+  from {
+    top: -4px;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    top: calc(100% - 4px);
+  }
+}
+@keyframes flow-up {
+  from {
+    top: calc(100% - 4px);
+  }
+  to {
+    top: -4px;
+  }
+}

@@ -1,15 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check, CornerDownRight, Inbox } from "lucide-react";
+import { ArrowRight, CornerDownRight } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { LoopableMark } from "@/components/brand";
 import { ConnectorIcon } from "@/components/connector-icon";
 import { signInHref } from "@/components/sign-in";
 import { Button } from "@/components/ui/button";
+import { HeroFlow } from "./hero-flow";
+import { LoopFooter } from "./loop-footer";
 
 const TITLE = "Loopable — prompt it when you're here, loop it when you're not";
 const DESCRIPTION =
-  "Loopable turns the work that keeps coming back into agent workflows, in minutes. They run on your machine with Codex, Claude Code, or Cursor Agent, and answer where they were asked.";
+  "Loopable turns the work that keeps coming back into agent workflows, in minutes. They run on your machine with Codex or Claude Code, and answer where they were asked.";
 const ORIGIN = "https://loop.goodone.si";
 const REPO = "https://github.com/imsobear/loopable";
 
@@ -55,7 +57,7 @@ export function Landing({ signedIn, next, error }: Props) {
         <OnYourMachine />
         <GetStarted signedIn={signedIn} next={next} />
       </main>
-      <Footer />
+      <LoopFooter links={<FooterLinks />} />
     </div>
   );
 }
@@ -75,7 +77,7 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-16 border-t">
-      <div className="mx-auto max-w-5xl px-6 py-20">
+      <div className="mx-auto max-w-6xl px-6 py-20">
         <p className="text-sm font-medium text-muted-foreground">{kicker}</p>
         <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight text-balance">{title}</h2>
         {lead ? <p className="mt-3 max-w-2xl text-muted-foreground text-pretty">{lead}</p> : null}
@@ -88,7 +90,7 @@ function Section({
 export function Nav({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-10 border-b bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-6">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
         <a href="/" className="flex items-center gap-2 font-medium">
           <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <LoopableMark className="size-4.5" />
@@ -126,9 +128,9 @@ export function Nav({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-function SignInButtons({ next }: { next?: string }) {
+function SignInButtons({ next, stacked }: { next?: string; stacked?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={stacked ? "flex flex-col gap-2 [&>*]:w-full" : "flex flex-wrap items-center gap-2"}>
       <Button size="lg" nativeButton={false} render={<a href={signInHref(next)} />}>
         <GithubMark />
         Sign in with GitHub
@@ -143,14 +145,13 @@ function SignInButtons({ next }: { next?: string }) {
 
 function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
   return (
-    <section className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-20 md:grid-cols-[1.6fr_1fr] md:py-28">
+    <section className="mx-auto grid min-h-[calc(100svh-3.5rem)] max-w-6xl items-center gap-12 px-6 py-16 md:grid-cols-[1.25fr_1fr]">
       <div>
-        <p className="text-sm font-medium text-muted-foreground">Agent workflows</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance lg:text-[2.75rem] lg:leading-tight">
+        <h1 className="text-4xl font-semibold tracking-tight text-balance lg:text-[2.75rem] lg:leading-tight">
           <span className="block">Prompt it when you&rsquo;re here.</span>
           <span className="block">Loop it when you&rsquo;re not.</span>
         </h1>
-        <p className="mt-5 text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>
+        <p className="mt-5 max-w-xl text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>
         <div className="mt-8">
           {signedIn ? (
             <Button size="lg" nativeButton={false} render={<Link to="/inbox" />}>
@@ -162,61 +163,8 @@ function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
           )}
         </div>
       </div>
-      <RunCard />
+      <HeroFlow />
     </section>
-  );
-}
-
-/** One run, drawn the way the Inbox shows it: what came in, where it ran, what went back. */
-function RunCard() {
-  return (
-    <div className="rounded-xl border bg-card p-1.5 shadow-sm">
-      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-        <Inbox className="size-3.5" />
-        Inbox
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Step icon={<ConnectorIcon icon="Slack" className="size-8" />} label="Slack bot · #oncall">
-          <span className="text-muted-foreground">Maya:</span> @loopable checkout 5xx since 4pm?
-        </Step>
-        <Step icon={<ConnectorIcon icon="Codex" className="size-8" />} label="Codex · on Maya's laptop">
-          Read the service logs and the last deploy. Found it in the cart service.
-        </Step>
-        <Step icon={<ConnectorIcon icon="Slack" className="size-8" />} label="Replied in the thread" done>
-          Cause: redis timeouts on cart since the 15:52 deploy. Rolling back fixes it.
-        </Step>
-      </div>
-    </div>
-  );
-}
-
-function Step({
-  icon,
-  label,
-  done,
-  children,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  done?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex gap-3 rounded-lg bg-muted/50 p-3">
-      {icon}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {label}
-          {done ? (
-            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-400">
-              <Check className="size-3" />
-              Written
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1 text-sm">{children}</p>
-      </div>
-    </div>
   );
 }
 
@@ -277,8 +225,7 @@ function HowItWorks() {
       <ol className="grid gap-4 md:grid-cols-3">
         {steps.map((step, index) => (
           <li key={step.title} className="flex flex-col rounded-xl border p-5">
-            <span className="text-sm text-muted-foreground">{index + 1}</span>
-            <h3 className="mt-1 font-medium">{step.title}</h3>
+            <StepTitle n={index + 1}>{step.title}</StepTitle>
             <p className="mt-2 flex-1 text-sm text-muted-foreground">{step.body}</p>
             {step.icons.length > 0 ? (
               <div className="mt-4 flex gap-1.5">
@@ -377,6 +324,18 @@ function OnYourMachine() {
   );
 }
 
+/** A step's number and title on one line. */
+function StepTitle({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-2.5 font-medium">
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground tabular-nums">
+        {n}
+      </span>
+      {children}
+    </h3>
+  );
+}
+
 function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
   return (
     <Section
@@ -386,9 +345,8 @@ function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
       lead="Your machine needs Node 22+ and Codex or Claude Code signed in."
     >
       <ol className="grid gap-4 md:grid-cols-3">
-        <li className="rounded-xl border p-5">
-          <span className="text-sm text-muted-foreground">1</span>
-          <h3 className="mt-1 font-medium">Sign in</h3>
+        <li className="flex flex-col rounded-xl border p-5">
+          <StepTitle n={1}>Sign in</StepTitle>
           <div className="mt-4">
             {signedIn ? (
               <Button nativeButton={false} render={<Link to="/inbox" />}>
@@ -396,23 +354,19 @@ function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
                 <ArrowRight data-icon="inline-end" />
               </Button>
             ) : (
-              <div className="flex flex-col items-start gap-2">
-                <SignInButtons next={next} />
-              </div>
+              <SignInButtons next={next} stacked />
             )}
           </div>
         </li>
         <li className="rounded-xl border p-5">
-          <span className="text-sm text-muted-foreground">2</span>
-          <h3 className="mt-1 font-medium">Connect your machine</h3>
+          <StepTitle n={2}>Connect your machine</StepTitle>
           <pre className="mt-4 overflow-x-auto rounded-lg bg-muted px-3 py-2.5 font-mono text-xs leading-relaxed">
             npm install -g loopable-cli{"\n"}loopable runner --token …
           </pre>
           <p className="mt-2 text-xs text-muted-foreground">The token is on your Runners page.</p>
         </li>
         <li className="rounded-xl border p-5">
-          <span className="text-sm text-muted-foreground">3</span>
-          <h3 className="mt-1 font-medium">Turn on a loop</h3>
+          <StepTitle n={3}>Turn on a loop</StepTitle>
           <p className="mt-4 text-sm text-muted-foreground">
             Connect GitHub or a chat bot, and pick a workflow.
           </p>
@@ -422,29 +376,37 @@ function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
   );
 }
 
+/** Where the footer points, on the front page and the legal pages alike. */
+function FooterLinks() {
+  return (
+    <>
+      <a href={REPO} className="hover:text-foreground">
+        GitHub
+      </a>
+      <a href={`${REPO}/tree/main/docs`} className="hover:text-foreground">
+        Docs
+      </a>
+      <a href="/privacy" className="hover:text-foreground">
+        Privacy
+      </a>
+      <a href="/terms" className="hover:text-foreground">
+        Terms
+      </a>
+      <span>MIT licensed</span>
+    </>
+  );
+}
+
 export function Footer() {
   return (
     <footer className="border-t">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-sm text-muted-foreground">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-sm text-muted-foreground">
         <span className="flex items-center gap-2 text-foreground">
           <LoopableMark className="size-4" />
           Loopable
         </span>
-        <span>Put your coding agent on a loop</span>
         <span className="ml-auto flex gap-5">
-          <a href={REPO} className="hover:text-foreground">
-            GitHub
-          </a>
-          <a href={`${REPO}/tree/main/docs`} className="hover:text-foreground">
-            Docs
-          </a>
-          <a href="/privacy" className="hover:text-foreground">
-            Privacy
-          </a>
-          <a href="/terms" className="hover:text-foreground">
-            Terms
-          </a>
-          <span>MIT licensed</span>
+          <FooterLinks />
         </span>
       </div>
     </footer>

@@ -2,7 +2,7 @@
 
 Prompt it when you're here. Loop it when you're not.
 
-Loopable turns the work that keeps coming back into agent workflows, in minutes. Set them up at [loop.goodone.si](https://loop.goodone.si); they run on your machine with Codex, Claude Code, or Cursor Agent, and the answer goes back where it was asked.
+Loopable turns the work that keeps coming back into agent workflows, in minutes. Set them up at [loop.goodone.si](https://loop.goodone.si); they run on your machine with Codex or Claude Code, and the answer goes back where it was asked.
 
 A review request, a question in #oncall, a morning check: today each one waits until you copy it into your agent, and when you are busy or away, it stops. Hosted agents can take some of it, but they run in a cloud sandbox that cannot reach your internal network, logs, or services.
 
