@@ -33,17 +33,11 @@ A GitHub App was considered and set aside for now. An App cannot be requested as
 Nobody using Loopable registers an OAuth app. They click Connect.
 
 - **Hosted**, Loopable's own GitHub OAuth app has the callback `https://loop.goodone.si/api/connectors/github/callback`. Signing in with GitHub comes back to the same address, so one registration covers both. Setup is in [hosting.md](hosting.md).
-- **Locally** (`pnpm dev`), the app shipped in this repo has the loopback callback `http://127.0.0.1:4321/api/connectors/github/callback`. GitHub matches it exactly, port and path, so open the app at `http://127.0.0.1:4321`.
+- **Locally** (`pnpm dev`), copy `config/oauth-app.example.json` to `config/oauth-app.json` (gitignored) and fill in your own development apps, registered with the loopback callback `http://127.0.0.1:4321/api/connectors/github/callback`. GitHub matches it exactly, port and path, so open the app at `http://127.0.0.1:4321`.
 
-Login is the OAuth 2.0 authorization code flow with PKCE (S256).
+No app is built into the code, so no client secret lives in the repository. The app is read from `LOOPABLE_GITHUB_CLIENT_ID` and `LOOPABLE_GITHUB_CLIENT_SECRET` (the Worker's secrets when hosted), or from `config/oauth-app.json`.
 
-**Treat the shipped client secret as public, not as a credential.** GitHub lists `client_secret` as required at the token endpoint and does not distinguish between public and confidential clients, so a browser-redirect login cannot hide one. The GitHub CLI embeds its secret for the same reason.
-
-PKCE is what actually protects a login: an intercepted authorization code cannot be redeemed by anyone else, because the exchange must present the verifier held only by the process that started the flow.
-
-What a copied client id and secret allow is impersonation: a different app can show "Loopable" on GitHub's consent screen. They give no access to any account, mint no token without a person clicking Authorize, and cannot reach tokens already stored.
-
-To use your own registration (GitHub Enterprise, or a private app), set `LOOPABLE_GITHUB_CLIENT_ID` and `LOOPABLE_GITHUB_CLIENT_SECRET`, or put them in gitignored `config/oauth-app.json`.
+Login is the OAuth 2.0 authorization code flow with PKCE (S256). An intercepted authorization code cannot be redeemed by anyone else, because the exchange must present the verifier held only by the process that started the flow.
 
 ## WeChat
 

@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { oauthAppRegistration, shippedOAuthApp } from "./oauth-app.ts";
+import { oauthAppRegistration } from "./oauth-app.ts";
 
 const previousId = process.env.LOOPABLE_GITHUB_CLIENT_ID;
 const previousSecret = process.env.LOOPABLE_GITHUB_CLIENT_SECRET;
@@ -20,12 +20,7 @@ function restore(key: string, value: string | undefined): void {
 }
 
 describe("oauth app registration", () => {
-  it("ships GitHub and Gmail so the user only authorizes", () => {
-    expect(shippedOAuthApp("github")?.clientId).toBeTruthy();
-    expect(shippedOAuthApp("gmail")?.clientId).toBeTruthy();
-  });
-
-  it("lets env override the shipped GitHub app", () => {
+  it("takes the app from env", () => {
     process.env.LOOPABLE_GITHUB_CLIENT_ID = "from-env";
     process.env.LOOPABLE_GITHUB_CLIENT_SECRET = "from-env-secret";
     expect(oauthAppRegistration("github")).toEqual({
@@ -34,16 +29,14 @@ describe("oauth app registration", () => {
     });
   });
 
-  it("does not use the shipped apps at a public address, whose callback is loopback", () => {
+  it("has no app built in", () => {
     // Away from any config/oauth-app.json this checkout happens to have.
     const cwd = vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(join(tmpdir(), "loopable-oauth-")));
     delete process.env.LOOPABLE_GITHUB_CLIENT_ID;
     delete process.env.LOOPABLE_GITHUB_CLIENT_SECRET;
-    process.env.LOOPABLE_BASE_URL = "https://loop.example";
+    delete process.env.LOOPABLE_BASE_URL;
     expect(oauthAppRegistration("github")).toBeNull();
-    process.env.LOOPABLE_GITHUB_CLIENT_ID = "hosted";
-    process.env.LOOPABLE_GITHUB_CLIENT_SECRET = "hosted-secret";
-    expect(oauthAppRegistration("github")?.clientId).toBe("hosted");
+    expect(oauthAppRegistration("gmail")).toBeNull();
     cwd.mockRestore();
   });
 });

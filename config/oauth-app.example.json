@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy to config/oauth-app.json (gitignored) to sign in and connect while developing. Register each app with the loopback callback: GitHub http://127.0.0.1:4321/api/connectors/github/callback, Google http://127.0.0.1:4321/api/connectors/gmail/callback.",
+  "github": { "clientId": "", "clientSecret": "" },
+  "gmail": { "clientId": "", "clientSecret": "" }
+}

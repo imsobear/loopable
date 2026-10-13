@@ -7,49 +7,23 @@ export type OAuthAppRegistration = {
 };
 
 /**
- * App registrations Loopable ships. End users never set these; they only click
- * Connect. A client on the user's machine cannot keep clientSecret confidential,
- * which both GitHub and Google accept for public clients. PKCE is what secures
- * the exchange. Env or config/oauth-app.json override this for GitHub Enterprise
- * or a private registration.
+ * The OAuth app a connector signs in and connects with: from env when hosted
+ * (Worker secrets), or from gitignored config/oauth-app.json when developing.
+ * Nothing is built in, so no app's secret lives in the repository; without
+ * one, signing in with that provider says plainly that it is not set up.
  */
-const SHIPPED: Record<string, OAuthAppRegistration> = {
-  github: {
-    clientId: "Ov23lilxTpmZdHyRCH5f",
-    clientSecret: "478c0e954e7c573763f128ba80054aca3fe5724e",
-  },
-  gmail: {
-    clientId: "477908327191-4juu8vo8bffs63hoqlul1u2fqdch27i7.apps.googleusercontent.com",
-    clientSecret: "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",
-  },
-};
-
-export function shippedOAuthApp(connectorId: string): OAuthAppRegistration | null {
-  return SHIPPED[connectorId] ?? null;
-}
-
 export function oauthAppRegistration(connectorId: string): OAuthAppRegistration | null {
-  return fromEnv(connectorId) ?? fromFile(connectorId) ?? shippedForHere(connectorId);
+  return fromEnv(connectorId) ?? fromFile(connectorId);
 }
 
-/**
- * The shipped apps call back to 127.0.0.1, so at a public address they would
- * send people back somewhere that is not Loopable. There, only a registration
- * made for that address counts, and a missing one is said plainly.
- */
-function shippedForHere(connectorId: string): OAuthAppRegistration | null {
-  if (process.env.LOOPABLE_BASE_URL?.startsWith("https://")) return null;
-  return shippedOAuthApp(connectorId);
-}
-
-/** LOOPABLE_GITHUB_CLIENT_ID and friends, for a private or Enterprise app. */
+/** LOOPABLE_GITHUB_CLIENT_ID and friends. */
 function fromEnv(connectorId: string): OAuthAppRegistration | null {
   const prefix = `LOOPABLE_${connectorId.toUpperCase()}_CLIENT_`;
   return pick(process.env[`${prefix}ID`], process.env[`${prefix}SECRET`]);
 }
 
 /**
- * Optional override in config/oauth-app.json. Gitignored. Either an object per
+ * config/oauth-app.json, gitignored. Either an object per
  * connector or, for GitHub alone, the two keys at the top level.
  */
 function fromFile(connectorId: string): OAuthAppRegistration | null {
