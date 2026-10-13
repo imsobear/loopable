@@ -43,6 +43,9 @@ function usable(connector: ConnectorManifest, connected: string[]): boolean {
 
 function NewLoopPage() {
   const { connector, workflow, custom } = Route.useSearch();
+  // Read here, every render: a hook read only on some branches changes how
+  // many hooks this has, and React stops on that.
+  const { connected } = Route.useLoaderData();
   const chosen =
     connector && workflow && connectorWorkflow(connector, workflow)
       ? { connector, workflow }
@@ -50,7 +53,7 @@ function NewLoopPage() {
 
   if (custom) {
     // Before anything is picked, the first trigger that can actually run.
-    const start = chosen ?? firstUsableTrigger(Route.useLoaderData().connected);
+    const start = chosen ?? firstUsableTrigger(connected);
     return <CustomLoop connectorId={start.connector} workflowId={start.workflow} />;
   }
   return chosen ? (
