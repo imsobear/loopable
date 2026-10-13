@@ -416,6 +416,12 @@ export type Signal = WorkItemRef & {
    * kept here or it is lost between noticing it and acting on it.
    */
   payload?: JsonValue;
+  /**
+   * When it happened, in milliseconds, for sources that know. A loop's first
+   * look sends what it finds to the backlog, but a message sent after the
+   * loop was made is not backlog: it was sent to the loop.
+   */
+  at?: number;
 };
 
 export type ConnectorRuntime = {
@@ -458,6 +464,13 @@ export type ConnectorRuntime = {
      * between them instead of each seeing all of them.
      */
     cursor: JsonValue | null;
+    /**
+     * When this loop last looked, or when it was made if it never has, in
+     * milliseconds. A stream with nothing in the cursor for a place reads it
+     * from here: taking the newest message as the starting point would skip
+     * the very message that was sent to the loop before its first look.
+     */
+    since: number;
   }): Promise<{ signals: Signal[]; cursor?: JsonValue }>;
   /** Carry out one of the manifest's actions. This is the part that writes. */
   applyAction?(input: {

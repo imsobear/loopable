@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { HeroFlow } from "./hero-flow";
 import { LoopFooter } from "./loop-footer";
 
-const TITLE = "Loopable — prompt it when you're here, loop it when you're not";
+const TITLE = "Loopable — prompt it when you're there, loop it when you're not";
 const DESCRIPTION =
   "Loopable turns the work that keeps coming back into agent workflows, in minutes. They run on your machine with Codex or Claude Code, and answer where they were asked.";
 const ORIGIN = "https://loop.goodone.si";
@@ -150,7 +150,7 @@ function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
     <section className="mx-auto grid min-h-[calc(100svh-3.5rem)] max-w-6xl items-center gap-12 px-6 py-16 md:grid-cols-[1.25fr_1fr]">
       <div>
         <h1 className="text-4xl font-semibold tracking-tight text-balance lg:text-[2.75rem] lg:leading-tight">
-          <span className="block">Prompt it when you&rsquo;re here.</span>
+          <span className="block">Prompt it when you&rsquo;re there.</span>
           <span className="block">Loop it when you&rsquo;re not.</span>
         </h1>
         <p className="mt-5 max-w-xl text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>

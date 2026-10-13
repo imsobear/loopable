@@ -1,6 +1,6 @@
 # Narrative
 
-Prompt it when you're here. Loop it when you're not.
+Prompt it when you're there. Loop it when you're not.
 
 Loopable turns the work that keeps coming back into agent workflows, in minutes. You set them up in the browser at loop.goodone.si; they run on your machine with Codex or Claude Code, and answer where they were asked.
 

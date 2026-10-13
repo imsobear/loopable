@@ -93,7 +93,7 @@ export const slackRuntime: ConnectorRuntime = {
     return { ready: true };
   },
 
-  async poll({ workflowId, credential, cursor }) {
+  async poll({ workflowId, credential, cursor, since }) {
     if (workflowId !== "slack.ask") {
       throw new Error(`Slack cannot watch for ${workflowId}.`);
     }
@@ -104,14 +104,15 @@ export const slackRuntime: ConnectorRuntime = {
     const signals: Signal[] = [];
 
     for (const channel of channels) {
-      const oldest = previous[channel.id];
+      // A channel seen for the first time is read from when the loop last
+      // looked, so a mention sent before this look is not taken as the start.
+      const oldest = previous[channel.id] ?? String(since / 1000);
       const messages = await history(account, channel.id, oldest);
       if (messages.length === 0) {
-        if (!next[channel.id]) next[channel.id] = String(Date.now() / 1000);
+        next[channel.id] = oldest;
         continue;
       }
       next[channel.id] = messages[messages.length - 1]!.ts;
-      if (!oldest) continue;
       for (const message of messages) {
         if (
           !isAsk({
@@ -139,6 +140,7 @@ export const slackRuntime: ConnectorRuntime = {
           title: summarise(message.text),
           url: permalink(account, channel.id, message.ts),
           payload: asked as unknown as JsonValue,
+          at: Math.round(Number(message.ts) * 1000),
         });
       }
     }

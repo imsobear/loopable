@@ -49,11 +49,12 @@ function claimOf(loop: Loop, signal: Signal): string {
 /**
  * One look at what a loop is watching for.
  *
- * The first look never acts. Whatever is already waiting when a loop is
- * created is that loop's backlog, and running an agent over a review queue
- * that has been piling up for a month is not what someone turning on a loop
- * is asking for. It is recorded rather than discarded, so it can still be run
- * on purpose afterwards.
+ * The first look does not act on what was there before the loop. Whatever is
+ * already waiting when a loop is created is that loop's backlog, and running
+ * an agent over a review queue that has been piling up for a month is not
+ * what someone turning on a loop is asking for. It is recorded rather than
+ * discarded, so it can still be run on purpose afterwards. A message sent
+ * after the loop was made, before its first look, is acted on.
  */
 export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollReport> {
   const report: PollReport = {
@@ -85,6 +86,7 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
       settings: loop.settings,
       credential,
       cursor: loop.pollCursor ?? null,
+      since: (loop.polledAt ?? loop.createdAt).getTime(),
     });
     const found = answer.signals;
     report.found = found.length;
@@ -131,11 +133,12 @@ export async function pollLoop(loop: Loop, claimed: Set<string>): Promise<PollRe
       // first look: the same thing sitting in two loops' lists would be run
       // twice by whoever works through them.
       const hold = signal.hold ?? judged.get(signal.key);
+      const before = signal.at === undefined || signal.at < loop.createdAt.getTime();
       const outcome = claimed.has(claim)
         ? "superseded"
         : hold
           ? "held"
-          : first
+          : first && before
             ? "backlog"
             : "queued";
       const task = outcome === "queued" ? await enqueueSignal({ loop, signal }) : null;

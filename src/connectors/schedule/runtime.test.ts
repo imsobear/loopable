@@ -17,7 +17,7 @@ function clockAt(text: string): void {
 }
 
 function look(settings: Record<string, unknown>, cursor: string | null) {
-  return scheduleRuntime.poll!({ workflowId: "schedule.recurring", settings, credential: null, cursor });
+  return scheduleRuntime.poll!({ workflowId: "schedule.recurring", settings, credential: null, cursor, since: 0 });
 }
 
 afterEach(() => {
