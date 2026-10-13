@@ -51,4 +51,4 @@ Run the same `loopable runner --token` on each. Every job goes to an online runn
 npm install -g loopable-cli
 ```
 
-Then `loopable stop` and `loopable runner` to restart it on the new version. The Runners page shows each runner's version and flags any that are older than the service. An older runner keeps working, but does not take jobs that need something newer, such as loops that work in a folder.
+Then `loopable stop` and `loopable runner` to restart it on the new version. The Runners page shows each runner's version and flags any that are older than the newest `loopable-cli` on npm. An older runner keeps working, but does not take jobs that need something newer, such as loops that work in a folder.

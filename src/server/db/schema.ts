@@ -331,7 +331,7 @@ export const appSettings = sqliteTable(
  */
 /**
  * Credentials when App and Dispatcher do not share a keychain. Encrypted with
- * LOOPABLE_MASTER_KEY. Local laptop installs keep using the OS store.
+ * LOOPABLE_MASTER_KEY. `pnpm dev` keeps using the OS store.
  */
 export const secrets = sqliteTable("secrets", {
   key: text("key").primaryKey(),

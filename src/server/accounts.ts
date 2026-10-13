@@ -52,8 +52,8 @@ type Provider = {
   registration: string;
   /**
    * The connection's own callback, shared so one registered address covers
-   * both: GitHub and Google match a loopback callback only exactly. The
-   * callback tells a sign-in apart by its state.
+   * both, signing in and connecting. The callback tells a sign-in apart by
+   * its state.
    */
   callbackPath: string;
   authorizeUrl(input: { clientId: string; redirectUri: string; state: string; challenge: string }): string;
@@ -302,7 +302,7 @@ export function clearedSessionCookie(secure: boolean): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
-/** Who is looking at the app right now, for the page to show. Null on a local install. */
+/** Who is looking at the app right now, for the page to show. Null under `pnpm dev`. */
 export async function viewerInScope(): Promise<Viewer | null> {
   const scope = currentScope();
   if (!scope?.userId) return null;

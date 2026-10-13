@@ -105,8 +105,8 @@ export function lastDue(schedule: Schedule, now: Date): Date {
 /**
  * The run owed since `after`, or null when none is.
  *
- * At most one, and the most recent, on purpose. A laptop shut for a week owes
- * a morning summary, not seven of them, and the one worth having is today's.
+ * At most one, and the most recent, on purpose. A dispatcher down for a week
+ * owes a morning summary, not seven of them, and the one worth having is today's.
  * Which of the missed ones is chosen matters because the caller records it: the
  * older ones are passed over rather than queued behind it.
  */

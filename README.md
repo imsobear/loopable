@@ -2,7 +2,7 @@
 
 Prompt it when you're here. Loop it when you're not.
 
-Loopable turns the work that keeps coming back into agent workflows, in minutes. Set them up at [loop.goodone.si](https://loop.goodone.si); they run on your machine with Codex or Claude Code, and the answer goes back where it was asked.
+Loopable turns the work that keeps coming back into agent workflows, in minutes. Set them up at [loop.goodone.si](https://loop.goodone.si); they run on your machine with Codex or Claude Code, and answer where they were asked.
 
 A review request, a question in #oncall, a morning check: today each one waits until you copy it into your agent, and when you are busy or away, it stops. Hosted agents can take some of it, but they run in a cloud sandbox that cannot reach your internal network, logs, or services.
 
@@ -72,11 +72,11 @@ pnpm db:generate    # after changing src/server/db/schema.ts
 pnpm db:studio
 ```
 
-`pnpm dev` is a single local workspace with no sign-in. To try sign-in, workspaces, and joining a runner with a token locally, see [docs/hosting.md](docs/hosting.md#trying-hosted-mode-locally). `pnpm runner` is only for a second machine while `pnpm dev` is running.
+`pnpm dev` is a single local workspace with no sign-in. To try sign-in, workspaces, and joining a runner with a token locally, see [docs/hosting.md](docs/hosting.md#trying-hosted-mode-locally). `pnpm runner --token <from the local Runners page>` joins a second runner to `pnpm dev`, kept apart from your real one in `~/.loopable-dev`.
 
 ### Release and deploy
 
-Changes go through a pull request; CI must pass before it merges. Merging to `main` deploys the service by itself, migrations first. The CLI is released by hand with the **Release** workflow. All of it, and how to roll back, is in [docs/release.md](docs/release.md).
+Changes go through a pull request; CI must pass before it merges. Merging to `main` deploys the service by itself, migrations first. The CLI's version is bumped in a pull request with `pnpm bump`, then the **Release** workflow publishes it. All of it, and how to roll back, is in [docs/release.md](docs/release.md).
 
 | Path | Contents |
 | --- | --- |

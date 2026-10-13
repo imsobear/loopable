@@ -77,7 +77,7 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   );
 }
 
-/** Who is signed in, and the way out. Absent on a local install, where nobody signs in. */
+/** Who is signed in, and the way out. Absent under `pnpm dev`, where nobody signs in. */
 function SignedIn() {
   const { viewer } = useLoaderData({ from: "__root__" });
   if (!viewer) return null;

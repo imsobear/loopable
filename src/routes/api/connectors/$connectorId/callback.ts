@@ -11,8 +11,7 @@ export const Route = createFileRoute("/api/connectors/$connectorId/callback")({
     handlers: {
       GET: async ({ request, params }) => {
         // Signing in comes back here too, so one registered address covers
-        // both: GitHub and Google match a loopback callback only exactly.
-        // The state says which it was.
+        // both, signing in and connecting. The state says which it was.
         const signIn = await signInProviderFor(new URL(request.url).searchParams.get("state"));
         if (signIn) return finishSignIn(request, signIn);
 

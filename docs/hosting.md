@@ -8,7 +8,7 @@ How the hosted service at loop.goodone.si is set up and deployed. This is for wh
 | --- | --- | --- |
 | App Worker | Cloudflare Worker `loopable`, at loop.goodone.si | Front page, the app, sign-in, the API runners call |
 | Dispatcher | Cloudflare Container beside the Worker | Watches services, queues jobs, writes answers back; applies migrations on start |
-| Database | A libSQL server, such as Turso | Every workspace's loops, tasks, connections, encrypted secrets |
+| Database | Turso, in `aws-us-west-2`; the Worker's `placement` in `wrangler.jsonc` sits next to it, and must move with it | Every workspace's loops, tasks, connections, encrypted secrets |
 | Runners | People's own machines | Run the agent; installed with `npm install -g loopable-cli` |
 
 The Worker wakes the dispatcher on every request and once a minute from a cron trigger. There is one dispatcher for everyone.
@@ -37,9 +37,9 @@ The Worker wakes the dispatcher on every request and once a minute from a cron t
 
 Merging to `main` deploys: once CI passes there, the **Deploy** workflow migrates the database, builds the Worker and the dispatcher's container image (which needs Docker, so it is built there), and deploys both. Run it by hand to redeploy or roll back. The whole flow is in [release.md](release.md).
 
-## Moving loop.goodone.si to the app
+## Moving loop.goodone.si to the app (done)
 
-loop.goodone.si used to point at the old site Worker, `loopable-web`. To hand it to the app:
+Done in October 2026, and kept for reference. loop.goodone.si used to point at the old site Worker, `loopable-web`. To hand it to the app:
 
 1. In the Cloudflare dashboard, under Workers & Pages → `loopable-web` → Settings → Domains & Routes, remove `loop.goodone.si`.
 2. Run the **Deploy** workflow with **Also deploy the old site address as a redirect** ticked. The app takes loop.goodone.si, and `loopable-web.sobear-me.workers.dev` starts redirecting there.
@@ -55,4 +55,4 @@ Each workspace can have up to 20 loops and 5 runners, and a loop is looked at no
 LOOPABLE_HOSTED=1 LOOPABLE_MASTER_KEY=local LOOPABLE_HOME=$PWD/.hosted PORT=4321 pnpm dev
 ```
 
-This runs the app, sign-in and workspaces on a local file database. Signing in uses the development apps in `config/oauth-app.json`, registered with callbacks on `http://127.0.0.1:4321`; copy `config/oauth-app.example.json` to start. Open the app at `http://127.0.0.1:4321`, not `localhost`, and stop `pnpm dev` first since it uses the same port. Connect a runner with the command on the Runners page, run from the checkout: `node --experimental-strip-types src/cli.ts runner --url http://127.0.0.1:4321 --token TOKEN`.
+This runs the app, sign-in and workspaces on a local file database. Signing in uses the development apps in `config/oauth-app.json`, registered with callbacks on `http://127.0.0.1:4321`; copy `config/oauth-app.example.json` to start. Open the app at `http://127.0.0.1:4321`, not `localhost`, and stop `pnpm dev` first since it uses the same port. Connect a runner from the checkout with the token from the local Runners page: `pnpm runner --token TOKEN`. It joins `http://127.0.0.1:4321` and keeps its state in `~/.loopable-dev`, apart from a real runner.

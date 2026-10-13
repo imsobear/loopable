@@ -83,7 +83,7 @@ function RunnersPage() {
         <h2 className="text-sm font-medium">Join a runner</h2>
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">
-            {hosted ? "On your machine:" : "On this machine or another on the network:"}
+            {hosted ? "On your machine:" : "From this checkout, for pnpm dev:"}
           </span>
           <Button variant="ghost" size="sm" onClick={rotate}>
             <RotateCcw />

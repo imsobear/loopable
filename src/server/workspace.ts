@@ -12,12 +12,12 @@ import { isHosted } from "#/lib/hosted.ts";
  * everyone's rows.
  *
  * Asking with no scope set is an error when hosted, so a forgotten scope fails
- * loudly instead of reading across workspaces. On a local install there is
+ * loudly instead of reading across workspaces. Under `pnpm dev` there is
  * only one workspace, so it is the answer.
  */
 export type Scope = { workspaceId: string; userId: string | null };
 
-/** The one workspace of a local install, and of everything made before workspaces. */
+/** The one workspace of `pnpm dev`, and of everything made before workspaces. */
 export const LOCAL_WORKSPACE = "local";
 
 /** Settings that belong to the dispatcher itself, not to anyone's workspace. */
@@ -42,7 +42,7 @@ export function workspaceId(): string {
   throw new Error("Sign in to Loopable first.");
 }
 
-/** The signed-in person, when there is one. A local install has nobody signed in. */
+/** The signed-in person, when there is one. Under `pnpm dev` nobody signs in. */
 export function currentUserId(): string | null {
   return scope.getStore()?.userId ?? null;
 }

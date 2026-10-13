@@ -7,7 +7,7 @@ import { workspaceId } from "./workspace.ts";
 /**
  * What one workspace may use of the hosted service. Not a price list: a way to
  * keep polling and storage bounded while there is no pricing, so one busy
- * workspace cannot slow everyone else down. A local install has none.
+ * workspace cannot slow everyone else down. `pnpm dev` has none.
  */
 export type Limits = {
   /** Loops in one workspace. */
