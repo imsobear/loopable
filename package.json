@@ -1,6 +1,6 @@
 {
   "name": "loopable-cli",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Connect your machine to Loopable: a runner that does your workspace's jobs with your own coding agent.",
   "license": "MIT",
   "type": "module",
@@ -24,7 +24,14 @@
     "url": "https://github.com/imsobear/loopable/issues"
   },
   "homepage": "https://loop.goodone.si",
-  "keywords": ["coding-agent", "codex", "claude-code", "agent-workflows", "runner", "loopable"],
+  "keywords": [
+    "coding-agent",
+    "codex",
+    "claude-code",
+    "agent-workflows",
+    "runner",
+    "loopable"
+  ],
   "publishConfig": {
     "access": "public"
   },
