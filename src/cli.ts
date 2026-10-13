@@ -170,7 +170,7 @@ async function runner(flags: Flags): Promise<number> {
   const env = { ...process.env, LOOPABLE_URL: url, LOOPABLE_RUNNER_TOKEN: token };
 
   if (flags.foreground) {
-    const child = spawn(node, args, { cwd: root, env, stdio: "inherit" });
+    const child = spawn(node, args, { cwd: homedir(), env, stdio: "inherit" });
     const stop = () => child.kill("SIGTERM");
     process.on("SIGINT", stop);
     process.on("SIGTERM", stop);
@@ -200,7 +200,7 @@ async function startInBackground(args: string[], env: NodeJS.ProcessEnv): Promis
   const startedAt = tooBig ? 0 : statSync(logPath()).size;
   // Told where its pid lives, so after updating itself the new runner is the one stop stops.
   const child = spawn(node, args, {
-    cwd: root,
+    cwd: homedir(),
     env: { ...env, LOOPABLE_RUNNER_PIDFILE: pidPath() },
     detached: true,
     stdio: ["ignore", log, log],
