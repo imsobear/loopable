@@ -1,9 +1,0 @@
-{
-  "name": "loopable-web",
-  "main": "src/redirect.ts",
-  "compatibility_date": "2026-09-17",
-  // Only the old workers.dev address. loop.goodone.si belongs to the app now;
-  // see docs/hosting.md for the order of the switch.
-  "workers_dev": true,
-  "preview_urls": false
-}

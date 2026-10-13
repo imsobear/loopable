@@ -42,8 +42,10 @@ Merging to `main` deploys: once CI passes there, the **Deploy** workflow migrate
 Done in October 2026, and kept for reference. loop.goodone.si used to point at the old site Worker, `loopable-web`. To hand it to the app:
 
 1. In the Cloudflare dashboard, under Workers & Pages → `loopable-web` → Settings → Domains & Routes, remove `loop.goodone.si`.
-2. Run the **Deploy** workflow with **Also deploy the old site address as a redirect** ticked. The app takes loop.goodone.si, and `loopable-web.sobear-me.workers.dev` starts redirecting there.
+2. Run the **Deploy** workflow. The app takes loop.goodone.si.
 3. Check `https://loop.goodone.si` shows the front page, and that signing in works.
+
+The old Worker was then left as a redirect from `loopable-web.sobear-me.workers.dev` to the app. Its source is gone from this repository; the deployed Worker stays up until it is deleted in the Cloudflare dashboard.
 
 ## Limits
 
