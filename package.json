@@ -52,7 +52,6 @@
     "typecheck": "tsc --noEmit",
     "bump": "node scripts/bump.mjs",
     "deploy": "LOOPABLE_CF=1 vite build && wrangler deploy",
-    "site:deploy": "pnpm --filter loopable-site run deploy",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
@@ -63,7 +62,6 @@
     "@cloudflare/containers": "^0.3.7",
     "@cloudflare/vite-plugin": "^1.54.10",
     "@fontsource-variable/geist": "^5.3.0",
-    "@fontsource/geist-mono": "^5.3.0",
     "@tailwindcss/vite": "4.1.18",
     "@tanstack/devtools-vite": "0.8.5",
     "@tanstack/react-devtools": "0.10.12",

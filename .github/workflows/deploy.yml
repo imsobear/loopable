@@ -24,10 +24,6 @@ on:
       ref:
         description: "Commit or tag to deploy (defaults to main)"
         required: false
-      redirect:
-        description: "Also deploy the old site address as a redirect to loop.goodone.si"
-        type: boolean
-        default: false
 
 concurrency:
   group: deploy
@@ -68,13 +64,6 @@ jobs:
 
       - name: Deploy the app and the dispatcher
         run: pnpm run deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Deploy the old site address as a redirect
-        if: ${{ inputs.redirect }}
-        run: pnpm site:deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

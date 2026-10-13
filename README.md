@@ -88,7 +88,6 @@ Changes go through a pull request; CI must pass before it merges. Merging to `ma
 | `src/routes/` | Pages and `/api/` |
 | `src/landing/` | The front page |
 | `src/worker.ts` | The Cloudflare Worker and its dispatcher container |
-| `site/` | The old site address, now a redirect to loop.goodone.si |
 | `drizzle/` | Migrations |
 
 A new connector is a folder plus one line in `src/connectors/manifests.ts` and `src/connectors/runtimes.ts`. See [docs/connectors.md](docs/connectors.md).
