@@ -7,6 +7,11 @@ const home = mkdtempSync(join(tmpdir(), "loopable-accounts-"));
 process.env.LOOPABLE_HOME = home;
 process.env.LOOPABLE_DB = join(home, "test.sqlite");
 process.env.LOOPABLE_KEYCHAIN = "0";
+// Test apps, so a checkout with no config/oauth-app.json (CI) can sign in.
+process.env.LOOPABLE_GITHUB_CLIENT_ID = "test-github";
+process.env.LOOPABLE_GITHUB_CLIENT_SECRET = "test-github-secret";
+process.env.LOOPABLE_GMAIL_CLIENT_ID = "test-gmail";
+process.env.LOOPABLE_GMAIL_CLIENT_SECRET = "test-gmail-secret";
 
 const { db, migrateIfNeeded } = await import("./db/client.ts");
 const { sessions } = await import("./db/schema.ts");
