@@ -85,7 +85,7 @@ function Section({
   );
 }
 
-function Nav({ signedIn }: { signedIn: boolean }) {
+export function Nav({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-10 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-6">
@@ -96,13 +96,13 @@ function Nav({ signedIn }: { signedIn: boolean }) {
           Loopable
         </a>
         <nav className="hidden items-center gap-5 text-sm text-muted-foreground sm:flex">
-          <a href="#how" className="hover:text-foreground">
+          <a href="/#how" className="hover:text-foreground">
             How it works
           </a>
-          <a href="#workflows" className="hover:text-foreground">
+          <a href="/#workflows" className="hover:text-foreground">
             Workflows
           </a>
-          <a href="#start" className="hover:text-foreground">
+          <a href="/#start" className="hover:text-foreground">
             Get started
           </a>
         </nav>
@@ -116,7 +116,7 @@ function Nav({ signedIn }: { signedIn: boolean }) {
               <ArrowRight data-icon="inline-end" />
             </Button>
           ) : (
-            <Button variant="outline" nativeButton={false} render={<a href="#start" />}>
+            <Button variant="outline" nativeButton={false} render={<a href="/#start" />}>
               Sign in
             </Button>
           )}
@@ -421,7 +421,7 @@ function GetStarted({ signedIn, next }: { signedIn: boolean; next?: string }) {
   );
 }
 
-function Footer() {
+export function Footer() {
   return (
     <footer className="border-t">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-sm text-muted-foreground">
@@ -436,6 +436,12 @@ function Footer() {
           </a>
           <a href={`${REPO}/tree/main/docs`} className="hover:text-foreground">
             Docs
+          </a>
+          <a href="/privacy" className="hover:text-foreground">
+            Privacy
+          </a>
+          <a href="/terms" className="hover:text-foreground">
+            Terms
           </a>
           <span>MIT licensed</span>
         </span>

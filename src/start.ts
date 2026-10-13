@@ -18,7 +18,7 @@ function ensureMigrated() {
 }
 
 /** Pages anyone may see without signing in. */
-const PUBLIC_PAGES = new Set(["/", "/welcome"]);
+const PUBLIC_PAGES = new Set(["/", "/welcome", "/privacy", "/terms"]);
 
 /** A browser asking for a page, as opposed to a server function, an API call or a file. */
 function isPageRequest(request: Request, pathname: string): boolean {

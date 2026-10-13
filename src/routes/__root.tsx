@@ -30,7 +30,7 @@ export const Route = createRootRoute({
 const Devtools = import.meta.env.DEV ? lazy(() => import("@/components/devtools")) : () => null;
 
 /** Pages that stand on their own, with no app around them. */
-const BARE = new Set(["/", "/welcome"]);
+const BARE = new Set(["/", "/welcome", "/privacy", "/terms"]);
 
 function AppLayout() {
   // The page on screen, not the address being loaded: while the front page
