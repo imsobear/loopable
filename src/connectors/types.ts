@@ -526,6 +526,11 @@ export type ConnectorRuntime = {
      * callback address, which the desktop app prefers.
      */
     startDeviceLogin?(): Promise<DeviceChallenge>;
+    /**
+     * Optional for "oauth_redirect": the account a tool on this machine is
+     * already signed in as, connected in one step. Desktop app only.
+     */
+    fromLocalLogin?(): Promise<AuthResult>;
     pollDeviceLogin?(attempt: JsonValue): Promise<QrOutcome>;
     /** Re-read the account to prove a stored credential still works. */
     identity(credential: unknown): Promise<IdentityResult>;

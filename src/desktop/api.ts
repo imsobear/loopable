@@ -3,6 +3,7 @@ import { toDataURL } from "qrcode";
 import { AGENT_MANIFESTS, fallbackAgent } from "#/agents/manifests.ts";
 import type { PermissionMode } from "#/agents/types.ts";
 import { CONNECTOR_MANIFESTS, connectorWorkflow } from "#/connectors/manifests.ts";
+import { oauthAppRegistration } from "#/connectors/oauth-app.ts";
 import { connectorRuntime } from "#/connectors/runtimes.ts";
 import { dispatcherIsAlive } from "#/dispatcher/instance.ts";
 import type { AgentOnRunner, AgentView, ConnectionSettings, JsonValue, LoopEdit } from "#/lib/domain.ts";
@@ -199,7 +200,16 @@ export const rpc = {
    */
   beginConnect: async (data: { connectorId: string }) => {
     const runtime = connectorRuntime(data.connectorId);
-    if (runtime.auth.startDeviceLogin) {
+    // A login this Mac already has comes first: one click, nothing to enter.
+    if (runtime.auth.fromLocalLogin) {
+      try {
+        const connection = await saveAuthorizedConnection(data.connectorId, await runtime.auth.fromLocalLogin());
+        return { kind: "connected" as const, accountLabel: connection.accountLabel };
+      } catch (error) {
+        if (!oauthAppRegistration(data.connectorId)) throw error;
+      }
+    }
+    if (runtime.auth.startDeviceLogin && oauthAppRegistration(data.connectorId)) {
       return { kind: "device" as const, ...(await runtime.auth.startDeviceLogin()) };
     }
     if (!runtime.auth.startAuthorization) {

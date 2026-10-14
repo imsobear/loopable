@@ -21,7 +21,9 @@ The runner is `src/desktop/local-runner.ts`: the CLI runner with the HTTP taken 
 
 Slack, Feishu and WeChat connect as they do on the web: a pasted bot token, or a scan.
 
-GitHub and Gmail connect through Loopable's own apps, built into the desktop app, so nobody using it registers anything. The desktop app is a public client: it ships client IDs and keeps no secret.
+GitHub connects from the GitHub CLI's login on the Mac, in one click: the engine asks `gh auth token`, and keeps asking every few minutes, so signing in again with `gh` carries over. It is the account this Mac's git already works as. Without `gh` signed in, the connector says to run `gh auth login`. Only the desktop engine ever reads it (`src/connectors/github/local-login.ts`).
+
+When there is no CLI login, GitHub and Gmail connect through Loopable's own apps, built into the desktop app, so nobody using it registers anything. The desktop app is a public client: it ships client IDs and keeps no secret.
 
 - **GitHub.** An OAuth app with *device flow* turned on, in its settings on GitHub. The app shows a code to enter on github.com and polls until GitHub hands over a token. No callback address and no client secret.
 - **Google.** A client of type *Desktop app* in Google Cloud, with the Gmail API enabled. Google calls what it gives a desktop client a secret, but does not treat it as one. The browser comes back to the engine's loopback address, which desktop clients may use on any port.

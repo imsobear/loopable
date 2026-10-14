@@ -52,7 +52,7 @@ func (a *app) connectorsPage(c *ui.Context) {
 					ui.Text(c, manifest.Name).FontSize(13).Bold()
 					switch {
 					case state != nil && !state.Readiness.Ready:
-						ui.Text(c, "Not available in this build").FontSize(11).TextColor(t.TextMuted).SingleLine()
+						ui.Text(c, state.Readiness.Reason).FontSize(11).TextColor(t.TextMuted).SingleLine()
 					case state != nil && len(state.Connections) > 0:
 						ui.Row(c).Gap(10).AlignItems(ui.Center).Wrap().Children(func() {
 							for _, connection := range state.Connections {
@@ -150,15 +150,13 @@ func (a *app) connectorPage(c *ui.Context, id string) {
 	})
 
 	if state != nil && !ready {
-		// Loopable's own apps are built in, so this is the build's doing,
-		// and there is nothing for the person to set up.
+		// The engine words this for the desktop: what this Mac is missing,
+		// or that the build is, never an app to register.
 		lines := []string{state.Readiness.Reason}
-		if manifest.Auth.Kind == "oauth_redirect" {
-			lines = []string{"This copy of Loopable was built without its " + manifest.Name + " app, so " + manifest.Name + " cannot be connected yet. A newer version will fix it."}
-		} else if state.Readiness.FixHint != "" {
+		if state.Readiness.FixHint != "" {
 			lines = append(lines, state.Readiness.FixHint)
 		}
-		alert(c, "Not available", lines, true)
+		alert(c, "Not ready", lines, false)
 	}
 
 	if a.connect != nil {
@@ -278,6 +276,7 @@ func (a *app) beginConnect(manifest *Connector) {
 			var started struct {
 				Kind            string `json:"kind"`
 				URL             string `json:"url"`
+				AccountLabel    string `json:"accountLabel"`
 				Attempt         any    `json:"attempt"`
 				UserCode        string `json:"userCode"`
 				VerificationURL string `json:"verificationUrl"`
@@ -295,6 +294,12 @@ func (a *app) beginConnect(manifest *Connector) {
 					return
 				}
 				flow.kind = started.Kind
+				if started.Kind == "connected" {
+					a.toast("Connected " + started.AccountLabel)
+					a.connect = nil
+					a.refresh()
+					return
+				}
 				if started.Kind == "browser" {
 					_ = mygo.Shell.OpenExternal(started.URL)
 					flow.hint = "Finish in your browser. This page updates when the account is connected."

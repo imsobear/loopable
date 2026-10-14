@@ -6,6 +6,11 @@ export type GithubCredential = {
   refreshToken?: string;
   /** Epoch ms, already reduced by a safety margin. */
   expiresAt?: number;
+  /**
+   * "gh" when it came from the GitHub CLI's login, in the desktop app: the
+   * CLI's current token is used, and the stored one only when it has none.
+   */
+  source?: "gh";
 };
 
 export function createPkce(): { verifier: string; challenge: string } {

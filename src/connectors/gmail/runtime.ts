@@ -65,6 +65,12 @@ function messageIdFrom(url: string, payload: unknown): string {
 export const gmailRuntime = defineRuntime({
   async readiness() {
     if (oauthAppRegistration("gmail")) return { ready: true };
+    if (process.env.LOOPABLE_DESKTOP === "1") {
+      return {
+        ready: false,
+        reason: "This copy of Loopable was built without its Google app, so Gmail cannot be connected yet. A newer version will fix it.",
+      };
+    }
     return {
       ready: false,
       reason: "No Google app is registered here.",
