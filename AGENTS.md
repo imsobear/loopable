@@ -11,6 +11,7 @@ Work comes in from GitHub, Slack, Lark, email, or the clock. A loop says what to
 - Tailwind CSS with shadcn/ui
 - SQLite for state (libSQL when hosted), encrypted secrets when hosted, the macOS keychain (or a file elsewhere) in `pnpm dev`
 - Hosted on Cloudflare: the app as a Worker, the dispatcher as a Container; see `docs/hosting.md`
+- A desktop app in `desktop/`, native UI in Go with MyGo, running the same engine (dispatcher, runner, API) as a Node process beside it; see `docs/desktop.md`
 
 ## Workspaces
 

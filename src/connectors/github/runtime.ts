@@ -8,6 +8,8 @@ import {
   pullForBranch,
   submitReview,
 } from "./api.ts";
+import { pollDeviceCode, requestDeviceCode } from "./device.ts";
+import { GITHUB_SCOPES } from "./manifest.ts";
 import { pollGithub } from "./poll.ts";
 import { githubRef, parseGithubRef, parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
@@ -210,6 +212,46 @@ export const githubRuntime = defineRuntime({
       const { accessToken, refreshed } = await usableToken(credential as GithubCredential);
       const account = accountFrom(await getViewer(accessToken));
       return refreshed ? { account, renewedCredential: refreshed } : { account };
+    },
+
+    // Device flow: the desktop app has no callback address, and needs no
+    // client secret this way. The attempt carries what polling needs.
+    async startDeviceLogin() {
+      const registration = requireRegistration();
+      const code = await requestDeviceCode(registration.clientId, GITHUB_SCOPES);
+      return {
+        attempt: {
+          deviceCode: code.deviceCode,
+          intervalMs: code.intervalMs,
+          expiresAt: Date.now() + code.expiresInMs,
+        },
+        userCode: code.userCode,
+        verificationUrl: code.verificationUri,
+        expiresInMs: code.expiresInMs,
+        intervalMs: code.intervalMs,
+      };
+    },
+    async pollDeviceLogin(attempt) {
+      const registration = requireRegistration();
+      const current = attempt as { deviceCode: string; intervalMs: number; expiresAt: number };
+      if (Date.now() > current.expiresAt) {
+        return { state: "expired", reason: "The code expired before it was entered." };
+      }
+      const outcome = await pollDeviceCode(registration.clientId, current.deviceCode);
+      if (outcome.state === "granted") {
+        const viewer = await getViewer(outcome.credential.accessToken);
+        return { state: "confirmed", result: { credential: outcome.credential, account: accountFrom(viewer) } };
+      }
+      if (outcome.state === "expired") return { state: "expired", reason: outcome.reason };
+      return {
+        state: "pending",
+        attempt: {
+          ...current,
+          // GitHub asks for five seconds more between polls when it says so.
+          intervalMs: outcome.slowDown ? current.intervalMs + 5_000 : current.intervalMs,
+        },
+        hint: "Waiting for the code to be entered on GitHub…",
+      };
     },
   },
 });

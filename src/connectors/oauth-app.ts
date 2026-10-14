@@ -50,8 +50,18 @@ function fromFile(connectorId: string): OAuthAppRegistration | null {
   return pick(flat.clientId, flat.clientSecret);
 }
 
+/**
+ * The desktop app is a public client: it ships its client IDs and cannot keep
+ * a secret, so GitHub connects by device flow and Google's desktop client
+ * treats its "secret" as public. An ID alone is a registration there.
+ */
+function isPublicClient(): boolean {
+  return process.env.LOOPABLE_DESKTOP === "1";
+}
+
 function pick(id: unknown, secret: unknown): OAuthAppRegistration | null {
   const clientId = typeof id === "string" ? id.trim() : "";
   const clientSecret = typeof secret === "string" ? secret.trim() : "";
-  return clientId && clientSecret ? { clientId, clientSecret } : null;
+  if (clientId && clientSecret) return { clientId, clientSecret };
+  return clientId && isPublicClient() ? { clientId, clientSecret: "" } : null;
 }

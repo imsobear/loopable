@@ -25,3 +25,6 @@ config/oauth-app.json
 
 # Trying hosted mode locally (docs/hosting.md)
 .hosted/
+
+# The desktop app's engine, built by scripts/build-engine.mjs (docs/desktop.md)
+desktop/resources/engine/

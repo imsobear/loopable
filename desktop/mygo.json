@@ -1,0 +1,13 @@
+{
+  "name": "Loopable",
+  "identifier": "si.goodone.loopable",
+  "version": "0.1.0",
+  "copyright": "© 2026 Loopable",
+  "out": "build",
+  "macos": {
+    "minimumSystemVersion": "13.0",
+    "infoPlist": {
+      "LSApplicationCategoryType": "public.app-category.developer-tools"
+    }
+  }
+}

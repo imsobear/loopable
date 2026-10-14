@@ -7,11 +7,13 @@ import { oauthAppRegistration } from "./oauth-app.ts";
 const previousId = process.env.LOOPABLE_GITHUB_CLIENT_ID;
 const previousSecret = process.env.LOOPABLE_GITHUB_CLIENT_SECRET;
 const previousBase = process.env.LOOPABLE_BASE_URL;
+const previousDesktop = process.env.LOOPABLE_DESKTOP;
 
 afterEach(() => {
   restore("LOOPABLE_GITHUB_CLIENT_ID", previousId);
   restore("LOOPABLE_GITHUB_CLIENT_SECRET", previousSecret);
   restore("LOOPABLE_BASE_URL", previousBase);
+  restore("LOOPABLE_DESKTOP", previousDesktop);
 });
 
 function restore(key: string, value: string | undefined): void {
@@ -27,6 +29,17 @@ describe("oauth app registration", () => {
       clientId: "from-env",
       clientSecret: "from-env-secret",
     });
+  });
+
+  it("takes a client ID alone in the desktop app, which keeps no secret", () => {
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(join(tmpdir(), "loopable-oauth-")));
+    process.env.LOOPABLE_GITHUB_CLIENT_ID = "public-id";
+    delete process.env.LOOPABLE_GITHUB_CLIENT_SECRET;
+    delete process.env.LOOPABLE_DESKTOP;
+    expect(oauthAppRegistration("github")).toBeNull();
+    process.env.LOOPABLE_DESKTOP = "1";
+    expect(oauthAppRegistration("github")).toEqual({ clientId: "public-id", clientSecret: "" });
+    cwd.mockRestore();
   });
 
   it("has no app built in", () => {

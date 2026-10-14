@@ -44,6 +44,8 @@
     "runner": "LOOPABLE_DEV=1 node --experimental-strip-types src/cli.ts runner",
     "generate-routes": "tsr generate",
     "build": "vite build && node scripts/build-cli.mjs",
+    "build:engine": "node scripts/build-engine.mjs",
+    "desktop": "node scripts/build-engine.mjs && cd desktop && LOOPABLE_ENGINE_DIR=$PWD/resources/engine LOOPABLE_DEBUG=1 go tool mygo dev",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
