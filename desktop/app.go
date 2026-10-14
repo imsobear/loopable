@@ -46,6 +46,7 @@ type app struct {
 	// Task states last seen, to notice one finishing.
 	seen       map[string]string
 	refreshing atomic.Bool
+	gen        atomic.Uint64
 	lastTick   time.Time
 }
 
@@ -146,8 +147,10 @@ func (a *app) call(name string, in any, out any) error {
 	return a.engine.Call(name, in, out)
 }
 
-// refresh loads what the page on screen needs. Called on the main thread;
-// the loading happens elsewhere and lands with update.
+// refresh loads what the page on screen needs, that page's own data
+// first, so a page never waits on another's. Called on the main thread;
+// the loading happens elsewhere and lands with update. A newer refresh
+// outranks an older one still in flight.
 func (a *app) refresh() {
 	if a.engine == nil {
 		return
@@ -156,122 +159,125 @@ func (a *app) refresh() {
 	if state != "running" {
 		return
 	}
-	if !a.refreshing.CompareAndSwap(false, true) {
-		return
-	}
+	a.refreshing.Store(true)
+	gen := a.gen.Add(1)
 	path := a.router.Path()
 	needManifests := a.m == nil
 	taskID, loopID := a.task.id, a.loopPage.id
+	latest := func() bool { return a.gen.Load() == gen }
 	go func() {
-		defer a.refreshing.Store(false)
-		var m *Manifests
+		defer func() {
+			if latest() {
+				a.refreshing.Store(false)
+			}
+		}()
 		if needManifests {
 			var got Manifests
 			if err := a.call("getManifests", nil, &got); err == nil {
-				m = &got
+				a.update(func() { a.m = &got })
 			}
 		}
-		var inbox struct {
-			Tasks  []TaskView    `json:"tasks"`
-			Agents []AgentChoice `json:"agents"`
-		}
-		inboxErr := a.call("getInbox", nil, &inbox)
 
-		var page struct {
-			Loops     []LoopView    `json:"loops"`
-			Readiness LoopReadiness `json:"readiness"`
-		}
-		var loopsErr error = errSkip
-		if strings.HasPrefix(path, "/loops") || strings.HasPrefix(path, "/connectors/") {
-			loopsErr = a.call("getLoopsPage", nil, &page)
-		}
-
-		var task *TaskView
-		var log string
-		if strings.HasPrefix(path, "/inbox/") && taskID != "" {
+		switch {
+		case path == "/inbox":
+			a.loadInbox()
+		case strings.HasPrefix(path, "/inbox/") && taskID != "":
 			var t TaskView
 			if err := a.call("getTaskById", map[string]string{"id": taskID}, &t); err == nil && t.ID != "" {
-				task = &t
 				var text *string
+				log := ""
 				if a.call("getTaskLog", map[string]string{"id": taskID}, &text) == nil && text != nil {
 					log = *text
 				}
+				a.update(func() {
+					if a.task.id == t.ID {
+						a.task.task, a.task.log = &t, log
+					}
+				})
 			}
-		}
-
-		var lp *loopPage
-		if strings.HasPrefix(path, "/loops/") && loopID != "" && path != "/loops/new" && !strings.HasPrefix(path, "/loops/new/") {
+		case path == "/loops" || path == "/loops/new" || strings.HasPrefix(path, "/loops/new/"):
+			a.loadLoops()
+			if path != "/loops" {
+				a.loadOverview()
+			}
+		case strings.HasPrefix(path, "/loops/") && loopID != "":
 			var l LoopView
 			if err := a.call("getLoopById", map[string]string{"id": loopID}, &l); err == nil && l.ID != "" {
-				lp = &loopPage{id: loopID, loop: &l}
+				lp := &loopPage{id: loopID, loop: &l}
 				_ = a.call("getLoopTasks", map[string]string{"loopId": loopID}, &lp.tasks)
 				var poll LoopPollState
 				if a.call("getLoopPollState", map[string]string{"id": loopID}, &poll) == nil {
 					lp.poll = &poll
 				}
+				a.update(func() {
+					if a.loopPage.id == lp.id {
+						a.loopPage.loop, a.loopPage.tasks, a.loopPage.poll = lp.loop, lp.tasks, lp.poll
+					}
+				})
 			}
-		}
-
-		var agents struct {
-			Agents []AgentView `json:"agents"`
-		}
-		agentsErr := errSkip
-		if path == "/agents" {
-			agentsErr = a.call("getAgentsPage", nil, &agents)
-		}
-
-		var overview []ConnectorOverview
-		overviewErr := errSkip
-		if strings.HasPrefix(path, "/connectors") || strings.HasPrefix(path, "/loops") {
-			overviewErr = a.call("getConnectorOverview", nil, &overview)
-		}
-
-		var status *Status
-		if path == "/settings" {
+			a.loadLoops()
+		case path == "/connectors":
+			a.loadOverview()
+		case strings.HasPrefix(path, "/connectors/"):
+			a.loadOverview()
+			a.loadLoops()
+		case path == "/agents":
+			var agents struct {
+				Agents []AgentView `json:"agents"`
+			}
+			if a.call("getAgentsPage", nil, &agents) == nil {
+				a.update(func() { a.agents = agents.Agents })
+			}
+		case path == "/settings":
 			var s Status
 			if a.call("getStatus", nil, &s) == nil {
-				status = &s
+				a.update(func() { a.status = &s })
 			}
 		}
 
-		a.update(func() {
-			if m != nil {
-				a.m = m
-			}
-			if inboxErr == nil {
-				a.noticeFinished(inbox.Tasks)
-				a.tasks, a.runnable = inbox.Tasks, inbox.Agents
-				if a.ask.agent == "" && len(inbox.Agents) > 0 {
-					a.ask.agent = inbox.Agents[0].Name
-				}
-			}
-			if loopsErr == nil {
-				a.loops, a.readiness = page.Loops, &page.Readiness
-			}
-			if task != nil && a.task.id == task.ID {
-				a.task.task, a.task.log = task, log
-			}
-			if lp != nil && a.loopPage.id == lp.id {
-				a.loopPage.loop, a.loopPage.tasks, a.loopPage.poll = lp.loop, lp.tasks, lp.poll
-			}
-			if agentsErr == nil {
-				a.agents = agents.Agents
-			}
-			if overviewErr == nil {
-				a.overview = overview
-			}
-			if status != nil {
-				a.status = status
-			}
-		})
+		// The inbox feeds the sidebar's count and the notifications, so it
+		// is looked at after every page, when nothing newer is on its way.
+		if path != "/inbox" && latest() {
+			a.loadInbox()
+		}
 	}()
 }
 
-type skipError struct{}
+func (a *app) loadInbox() {
+	var inbox struct {
+		Tasks  []TaskView    `json:"tasks"`
+		Agents []AgentChoice `json:"agents"`
+	}
+	if a.call("getInbox", nil, &inbox) != nil {
+		return
+	}
+	a.update(func() {
+		a.noticeFinished(inbox.Tasks)
+		a.tasks, a.runnable = inbox.Tasks, inbox.Agents
+		if a.ask.agent == "" && len(inbox.Agents) > 0 {
+			a.ask.agent = inbox.Agents[0].Name
+		}
+	})
+}
 
-func (skipError) Error() string { return "skipped" }
+func (a *app) loadLoops() {
+	var page struct {
+		Loops     []LoopView    `json:"loops"`
+		Readiness LoopReadiness `json:"readiness"`
+	}
+	if a.call("getLoopsPage", nil, &page) != nil {
+		return
+	}
+	a.update(func() { a.loops, a.readiness = page.Loops, &page.Readiness })
+}
 
-var errSkip error = skipError{}
+func (a *app) loadOverview() {
+	var overview []ConnectorOverview
+	if a.call("getConnectorOverview", nil, &overview) != nil {
+		return
+	}
+	a.update(func() { a.overview = overview })
+}
 
 // noticeFinished tells the person about a run that ended while they were
 // not looking, once per run.
@@ -338,6 +344,13 @@ func (a *app) enter(path string) {
 	if rest, ok := strings.CutPrefix(path, "/inbox/"); ok && rest != "" {
 		if a.task.id != rest {
 			a.task = taskPage{id: rest}
+			// What the list already knows, shown at once; the log follows.
+			for i := range a.tasks {
+				if a.tasks[i].ID == rest {
+					t := a.tasks[i]
+					a.task.task = &t
+				}
+			}
 		}
 	}
 	if rest, ok := strings.CutPrefix(path, "/loops/"); ok && rest != "" && rest != "new" && !strings.HasPrefix(rest, "new/") {
@@ -347,6 +360,12 @@ func (a *app) enter(path string) {
 		}
 		if a.loopPage.id != id {
 			a.loopPage = loopPage{id: id, dryRun: true}
+			for i := range a.loops {
+				if a.loops[i].ID == id {
+					l := a.loops[i]
+					a.loopPage.loop = &l
+				}
+			}
 		}
 	}
 }
@@ -404,7 +423,7 @@ func (a *app) ticker() {
 			} else if !visible {
 				every = 20 * time.Second
 			}
-			if time.Since(a.lastTick) < every {
+			if time.Since(a.lastTick) < every || a.refreshing.Load() {
 				return
 			}
 			a.lastTick = time.Now()

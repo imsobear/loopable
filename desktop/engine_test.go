@@ -58,7 +58,18 @@ func startTestEngine(t *testing.T) *Engine {
 	if e.port == 0 {
 		t.Fatal("the engine did not start")
 	}
-	return e
+	// The runner joins a moment after the engine listens, once it has
+	// looked for the agents; the pages are about what it found.
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		var s Status
+		if e.Call("getStatus", nil, &s) == nil && len(s.Runners) == 1 {
+			return e
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatal("the runner did not join")
+	return nil
 }
 
 func TestScreensWithARealEngine(t *testing.T) {

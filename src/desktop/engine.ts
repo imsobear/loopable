@@ -202,9 +202,30 @@ async function main(): Promise<void> {
 
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  // The app holds stdin open. When it is gone, so is the reason to run.
-  process.stdin.on("end", () => void shutdown("the app closed"));
-  process.stdin.on("error", () => void shutdown("the app closed"));
+
+  // The app is the parent. When it is gone, so is the reason to run: an
+  // orphan belongs to launchd, and a parent that cannot be signalled is
+  // dead. Asked every couple of seconds, and whenever stdin, which the app
+  // holds open, ends; an end with the app still there is noise.
+  const parent = process.ppid;
+  const parentGone = () => {
+    if (process.ppid !== parent) return true;
+    try {
+      process.kill(parent, 0);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  setInterval(() => {
+    if (parentGone()) void shutdown("the app is gone");
+  }, 2_000).unref();
+  const stdinEnded = () => {
+    if (parentGone()) void shutdown("the app closed");
+    else log("stdin ended, but the app is still here; staying up");
+  };
+  process.stdin.on("end", stdinEnded);
+  process.stdin.on("error", stdinEnded);
   process.stdin.resume();
 }
 
