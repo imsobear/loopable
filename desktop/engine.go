@@ -40,9 +40,11 @@ type Engine struct {
 	client   *http.Client
 }
 
-// OAuthApps is what the user registered with the providers, kept in
-// oauth.json in the app's data folder. Client IDs only; the desktop app is
-// a public client.
+// OAuthApps are Loopable's own GitHub and Google apps, built into the app
+// by scripts/build-engine.mjs as oauth-apps.json beside the engine. Client
+// IDs only, and Google's desktop "secret": the app is a public client.
+// oauth.json in the app's data folder can stand in for them while
+// developing; nobody using the app sees either.
 type OAuthApps struct {
 	GitHub struct {
 		ClientID string `json:"clientId"`
@@ -77,20 +79,20 @@ func userDataDir() string {
 func oauthFile() string { return filepath.Join(userDataDir(), "oauth.json") }
 
 func readOAuthApps() OAuthApps {
-	var apps OAuthApps
-	data, err := os.ReadFile(oauthFile())
-	if err == nil {
-		_ = json.Unmarshal(data, &apps)
+	var built, local OAuthApps
+	if data, err := os.ReadFile(filepath.Join(engineDir(), "oauth-apps.json")); err == nil {
+		_ = json.Unmarshal(data, &built)
 	}
-	return apps
-}
-
-func writeOAuthApps(apps OAuthApps) error {
-	data, err := json.MarshalIndent(apps, "", "  ")
-	if err != nil {
-		return err
+	if data, err := os.ReadFile(oauthFile()); err == nil {
+		_ = json.Unmarshal(data, &local)
 	}
-	return os.WriteFile(oauthFile(), data, 0o600)
+	if local.GitHub.ClientID != "" {
+		built.GitHub = local.GitHub
+	}
+	if local.Gmail.ClientID != "" {
+		built.Gmail = local.Gmail
+	}
+	return built
 }
 
 // engineDir is where engine.mjs lives: beside the app's resources, or

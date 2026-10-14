@@ -33,8 +33,10 @@ describe("GitHub device flow", () => {
   });
 
   it("says when device flow is off for the app", async () => {
-    const { fetchImpl } = answering({ error: "unauthorized_client", error_description: "nope" });
-    await expect(requestDeviceCode("client-1", ["repo"], fetchImpl)).rejects.toThrow(/device flow turned off/);
+    for (const error of ["unauthorized_client", "device_flow_disabled"]) {
+      const { fetchImpl } = answering({ error, error_description: "nope" });
+      await expect(requestDeviceCode("client-1", ["repo"], fetchImpl)).rejects.toThrow(/device flow turned off/);
+    }
   });
 
   it("keeps waiting while the code is not entered, and slows down when told", async () => {

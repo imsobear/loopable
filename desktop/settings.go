@@ -10,12 +10,8 @@ import (
 )
 
 type settingsPage struct {
-	loaded       bool
-	openAtLogin  bool
-	github       string
-	gmailID      string
-	gmailSecret  string
-	oauthChanged bool
+	loaded      bool
+	openAtLogin bool
 }
 
 func (a *app) settingsPage(c *ui.Context) {
@@ -24,8 +20,6 @@ func (a *app) settingsPage(c *ui.Context) {
 	if !s.loaded {
 		s.loaded = true
 		s.openAtLogin = mygo.App.OpenAtLogin()
-		apps := readOAuthApps()
-		s.github, s.gmailID, s.gmailSecret = apps.GitHub.ClientID, apps.Gmail.ClientID, apps.Gmail.ClientSecret
 	}
 	a.header(c, "", "", "Settings", "This Mac runs the loops. Nothing leaves it but what the loops answer.", "", nil)
 
@@ -119,41 +113,6 @@ func (a *app) settingsPage(c *ui.Context) {
 				ui.Text(c, "Open at login").FontSize(13)
 				ui.Text(c, "Starts in the menu bar, so loops run from the moment you sign in.").FontSize(11).TextColor(t.TextMuted)
 			})
-		})
-	})
-
-	section(c, "GitHub and Google apps", "The desktop app is a public client: it needs only client IDs. GitHub connects with a device code (turn on device flow in the OAuth app). Google needs a client of type Desktop app with the Gmail API enabled.", func() {
-		ui.Form(c, func() {
-			ui.Field(c, "GitHub client ID", func() {
-				if ui.TextInput(c, &s.github).Font("monospace").MaxWidth(420).Changed() {
-					s.oauthChanged = true
-				}
-			})
-			ui.Field(c, "Google client ID", func() {
-				if ui.TextInput(c, &s.gmailID).Font("monospace").MaxWidth(420).Changed() {
-					s.oauthChanged = true
-				}
-			})
-			ui.Field(c, "Google client secret", func() {
-				if ui.TextInput(c, &s.gmailSecret).Font("monospace").Password().MaxWidth(420).Changed() {
-					s.oauthChanged = true
-				}
-			}).Description("Google calls it a secret, but a desktop client's is not treated as one.")
-		})
-		ui.Row(c).Gap(8).Children(func() {
-			if ui.PrimaryButton(c, "Save and restart engine").Disabled(!s.oauthChanged).Clicked() {
-				var apps OAuthApps
-				apps.GitHub.ClientID = strings.TrimSpace(s.github)
-				apps.Gmail.ClientID = strings.TrimSpace(s.gmailID)
-				apps.Gmail.ClientSecret = strings.TrimSpace(s.gmailSecret)
-				if err := writeOAuthApps(apps); err != nil {
-					a.toast(errText(err))
-					return
-				}
-				s.oauthChanged = false
-				a.toast("Saved")
-				a.engine.Restart()
-			}
 		})
 	})
 

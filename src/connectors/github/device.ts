@@ -49,7 +49,7 @@ export async function requestDeviceCode(
   if (error) {
     const description = typeof body.error_description === "string" ? body.error_description : error;
     throw new Error(
-      error === "unauthorized_client"
+      error === "unauthorized_client" || error === "device_flow_disabled"
         ? "This GitHub app has device flow turned off. Turn it on in the app's settings on GitHub."
         : description,
     );

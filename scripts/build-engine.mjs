@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
@@ -46,6 +46,37 @@ await esbuild.build({
 });
 
 cpSync(join(root, "drizzle"), join(out, "drizzle"), { recursive: true });
+
+/**
+ * Loopable's own GitHub and Google apps, built into the app so nobody using
+ * it registers one. Public clients: GitHub needs only an ID (device flow),
+ * and Google does not treat a desktop client's secret as one. Taken from the
+ * environment when releasing, or from the desktop entry of the gitignored
+ * config/oauth-app.json when developing; nothing here lives in git.
+ */
+function desktopApps() {
+  let config = {};
+  try {
+    config = JSON.parse(readFileSync(join(root, "config", "oauth-app.json"), "utf8")).desktop ?? {};
+  } catch {}
+  const env = process.env;
+  return {
+    github: { clientId: env.LOOPABLE_DESKTOP_GITHUB_CLIENT_ID ?? config.github?.clientId ?? "" },
+    gmail: {
+      clientId: env.LOOPABLE_DESKTOP_GMAIL_CLIENT_ID ?? config.gmail?.clientId ?? "",
+      clientSecret: env.LOOPABLE_DESKTOP_GMAIL_CLIENT_SECRET ?? config.gmail?.clientSecret ?? "",
+    },
+  };
+}
+const apps = desktopApps();
+writeFileSync(join(out, "oauth-apps.json"), JSON.stringify(apps, null, 2));
+const missing = [
+  apps.github.clientId ? null : "GitHub",
+  apps.gmail.clientId && apps.gmail.clientSecret ? null : "Gmail",
+].filter(Boolean);
+if (missing.length) {
+  console.warn(`no ${missing.join(" or ")} app built in: those connectors will say they are not set up (docs/desktop.md)`);
+}
 
 writeFileSync(
   join(out, "package.json"),

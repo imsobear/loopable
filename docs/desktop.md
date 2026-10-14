@@ -21,12 +21,12 @@ The runner is `src/desktop/local-runner.ts`: the CLI runner with the HTTP taken 
 
 Slack, Feishu and WeChat connect as they do on the web: a pasted bot token, or a scan.
 
-GitHub and Gmail need an app registration, since the desktop app is a public client (it ships its client IDs and can keep no secret):
+GitHub and Gmail connect through Loopable's own apps, built into the desktop app, so nobody using it registers anything. The desktop app is a public client: it ships client IDs and keeps no secret.
 
-- **GitHub.** An OAuth app with *device flow* turned on. The app shows a code to enter on github.com, and polls until GitHub hands over a token. No callback address and no client secret. Enter the client ID under Settings.
-- **Google.** A client of type *Desktop app* in Google Cloud, with the Gmail API enabled. Google calls what it gives a desktop client a secret, but does not treat it as one. The browser comes back to the engine's loopback address, which desktop clients may use on any port. Enter the client ID and secret under Settings.
+- **GitHub.** An OAuth app with *device flow* turned on, in its settings on GitHub. The app shows a code to enter on github.com and polls until GitHub hands over a token. No callback address and no client secret.
+- **Google.** A client of type *Desktop app* in Google Cloud, with the Gmail API enabled. Google calls what it gives a desktop client a secret, but does not treat it as one. The browser comes back to the engine's loopback address, which desktop clients may use on any port.
 
-Saving the IDs restarts the engine with them. They are kept in `oauth.json` in the app's data folder.
+`scripts/build-engine.mjs` writes them into the engine directory as `oauth-apps.json`, from `LOOPABLE_DESKTOP_GITHUB_CLIENT_ID`, `LOOPABLE_DESKTOP_GMAIL_CLIENT_ID` and `LOOPABLE_DESKTOP_GMAIL_CLIENT_SECRET` when releasing, or from the `desktop` entry of the gitignored `config/oauth-app.json` when developing (see `config/oauth-app.example.json`). Without them the build says which connector it lacks, and the app shows that connector as not available. These are not the hosted service's apps: that GitHub app needs no device flow, and its Google client is a web client.
 
 ## Developing
 

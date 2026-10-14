@@ -52,7 +52,7 @@ func (a *app) connectorsPage(c *ui.Context) {
 					ui.Text(c, manifest.Name).FontSize(13).Bold()
 					switch {
 					case state != nil && !state.Readiness.Ready:
-						ui.Text(c, state.Readiness.Reason).FontSize(11).TextColor(t.TextMuted).SingleLine()
+						ui.Text(c, "Not available in this build").FontSize(11).TextColor(t.TextMuted).SingleLine()
 					case state != nil && len(state.Connections) > 0:
 						ui.Row(c).Gap(10).AlignItems(ui.Center).Wrap().Children(func() {
 							for _, connection := range state.Connections {
@@ -150,13 +150,15 @@ func (a *app) connectorPage(c *ui.Context, id string) {
 	})
 
 	if state != nil && !ready {
+		// Loopable's own apps are built in, so this is the build's doing,
+		// and there is nothing for the person to set up.
 		lines := []string{state.Readiness.Reason}
 		if manifest.Auth.Kind == "oauth_redirect" {
-			lines = append(lines, "Enter the app's client ID under Settings. The desktop app connects GitHub with a device code and Google with a desktop client, so no callback address is needed.")
+			lines = []string{"This copy of Loopable was built without its " + manifest.Name + " app, so " + manifest.Name + " cannot be connected yet. A newer version will fix it."}
 		} else if state.Readiness.FixHint != "" {
 			lines = append(lines, state.Readiness.FixHint)
 		}
-		alert(c, "Not set up", lines, true)
+		alert(c, "Not available", lines, true)
 	}
 
 	if a.connect != nil {
