@@ -1,12 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/png"
-	"runtime"
+	_ "embed"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -37,70 +32,44 @@ var (
 	iconOpen       = icon(`<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>`)
 	iconPlus       = icon(`<path d="M5 12h14"/><path d="M12 5v14"/>`)
 	iconChevron    = icon(`<path d="m9 18 6-6-6-6"/>`)
+
+	// Loopable's own mark, as LoopableMark in src/components/brand.tsx draws it.
+	iconLoopable = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M17.14 5.87A8 8 0 1 1 12 4" stroke="currentColor" stroke-width="2.6"/><path d="M15.4 4 10.8 5.9 10.8 2.1Z" fill="currentColor"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg>`))
 )
 
-// A connector shows as a tile with a letter or two in its color, since the
-// web app's icons are a font the window has not got.
-type tile struct {
-	text string
-	hue  ui.Color
-}
-
-var tiles = map[string]tile{
-	"github":   {"GH", ui.Hex("#24292f")},
-	"slack":    {"Sl", ui.Hex("#4a154b")},
-	"feishu":   {"Fs", ui.Hex("#3370ff")},
-	"gmail":    {"Gm", ui.Hex("#c5221f")},
-	"wechat":   {"Wx", ui.Hex("#07c160")},
-	"schedule": {"Sc", ui.Hex("#334155")},
-	"codex":    {"Cx", ui.Hex("#0f172a")},
-	"claude":   {"Cl", ui.Hex("#d97757")},
-}
-
-func tileFor(id string) tile {
-	if t, ok := tiles[id]; ok {
-		return t
-	}
-	label := id
-	if len(label) > 2 {
-		label = label[:2]
-	}
-	return tile{label, ui.Hex("#64748b")}
-}
-
-// connectorTile draws the tile, size DIPs square.
+// connectorTile draws a connector's or an agent's logo on a plain tile,
+// size DIPs square. The schedule is a clock, being the thing itself, and
+// anything without a logo is a plug.
 func connectorTile(c *ui.Context, id string, size float32, dim bool) ui.Element {
-	t := tileFor(id)
-	box := ui.Box(c).Size(size, size).Radius(size / 4).Background(t.hue).Center().Shrink(0)
+	t := c.Theme()
+	box := ui.Box(c).Size(size, size).Radius(size/4).Border(1, t.Border).Center().Shrink(0)
 	if dim {
 		box.Opacity(0.5)
 	}
-	box.Children(func() {
-		ui.Text(c, t.text).FontSize(size * 0.4).Bold().TextColor(ui.Hex("#ffffff"))
+	if m, ok := marks[id]; ok {
+		face := ui.Hex("#ffffff")
+		if t.Dark {
+			face = ui.Hex("#171717")
+		}
+		box.Background(face).TextColor(t.Text).Children(func() {
+			ui.Image(c, m).Size(size*0.55, size*0.55)
+		})
+		return box
+	}
+	glyph := iconConnectors
+	if id == "schedule" {
+		glyph = iconClock
+	}
+	box.Background(t.SurfaceHover).Children(func() {
+		ui.Icon(c, glyph).FontSize(size * 0.55).TextColor(t.TextMuted)
 	})
 	return box
 }
 
-// trayIcon draws a loop: black on transparent, which macOS tints.
-func trayIcon() []byte {
-	img := image.NewNRGBA(image.Rect(0, 0, 44, 44))
-	ink := color.NRGBA{R: 79, G: 124, B: 255, A: 255}
-	if runtime.GOOS == "darwin" {
-		ink = color.NRGBA{A: 255}
-	}
-	// A ring with a gap, and an arrow head: a loop.
-	for y := 0; y < 44; y++ {
-		for x := 0; x < 44; x++ {
-			dx, dy := float64(x)-22, float64(y)-22
-			d := dx*dx + dy*dy
-			if d > 11*11 && d < 17*17 && !(dx > 0 && dy < 0 && dy > -8) {
-				img.Set(x, y, ink)
-			}
-		}
-	}
-	draw.Draw(img, image.Rect(28, 6, 40, 10), image.NewUniform(ink), image.Point{}, draw.Src)
-	draw.Draw(img, image.Rect(36, 6, 40, 18), image.NewUniform(ink), image.Point{}, draw.Src)
-	var b bytes.Buffer
-	_ = png.Encode(&b, img)
-	return b.Bytes()
-}
+// trayPNG is the mark in black on transparent, 22 points at 2x, which macOS
+// tints to suit the menu bar.
+//
+//go:embed tray.png
+var trayPNG []byte
+
+func trayIcon() []byte { return trayPNG }

@@ -72,7 +72,7 @@ func (a *app) sidebar(c *ui.Context) {
 	t := c.Theme()
 	ui.Column(c).Width(196).Background(t.Surface).Shrink(0).BorderWidth(0, 1, 0, 0).BorderColor(t.Border).Children(func() {
 		ui.Row(c).Padding(18, 20, 10).Gap(8).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, iconLoops).FontSize(16)
+			ui.Icon(c, iconLoopable).FontSize(18)
 			ui.Text(c, "Loopable").FontSize(15).Bold()
 		})
 		path := a.router.Path()
