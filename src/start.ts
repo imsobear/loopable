@@ -1,5 +1,5 @@
 import { appOrigin, isLoopbackHost } from "#/lib/callback.ts";
-import { isHosted } from "#/lib/hosted.ts";
+import { isHosted, isSiteOnly } from "#/lib/hosted.ts";
 import { sessionFor, sessionTokenFrom } from "#/server/accounts.ts";
 import { LOCAL_WORKSPACE, withWorkspace } from "#/server/workspace.ts";
 import {
@@ -37,7 +37,10 @@ function isPageRequest(request: Request, pathname: string): boolean {
  * everything is the one local workspace.
  */
 const appAccess = createMiddleware({ type: "request" }).server(async ({ next, request, pathname }) => {
-  await ensureMigrated();
+  if (!isSiteOnly()) await ensureMigrated();
+
+  // Only the site: nobody signs in, and the database is not asked.
+  if (isSiteOnly()) return next();
 
   if (isHosted()) {
     // The session first, even on public paths: starting a connection's

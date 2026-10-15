@@ -8,3 +8,11 @@ export function isHosted(): boolean {
   const url = process.env.LOOPABLE_DATABASE_URL ?? "";
   return url.startsWith("libsql:") || url.startsWith("https:") || url.startsWith("wss:");
 }
+
+/**
+ * Only the front page is served, while Loopable becomes a desktop app: no
+ * sign-in, no app, no dispatcher. Set on the Worker in wrangler.jsonc.
+ */
+export function isSiteOnly(): boolean {
+  return process.env.LOOPABLE_SITE_ONLY === "1";
+}

@@ -13,11 +13,12 @@ export const Route = createFileRoute("/")({
     ...(typeof search.error === "string" ? { error: search.error } : {}),
   }),
   beforeLoad: async ({ search }) => {
-    const { hosted, viewer } = await getViewer();
+    const { hosted, siteOnly, viewer } = await getViewer();
+    if (siteOnly) return { signedIn: false, siteOnly: true };
     const next = search.next?.startsWith("/") && !search.next.startsWith("//") ? search.next : null;
     if (!hosted) throw redirect({ to: next ?? "/inbox" });
     if (viewer && next) throw redirect({ to: next });
-    return { signedIn: Boolean(viewer) };
+    return { signedIn: Boolean(viewer), siteOnly: false };
   },
   head: landingHead,
   component: Front,
@@ -25,6 +26,6 @@ export const Route = createFileRoute("/")({
 
 function Front() {
   const { next, error } = Route.useSearch();
-  const { signedIn } = Route.useRouteContext();
-  return <Landing signedIn={signedIn} next={next} error={error} />;
+  const { signedIn, siteOnly } = Route.useRouteContext();
+  return <Landing signedIn={signedIn} siteOnly={siteOnly} next={next} error={error} />;
 }

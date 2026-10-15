@@ -35,28 +35,28 @@ export const landingHead = () => ({
   ],
 });
 
-type Props = { signedIn: boolean; next?: string; error?: string };
+type Props = { signedIn: boolean; siteOnly?: boolean; next?: string; error?: string };
 
 /**
  * The front page, in the console's own type, colours and parts, so arriving
  * in the app after signing in feels like the same product. Signed in, it is
  * still here to read, with a way back into the app instead of sign-in buttons.
  */
-export function Landing({ signedIn, next, error }: Props) {
+export function Landing({ signedIn, siteOnly = false, next, error }: Props) {
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Nav signedIn={signedIn} />
+      <Nav signedIn={signedIn} siteOnly={siteOnly} />
       <main>
-        <Hero signedIn={signedIn} next={next} />
+        <Hero signedIn={signedIn} siteOnly={siteOnly} next={next} />
         <Problem />
         <HowItWorks />
         <Workflows />
         <OnYourMachine />
-        <GetStarted signedIn={signedIn} next={next} />
+        {siteOnly ? <ComingToMac /> : <GetStarted signedIn={signedIn} next={next} />}
       </main>
       <LoopFooter links={<FooterLinks />} />
     </div>
@@ -88,7 +88,7 @@ function Section({
   );
 }
 
-export function Nav({ signedIn }: { signedIn: boolean }) {
+export function Nav({ signedIn, siteOnly = false }: { signedIn: boolean; siteOnly?: boolean }) {
   return (
     <header className="sticky top-0 z-10 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
@@ -114,7 +114,7 @@ export function Nav({ signedIn }: { signedIn: boolean }) {
           <Button variant="ghost" size="icon" nativeButton={false} render={<a href={REPO} aria-label="GitHub" />}>
             <GithubMark />
           </Button>
-          {signedIn ? (
+          {siteOnly ? null : signedIn ? (
             <Button nativeButton={false} render={<Link to="/inbox" />}>
               Open Loopable
               <ArrowRight data-icon="inline-end" />
@@ -145,7 +145,7 @@ function SignInButtons({ next, stacked }: { next?: string; stacked?: boolean }) 
   );
 }
 
-function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
+function Hero({ signedIn, siteOnly, next }: { signedIn: boolean; siteOnly: boolean; next?: string }) {
   return (
     <section className="mx-auto grid min-h-[calc(100svh-3.5rem)] max-w-6xl items-center gap-12 px-6 py-16 md:grid-cols-[1.25fr_1fr]">
       <div>
@@ -155,7 +155,12 @@ function Hero({ signedIn, next }: { signedIn: boolean; next?: string }) {
         </h1>
         <p className="mt-5 max-w-xl text-lg text-muted-foreground text-pretty">{DESCRIPTION}</p>
         <div className="mt-8">
-          {signedIn ? (
+          {siteOnly ? (
+            <Button size="lg" nativeButton={false} render={<a href="/#start" />}>
+              Coming to the Mac
+              <ArrowRight data-icon="inline-end" />
+            </Button>
+          ) : signedIn ? (
             <Button size="lg" nativeButton={false} render={<Link to="/inbox" />}>
               Open Loopable
               <ArrowRight data-icon="inline-end" />
@@ -335,6 +340,28 @@ function StepTitle({ n, children }: { n: number; children: React.ReactNode }) {
       </span>
       {children}
     </h3>
+  );
+}
+
+/**
+ * In place of signing in, while the hosted service is paused: Loopable is
+ * becoming an app for the Mac, and this says so, with where to follow it.
+ */
+function ComingToMac() {
+  return (
+    <Section
+      id="start"
+      kicker="Coming soon"
+      title="Loopable is becoming a Mac app."
+      lead="Your loops, inbox and agents in one app on your machine. No account, nothing hosted: the work never leaves your Mac except as the answers your loops write back."
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="lg" nativeButton={false} render={<a href={REPO} />}>
+          <GithubMark />
+          Follow on GitHub
+        </Button>
+      </div>
+    </Section>
   );
 }
 

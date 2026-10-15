@@ -12,6 +12,7 @@ type DispatcherEnv = {
   LOOPABLE_GITHUB_CLIENT_SECRET?: string;
   LOOPABLE_GMAIL_CLIENT_ID?: string;
   LOOPABLE_GMAIL_CLIENT_SECRET?: string;
+  LOOPABLE_SITE_ONLY?: string;
 };
 
 /**
@@ -20,13 +21,12 @@ type DispatcherEnv = {
  */
 export class DispatcherContainer extends Container<DispatcherEnv> {
   defaultPort = 8080;
-  sleepAfter = "24h";
+  // Asleep after ten idle minutes. While the hosted service ran, the cron
+  // woke it every minute and it renewed its own timer, so it never slept;
+  // with only the site running nothing wakes it, and this lets it stop.
+  sleepAfter = "10m";
   enableInternet = true;
   pingEndpoint = "/health";
-
-  async onActivityExpired(): Promise<void> {
-    this.renewActivityTimeout();
-  }
 }
 
 function dispatcherEnv(env: DispatcherEnv): Record<string, string> {
@@ -71,9 +71,36 @@ async function wakeDispatcher(env: DispatcherEnv): Promise<void> {
   await dispatcher.fetch("http://dispatcher/health");
 }
 
+/** The pages the site still serves, and what they need to load. */
+const SITE_PATHS = new Set(["/", "/privacy", "/terms"]);
+
+/**
+ * Only the site: the front page and its legal pages. The app's pages go to
+ * the front page; sign-in and the runner API say plainly where Loopable
+ * went, which is what an older runner prints. Nothing touches the database.
+ */
+function siteOnly(request: Request): Response | null {
+  const { pathname } = new URL(request.url);
+  if (SITE_PATHS.has(pathname) || pathname.startsWith("/_serverFn")) return null;
+  if (pathname.startsWith("/api/")) {
+    return Response.json(
+      {
+        error:
+          "The hosted Loopable is paused while Loopable becomes a desktop app. See https://loop.goodone.si.",
+      },
+      { status: 410 },
+    );
+  }
+  return Response.redirect(new URL("/", request.url).href, 302);
+}
+
 export default {
   async fetch(request: Request, env: DispatcherEnv, ctx: { waitUntil: (p: Promise<unknown>) => void }) {
     bindProcessEnv(env);
+    if (env.LOOPABLE_SITE_ONLY === "1") {
+      process.env.LOOPABLE_SITE_ONLY = "1";
+      return siteOnly(request) ?? handler.fetch(request);
+    }
     ctx.waitUntil(
       wakeDispatcher(env).catch((error: unknown) => {
         console.error("dispatcher wake failed", error);
@@ -87,6 +114,7 @@ export default {
     env: DispatcherEnv,
     ctx: { waitUntil: (p: Promise<unknown>) => void },
   ) {
+    if (env.LOOPABLE_SITE_ONLY === "1") return;
     bindProcessEnv(env);
     ctx.waitUntil(wakeDispatcher(env));
   },

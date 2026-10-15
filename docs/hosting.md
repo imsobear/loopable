@@ -2,6 +2,12 @@
 
 How the hosted service at loop.goodone.si is set up and deployed. This is for whoever runs the service; people using Loopable only need [runners.md](runners.md).
 
+## Paused: only the site runs
+
+Since October 2026 the hosted service is paused while Loopable becomes a desktop app ([desktop.md](desktop.md)). `LOOPABLE_SITE_ONLY=1` in `wrangler.jsonc` makes the Worker serve the front page and its legal pages and nothing else: the app's pages go to the front page, sign-in and the runner API answer 410 with where Loopable went, and nothing reads the database. The cron is gone, nothing wakes the dispatcher, and the container stops after ten idle minutes, so it costs nothing.
+
+Everything else is kept as it was: the database and its data, the Worker's secrets, the container's definition and the deploy workflow. To run the hosted service again, remove `LOOPABLE_SITE_ONLY`, put the cron `* * * * *` back, and deploy. The dispatcher should then keep itself awake again, as `onActivityExpired` renewing its timer used to.
+
 ## What runs where
 
 | Part | Where | What it does |
