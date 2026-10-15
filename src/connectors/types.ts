@@ -299,6 +299,22 @@ export type QrOutcome =
   | { state: "expired"; reason?: string }
   | { state: "confirmed"; result: AuthResult };
 
+/**
+ * A login that finishes on the provider's site with a short code typed in,
+ * for an app that has no address a browser can be sent back to: the desktop
+ * app. Polled the way a QR scan is.
+ */
+export type DeviceChallenge = {
+  attempt: JsonValue;
+  /** What the person types on the provider's page. */
+  userCode: string;
+  /** Where they type it. */
+  verificationUrl: string;
+  expiresInMs: number;
+  /** How long to wait between polls; the provider says. */
+  intervalMs: number;
+};
+
 /** What a loop is acting on, resolved from a link or from a signal. */
 export type WorkItem = WorkItemRef & {
   title: string;
@@ -505,6 +521,17 @@ export type ConnectorRuntime = {
     /** Both required when auth.kind is "qr_scan". */
     startQrLogin?(): Promise<QrChallenge>;
     pollQrLogin?(attempt: JsonValue): Promise<QrOutcome>;
+    /**
+     * Optional for "oauth_redirect": the same account, connected without a
+     * callback address, which the desktop app prefers.
+     */
+    startDeviceLogin?(): Promise<DeviceChallenge>;
+    /**
+     * Optional for "oauth_redirect": the account a tool on this machine is
+     * already signed in as, connected in one step. Desktop app only.
+     */
+    fromLocalLogin?(): Promise<AuthResult>;
+    pollDeviceLogin?(attempt: JsonValue): Promise<QrOutcome>;
     /** Re-read the account to prove a stored credential still works. */
     identity(credential: unknown): Promise<IdentityResult>;
     revoke?(credential: unknown): Promise<void>;

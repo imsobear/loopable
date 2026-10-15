@@ -1,14 +1,15 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname as osHostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { AGENT_MANIFESTS, agentManifest } from "#/agents/manifests.ts";
 import { agentRuntime } from "#/agents/runtimes.ts";
 import type { AgentRunResult, AgentSettingsValues } from "#/agents/types.ts";
-import type { AgentView } from "#/lib/domain.ts";
+import type { AgentView, RunnerInventoryEntry } from "#/lib/domain.ts";
 import { isHosted } from "#/lib/hosted.ts";
 import { db } from "./db/client.ts";
 import { agentSettings } from "./db/schema.ts";
+import { listRunners } from "./runners.ts";
 import { readSetting, writeSetting } from "./settings.ts";
 import { workspaceId } from "./workspace.ts";
 
@@ -35,10 +36,15 @@ export async function settingsFor(agentId: string): Promise<AgentSettingsValues>
  * Detection, authorization state and settings for every known agent. Detection
  * runs on every call because installing or removing a CLI should show up
  * without anyone pressing refresh.
+ *
+ * The desktop app is the exception: its runner, in the same process, detects
+ * the agents on every heartbeat, and spawning three CLIs on every page would
+ * make every page wait on them. Its inventory is what this host has.
  */
 export async function listAgents(): Promise<AgentView[]> {
   const chosen = await storedSetting(DEFAULT_AGENT_KEY);
   const hosted = isHosted();
+  const known = process.env.LOOPABLE_DESKTOP === "1" ? await hostInventory() : null;
 
   const views = await Promise.all(
     AGENT_MANIFESTS.map(async (manifest) => {
@@ -56,6 +62,22 @@ export async function listAgents(): Promise<AgentView[]> {
           binaryPath: "",
           version: null,
           auth: null,
+          settings,
+          isDefault: false,
+          defaultIsImplicit: false,
+          commandPreview: `${preview.bin} ${preview.args.join(" ")}`,
+          onRunners: [],
+        } satisfies AgentView;
+      }
+
+      if (known) {
+        const entry = known.find((item) => item.agentId === manifest.id);
+        return {
+          agentId: manifest.id,
+          installed: entry?.installed ?? false,
+          binaryPath: null,
+          version: entry?.version ?? null,
+          auth: entry?.installed ? { signedIn: entry.signedIn, detail: entry.detail } : null,
           settings,
           isDefault: false,
           defaultIsImplicit: false,
@@ -84,6 +106,13 @@ export async function listAgents(): Promise<AgentView[]> {
   return views.map((view) =>
     view.agentId === chosen ? { ...view, isDefault: true, defaultIsImplicit: false } : view,
   );
+}
+
+/** What the runner on this machine last reported, or nothing before it joined. */
+async function hostInventory(): Promise<RunnerInventoryEntry[]> {
+  const local = osHostname();
+  const here = (await listRunners()).find((runner) => runner.hostname === local);
+  return here?.inventory ?? [];
 }
 
 export async function saveAgentSettings(agentId: string, values: AgentSettingsValues): Promise<void> {

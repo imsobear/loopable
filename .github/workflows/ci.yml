@@ -36,3 +36,36 @@ jobs:
 
       - name: Build the CLI
         run: pnpm build
+
+  desktop:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+      - run: pnpm install --frozen-lockfile
+
+      # The engine the app ships: the dispatcher, a runner and the API, in one file.
+      - name: Build the engine
+        run: pnpm build:engine
+
+      - name: Vet the app
+        working-directory: desktop
+        run: go vet ./... && go tool mygo vet .
+
+      # Draws every screen without a window, and loads them from a real engine.
+      - name: Test the app
+        working-directory: desktop
+        run: CGO_ENABLED=0 go test ./...
+
+      - name: Build the app
+        working-directory: desktop
+        run: go build ./...

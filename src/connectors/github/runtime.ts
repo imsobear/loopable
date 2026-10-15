@@ -8,6 +8,9 @@ import {
   pullForBranch,
   submitReview,
 } from "./api.ts";
+import { pollDeviceCode, requestDeviceCode } from "./device.ts";
+import { canUseLocalLogin, forgetLocalToken, localToken } from "./local-login.ts";
+import { GITHUB_SCOPES } from "./manifest.ts";
 import { pollGithub } from "./poll.ts";
 import { githubRef, parseGithubRef, parseGithubUrl, resolveWorkItem } from "./work-item.ts";
 import {
@@ -83,6 +86,9 @@ function pullBody(input: { body: string; source: ActionSource; stat: string }): 
 export async function usableToken(
   credential: GithubCredential,
 ): Promise<{ accessToken: string; refreshed?: GithubCredential }> {
+  if (credential.source === "gh") {
+    return { accessToken: (await localToken()) ?? credential.accessToken };
+  }
   const stillValid = !credential.expiresAt || Date.now() < credential.expiresAt;
   if (stillValid) return { accessToken: credential.accessToken };
   if (!credential.refreshToken) {
@@ -100,6 +106,14 @@ export async function usableToken(
 export const githubRuntime = defineRuntime({
   async readiness() {
     if (oauthAppRegistration("github")) return { ready: true };
+    if (canUseLocalLogin()) {
+      if (await localToken()) return { ready: true };
+      return {
+        ready: false,
+        reason: "Sign in to the GitHub CLI on this Mac, and Loopable connects with that account.",
+        fixHint: "Run gh auth login in a terminal, then come back here. Install it with brew install gh.",
+      };
+    }
     return {
       ready: false,
       reason: "No GitHub app is registered here.",
@@ -210,6 +224,56 @@ export const githubRuntime = defineRuntime({
       const { accessToken, refreshed } = await usableToken(credential as GithubCredential);
       const account = accountFrom(await getViewer(accessToken));
       return refreshed ? { account, renewedCredential: refreshed } : { account };
+    },
+
+    // The desktop app's first choice: the GitHub CLI's login, in one step.
+    async fromLocalLogin() {
+      forgetLocalToken();
+      const token = await localToken({ fresh: true });
+      if (!token) throw new Error("The GitHub CLI is not signed in on this Mac. Run gh auth login first.");
+      const viewer = await getViewer(token);
+      const credential: GithubCredential = { accessToken: token, source: "gh" };
+      return { credential, account: accountFrom(viewer) };
+    },
+
+    // Device flow: the desktop app has no callback address, and needs no
+    // client secret this way. The attempt carries what polling needs.
+    async startDeviceLogin() {
+      const registration = requireRegistration();
+      const code = await requestDeviceCode(registration.clientId, GITHUB_SCOPES);
+      return {
+        attempt: {
+          deviceCode: code.deviceCode,
+          intervalMs: code.intervalMs,
+          expiresAt: Date.now() + code.expiresInMs,
+        },
+        userCode: code.userCode,
+        verificationUrl: code.verificationUri,
+        expiresInMs: code.expiresInMs,
+        intervalMs: code.intervalMs,
+      };
+    },
+    async pollDeviceLogin(attempt) {
+      const registration = requireRegistration();
+      const current = attempt as { deviceCode: string; intervalMs: number; expiresAt: number };
+      if (Date.now() > current.expiresAt) {
+        return { state: "expired", reason: "The code expired before it was entered." };
+      }
+      const outcome = await pollDeviceCode(registration.clientId, current.deviceCode);
+      if (outcome.state === "granted") {
+        const viewer = await getViewer(outcome.credential.accessToken);
+        return { state: "confirmed", result: { credential: outcome.credential, account: accountFrom(viewer) } };
+      }
+      if (outcome.state === "expired") return { state: "expired", reason: outcome.reason };
+      return {
+        state: "pending",
+        attempt: {
+          ...current,
+          // GitHub asks for five seconds more between polls when it says so.
+          intervalMs: outcome.slowDown ? current.intervalMs + 5_000 : current.intervalMs,
+        },
+        hint: "Waiting for the code to be entered on GitHub…",
+      };
     },
   },
 });
