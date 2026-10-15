@@ -25,12 +25,13 @@ func homeDirs() []string {
 		filepath.Join(home, ".cargo/bin"), filepath.Join(home, ".volta/bin"),
 		filepath.Join(home, ".deno/bin"), filepath.Join(home, "n/bin"),
 	}
-	// Version managers keep every Node apart; the newest of each is enough.
+	// Version managers keep every Node apart. Their installs, not fnm's
+	// per-shell folders, which are links to the same installs and of which
+	// a machine gathers thousands.
 	for _, pattern := range []string{
 		filepath.Join(home, ".nvm/versions/node/*/bin"),
 		filepath.Join(home, ".local/share/fnm/node-versions/*/installation/bin"),
 		filepath.Join(home, "Library/Application Support/fnm/node-versions/*/installation/bin"),
-		filepath.Join(home, ".local/state/fnm_multishells/*/bin"),
 		filepath.Join(home, ".asdf/installs/nodejs/*/bin"),
 		"/opt/homebrew/opt/node@*/bin",
 	} {
@@ -82,15 +83,22 @@ type nodeInfo struct {
 	Major   int
 }
 
-// findNode looks along path for a Node new enough for the engine.
+// findNode takes the first Node along path new enough for the engine, the
+// one a terminal would run, asking each candidate its version only until
+// one will do. A Node reached by two paths is asked once.
 func findNode(path string) (nodeInfo, error) {
-	var best nodeInfo
+	seen := map[string]bool{}
 	var firstErr error
 	for _, dir := range strings.Split(path, ":") {
-		candidate := filepath.Join(dir, "node")
-		if _, err := os.Stat(candidate); err != nil {
+		if dir == "" || strings.Contains(dir, "fnm_multishells") {
 			continue
 		}
+		candidate := filepath.Join(dir, "node")
+		real, err := filepath.EvalSymlinks(candidate)
+		if err != nil || seen[real] {
+			continue
+		}
+		seen[real] = true
 		version, err := nodeVersion(candidate)
 		if err != nil {
 			if firstErr == nil {
@@ -98,18 +106,14 @@ func findNode(path string) (nodeInfo, error) {
 			}
 			continue
 		}
-		major := majorOf(version)
-		if major >= minNode && major > best.Major {
-			best = nodeInfo{Path: candidate, Version: version, Major: major}
+		if major := majorOf(version); major >= minNode {
+			return nodeInfo{Path: candidate, Version: version, Major: major}, nil
 		}
 	}
-	if best.Path != "" {
-		return best, nil
-	}
 	if firstErr != nil {
-		return best, firstErr
+		return nodeInfo{}, firstErr
 	}
-	return best, errNoNode
+	return nodeInfo{}, errNoNode
 }
 
 type nodeError string
