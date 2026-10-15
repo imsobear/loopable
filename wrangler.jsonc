@@ -9,7 +9,12 @@
     // The App Worker never migrates; the dispatcher container does, once.
     "LOOPABLE_SKIP_MIGRATE": "1",
     // Where OAuth callbacks and sign-in come back to, and the address runners join.
-    "LOOPABLE_BASE_URL": "https://loop.goodone.si"
+    "LOOPABLE_BASE_URL": "https://loop.goodone.si",
+    // Only the front page and its legal pages are served; the app, sign-in
+    // and the runner API answer that Loopable moved to the desktop, and the
+    // dispatcher is never woken. Remove it, and put the cron back, to run
+    // the hosted service again; see docs/hosting.md.
+    "LOOPABLE_SITE_ONLY": "1"
   },
   // The site lives here now: the front page is the app's /. Secrets
   // (database, master key, OAuth apps) are set with wrangler secret put;
@@ -20,8 +25,9 @@
   // in a row, and each one crossing an ocean is what made pages slow.
   "placement": { "mode": "targeted", "region": "aws:us-west-2" },
   "preview_urls": false,
+  // No cron while the site is all that runs: it only woke the dispatcher.
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": []
   },
   "containers": [
     {
